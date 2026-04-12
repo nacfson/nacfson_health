@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/router/app_router.dart';
 import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 
@@ -63,10 +64,12 @@ class GoogleSignInCard extends ConsumerWidget {
                       await authService.signIn();
                       ref.invalidate(isSignedInProvider);
                     } catch (e) {
-                      ErrorOverlay.show(
-                        title: '로그인 실패',
-                        message: '로그인에 실패했습니다: $e',
-                      );
+                      if (rootNavigatorKey.currentState?.overlay != null) {
+                        ErrorOverlay.show(
+                          title: '로그인 실패',
+                          message: '로그인에 실패했습니다: $e',
+                        );
+                      }
                     }
                   },
                   child: const Text('Google로 로그인'),
