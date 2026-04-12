@@ -116,7 +116,11 @@ class _ErrorCardState extends State<_ErrorCard>
         child: FadeTransition(
           opacity: _opacity,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 300),
+            // 최대 크기 제한으로 오버플로우 방지 (Decorator 패턴 활용)
+            constraints: const BoxConstraints(
+              maxWidth: 300,
+              maxHeight: 200,
+            ),
             child: Material(
               color: bgColor,
               borderRadius: BorderRadius.circular(12),
@@ -133,13 +137,22 @@ class _ErrorCardState extends State<_ErrorCard>
                             color: fgColor,
                             fontWeight: FontWeight.bold,
                           ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      widget.message,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: fgColor,
-                          ),
+                    // Flexible로 감싸 남은 공간 내에서만 렌더링
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Text(
+                          widget.message,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: fgColor,
+                              ),
+                          maxLines: 5,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ),
                   ],
                 ),
