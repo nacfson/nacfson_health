@@ -23,6 +23,9 @@ class DietNotifier extends StateNotifier<List<DietRecord>> {
     state = await _repository.getAll();
   }
 
+  /// 동기화 완료 후 DB에서 최신 상태를 다시 로드합니다.
+  Future<void> refresh() => _loadRecords();
+
   Future<void> addRecord(DietRecord record) async {
     await _repository.add(record);
     state = await _repository.getAll();

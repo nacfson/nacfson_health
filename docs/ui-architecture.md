@@ -1,6 +1,6 @@
 # UI Architecture
 
-> **문서 버전**: 2026-04-12  
+> **문서 버전**: 2026-04  
 > **범위**: 네비게이션, 레이아웃, 상태 관리  
 > **플랫폼**: Flutter (iOS, Android, macOS, Windows, Linux, Web)
 
@@ -172,14 +172,26 @@ lib/
                 └── summary_screen.dart    # 요약 화면
 
 └── settings/
-    ├── utils/
-    │   └── date_time_utils.dart       # Relative time, ID 축약 헬퍼
+    ├── domain/entities/
+    │   ├── exercise_template.dart     # ExerciseTemplate Entity + TemplateSyncStatus
+    │   └── food_template.dart         # FoodTemplate Entity + FoodTemplateSyncStatus (v4)
+    ├── data/repositories/
+    │   ├── exercise_template_repository.dart      # Interface
+    │   ├── sqlite_exercise_template_repository.dart # sqflite 구현체
+    │   ├── food_template_repository.dart           # Interface (v4)
+    │   └── sqlite_food_template_repository.dart    # sqflite 구현체 (v4)
     └── presentation/
+        ├── providers/
+        │   ├── exercise_template_provider.dart    # ExerciseTemplateNotifier
+        │   └── food_template_provider.dart        # FoodTemplateNotifier (v4)
         ├── screens/
-        │   └── settings_screen.dart   # 설정 탭 메인 화면
+        │   └── settings_screen.dart   # 설정 탭 메인 화면 (카드 ListView)
         └── widgets/
-            ├── google_sign_in_card.dart   # Google 로그인/로그아웃 카드
-            └── spreadsheet_status_card.dart # 스프레드시트 상태 + 동기화 카드
+            ├── diet_target_card.dart          # 영양 목표값 설정 (칼로리/탄단지)
+            ├── exercise_template_card.dart    # 운동 종목 프리셋 관리
+            ├── food_template_card.dart        # 음식 프리셋 관리 (v4)
+            ├── google_sign_in_card.dart       # Google 로그인/로그아웃
+            └── spreadsheet_status_card.dart   # 스프레드시트 상태 + 동기화 버튼
 ```
 
 ---

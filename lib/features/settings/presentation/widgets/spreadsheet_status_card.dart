@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/sync/google_auth_service.dart';
+import '../../../../core/sync/google_sheets_service.dart';
 import '../../../../core/sync/sync_preferences.dart';
 import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/widgets/error_overlay.dart';
-import '../../../exercise/presentation/providers/exercise_provider.dart';
 import '../../../diet/presentation/providers/diet_provider.dart';
+import '../../../exercise/presentation/providers/exercise_provider.dart';
+import '../../presentation/providers/exercise_template_provider.dart';
+import '../../presentation/providers/food_template_provider.dart';
 import '../../utils/date_time_utils.dart';
 
 enum _SpreadsheetAction { recreate, selectById }
@@ -20,6 +23,7 @@ class SpreadsheetStatusCard extends ConsumerWidget {
     final spreadsheetId = ref.watch(spreadsheetIdProvider);
     final lastSyncTime = ref.watch(lastSyncTimeProvider);
     final isSyncing = ref.watch(isSyncingProvider);
+    final isSignedIn = ref.watch(isSignedInProvider);
     final authService = ref.read(googleAuthServiceProvider);
     final prefs = ref.read(syncPreferencesProvider);
 
@@ -45,7 +49,7 @@ class SpreadsheetStatusCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            if (spreadsheetId != null) ...[
+            if (spreadsheetId != null && isSignedIn) ...[
               Text(
                 'ID: ${abbreviateSpreadsheetId(spreadsheetId)}',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -64,8 +68,9 @@ class SpreadsheetStatusCard extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed:
-                          isSyncing ? null : () => _triggerSync(context, ref),
+                      onPressed: isSyncing
+                          ? null
+                          : () => _triggerSync(context, ref),
                       icon: isSyncing
                           ? const SizedBox(
                               width: 16,
@@ -111,17 +116,55 @@ class SpreadsheetStatusCard extends ConsumerWidget {
                 ],
               ),
             ] else ...[
-              Text(
-                '스프레드시트에 연결되어 있지 않습니다.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
+              // 로그인 상태에 따라 메시지 구분
+              if (spreadsheetId != null && !isSignedIn) ...[
+                // [로그인 X, ID O] 스프레드시트는 있지만 로그인이 필요한 경우
+                Text(
+                  '스프레드시트가 연결되어 있지만 로그인이 필요합니다.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ] else ...[
+                // [로그인 O, ID X] 또는 [로그인 X, ID X] 정상적으로 연결 안 됨
+                Text(
+                  '스프레드시트에 연결되어 있지 않습니다.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
               const SizedBox(height: 12),
+              if (!isSignedIn) ...[
+                // 로그인 필요 안내
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    border: Border.all(color: Colors.orange[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info, color: Colors.orange[700], size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Google 계정으로 먼저 로그인해주세요',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.orange[900],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () =>
-                          _createSpreadsheet(context, ref, authService, prefs),
+                      onPressed: isSignedIn
+                          ? () =>
+                              _createSpreadsheet(context, ref, authService, prefs)
+                          : () => _showLoginRequiredDialog(context),
                       icon: const Icon(Icons.add, size: 16),
                       label: const Text('생성하기'),
                     ),
@@ -129,8 +172,10 @@ class SpreadsheetStatusCard extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _showSelectByIdDialogInitial(context, ref, prefs),
+                      onPressed: isSignedIn
+                          ? () =>
+                              _showSelectByIdDialogInitial(context, ref, prefs)
+                          : () => _showLoginRequiredDialog(context),
                       icon: const Icon(Icons.link, size: 16),
                       label: const Text('직접 연결하기'),
                     ),
@@ -140,6 +185,29 @@ class SpreadsheetStatusCard extends ConsumerWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // 로그인 필요 안내 다이얼로그
+  // =========================================================================
+
+  Future<void> _showLoginRequiredDialog(BuildContext context) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Google 로그인 필요'),
+        content: const Text(
+          'Google 시트와 동기화하려면 먼저 Google 계정으로 로그인해야 합니다.\n\n'
+          '설정 화면에서 "Google 연동" 섹션의 "Google로 로그인" 버튼을 누르세요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
       ),
     );
   }
@@ -156,6 +224,7 @@ class SpreadsheetStatusCard extends ConsumerWidget {
   ) async {
     try {
       final newId = await authService.createSpreadsheet('Nacfson Health');
+      await GoogleSheetsService(authService, newId).setupSheetHeaders();
       await prefs.setSpreadsheetId(newId);
       ref.invalidate(spreadsheetIdProvider);
       ref.invalidate(syncStateProvider);
@@ -441,13 +510,18 @@ class SpreadsheetStatusCard extends ConsumerWidget {
     // 1. 모든 로컬 레코드를 created 상태로 초기화 (새 시트에 전체 재업로드)
     await ref.read(exerciseRepositoryProvider).resetAllSyncStatus();
     await ref.read(dietRepositoryProvider).resetAllSyncStatus();
+    await ref.read(exerciseTemplateRepositoryProvider).resetAllSyncStatus();
+    await ref.read(foodTemplateRepositoryProvider).resetAllSyncStatus();
     // 2. 마지막 동기화 시간 초기화 (전체 pull 강제)
     await prefs.clearLastSyncTimestamp();
     // 3. 새 ID 저장 후 provider chain 갱신
     await prefs.setSpreadsheetId(newId);
     ref.invalidate(spreadsheetIdProvider);
     ref.invalidate(syncStateProvider); // SyncStateNotifier를 새 sheetsService로 재생성
-    // 4. 동기화 실행
+    // 4. 새 시트 헤더 초기화 (exercise_records, diet_records)
+    final authService = ref.read(googleAuthServiceProvider);
+    await GoogleSheetsService(authService, newId).setupSheetHeaders();
+    // 5. 동기화 실행
     final result = await ref.read(syncStateProvider.notifier).performSync();
     if (!result.hasErrors) {
       ref.invalidate(lastSyncTimeProvider);

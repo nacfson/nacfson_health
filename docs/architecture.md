@@ -1,7 +1,7 @@
 # 아키텍처 문서
 
-> **문서 버전**: 2026-04-12  
-> **범위**: 비즈니스 로직, 데이터 흐름, 데이터베이스 스키마
+> **문서 버전**: 2026-04  
+> **범위**: 비즈니스 로직, 데이터 흐름, 동기화 프로토콜
 
 ---
 
@@ -13,13 +13,15 @@
 
 ---
 
-## 도메인 분리 (3 Domains)
+## 도메인 분리
 
 | 도메인 | 책임 | 엔티티 |
 |--------|------|--------|
 | **운동** | 날짜별 부위, 종목, 세트, 중량, RPE 누적 기록 및 추적 | `ExerciseRecord` |
 | **식단** | 날짜별 식사 종류(아침, 점심, 저녁, 간식), 음식명, 매크로(탄/단/지), 만족도 기록 | `DietRecord` |
 | **요약** | 두 데이터 병합 → 하루 목표 대비 현재 섭취량/운동 소비량 통합 표시 | `DailySummary` |
+| **운동 템플릿** | 운동 종목 프리셋 관리, SQLite + Sheets 동기화 (생성·삭제만) | `ExerciseTemplate` |
+| **음식 템플릿** | 음식 프리셋 관리 (이름·칼로리·탄단지), SQLite + Sheets 동기화 (생성·삭제만) | `FoodTemplate` |
 
 ---
 
@@ -33,65 +35,44 @@
 
 ---
 
-## DB 스키마 (SQLite v2)
+## 동기화 프로토콜 (4단계)
 
-### 운동 레코드 (`exercise_records`)
+`lib/core/sync/sync_state.dart` → `_syncAll()` 함수에서 실행.
+
+| 단계 | 방향 | 내용 |
+|------|------|------|
+| **1. Push** | 로컬 → 시트 | `sync_status = created/modified/deleted` 항목을 시트에 업서트·삭제 후 `synced`로 마킹 |
+| **2. Pull** | 시트 → 로컬 | `lastSyncTime` 이후 변경된 행을 가져와 로컬에 병합 |
+| **3. HardDelete** | 로컬 | `sync_status = deleted` + 시트 반영 완료된 항목을 로컬 DB에서 영구 삭제 |
+| **4. Timestamp 갱신** | — | 오류 없을 때만 `lastSyncTimestamp` 업데이트 |
+
+**Pull 병합 전략**:
+- 레코드(`exercise_records`, `diet_records`): LWW (Last-Write-Wins, `updated_at` 기준)
+- 템플릿(`exercise_templates`, `food_templates`): insert-or-skip (uuid 중복 시 무시)
+
+**ensureAllRequiredSheets()**: 동기화 전 필수 시트 존재를 멱등으로 보장 (없는 시트만 생성).
+
+---
+
+## DB 스키마
+
+전체 테이블 스키마 및 버전 이력은 `docs/db-schema.md` 참조.
+
+**현재 DB 버전**: v4 (테이블 4개: exercise_records · diet_records · exercise_templates · food_templates)
+
+---
+
+> 상세 스키마(컬럼 정의, SyncStatus 정책, 마이그레이션 SQL)는 `docs/db-schema.md` 참조.
+
+### 요약 엔티티 (`DailySummary`) — DB 테이블 아님, 메모리 계산
+
 | 필드 | 타입 | 설명 |
 |------|------|------|
-| `timestamp` | DateTime | 기록 생성/수정 시간 |
-| `exercise_type` | String | 운동 종류 (예: 가슴, 등, 팔, 하체, 어깨, 코어) |
-| `exercise_name` | String | 운동 이름 (예: 벤치프레스, 스쿼트) |
-| `current_set` | int | 현재 세트 수 |
-| `weight` | double | 사용중량 (kg) |
-| `reps` | int | 반복 횟수 |
-| `rpe` | double | 자각강도 (RPE, 1~10) |
-
-> **CRUD**: Create(세트 추가), Read(세트 목록 조회), Update(중량/RPE 수정), Delete(세트 삭제)
-
-### 식단 레코드 (`diet_records`)
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `timestamp` | DateTime | 기록 생성/수정 시간 |
-| `meal_type` | String | 식사 종류 (아침, 점심, 저녁, 간식) |
-| `food_name` | String | 음식 종류/음식명 |
-| `total_calories` | int | 총 칼로리 (kcal) |
-| `carbs` | double | 탄수화물 (g) |
-| `protein` | double | 단백질 (g) |
-| `fat` | double | 지방 (g) |
-| `satisfaction` | int | 만족도 (1~5) |
-| `memo` | String? | 메모 (선택) |
-
-> **CRUD**: Create(식사 기록 추가), Read(일일/주간 목록 조회), Update(매크로/만족도 수정), Delete(식사 기록 삭제)
-
-### 요약 레코드 (`summary`)
-날짜별 식단/영양 요약과 운동 퍼포먼스를 통합 표시
-
-#### 1. 식단 및 영양 요약 (`diet_nutrition`)
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `date` | DateTime | 요약 기준 날짜 |
-| `consumedCalories` | int | 총 섭취 칼로리 (kcal) - 그날 모든 식사의 칼로리 합 |
-| `targetCalories` | int | 목표 칼로리 (kcal) - 사용자 설정값 (예: 1800) |
-| `macroStatus` | Map<String, MacroInfo> | 탄/단/지 각각의 섭취량 및 달성률 |
-
-```dart
-class MacroInfo {
-  final double consumed;    // 현재 섭취량 (g)
-  final double target;      // 목표량 (g)
-  final double percentage;  // 달성률 (%)
-}
-```
-
-| `calorieResult` | enum | 최종 상태 (달성\|초과\|미달) - UI 색상 처리용 |
-
-> **UI 활용**: 프로그레스 바/원형 차트 그리기관용 `percentage`, 상태별 색상 (초과=빨강, 달성=초록, 미달=노랑)
-
-#### 2. 운동 퍼포먼스 요약 (`workout_performance`)
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `isWorkoutDay` | bool | 오늘 운동 여부 |
-| `targetedMuscles` | List<String> | 오늘 자극한 부위 리스트 (예: `['등', '가슴']`) - 캘린더 Dot 표시용 |
-| `totalVolume` | double | 총 운동 볼륨 (중량×횟수×세트의 총합, kg) |
-| `averageRPE` | double | 오늘 수행한 모든 세트의 평균 자각강도 (1~10) |
-
-> **UI 활용**: `targetedMuscles`로 캘린더에 점(Dot) 표기, `totalVolume`으로 "오늘 총 X kg 들어올림" 피드백, `averageRPE`로 훈련 강도 수치화
+| `consumedCalories` | int | 당일 식단 칼로리 합계 |
+| `targetCalories` | int | 목표 칼로리 (SharedPreferences에서 읽음) |
+| `macroStatus` | Map | 탄/단/지 각각의 섭취량·목표·달성률 |
+| `calorieResult` | enum | 달성/초과/미달 → UI 색상 분기용 |
+| `isWorkoutDay` | bool | 당일 운동 기록 존재 여부 |
+| `targetedMuscles` | List | 당일 자극 부위 목록 (캘린더 Dot 표시용) |
+| `totalVolume` | double | 당일 총 운동 볼륨 (중량×횟수×세트 합, kg) |
+| `averageRPE` | double | 당일 평균 자각강도 |

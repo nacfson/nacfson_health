@@ -1,7 +1,9 @@
 import 'package:googleapis/sheets/v4.dart' as sheets;
 
-import '../../features/exercise/domain/entities/exercise_record.dart';
 import '../../features/diet/domain/entities/diet_record.dart' as diet;
+import '../../features/exercise/domain/entities/exercise_record.dart';
+import '../../features/settings/domain/entities/exercise_template.dart';
+import '../../features/settings/domain/entities/food_template.dart';
 import 'google_auth_service.dart';
 
 class GoogleSheetsService {
@@ -25,6 +27,101 @@ class GoogleSheetsService {
   // Initialize Sheets (Headers)
   // ==========================================================================
 
+  /// 새 스프레드시트 생성 직후 모든 시트 헤더를 한 번에 초기화
+  Future<void> setupSheetHeaders() async {
+    await initializeExerciseSheet();
+    await initializeDietSheet();
+    await initializeTemplatesSheet();
+    await initializeFoodTemplatesSheet();
+  }
+
+  /// 동기화 전 필수 시트 3개가 모두 존재함을 보장 (멱등 연산).
+  /// spreadsheets.get을 1회만 호출해 API 비용을 최소화합니다.
+  Future<void> ensureAllRequiredSheets() async {
+    final api = await _api;
+    final spreadsheet = await api.spreadsheets.get(spreadsheetId);
+    final existingTitles = spreadsheet.sheets
+            ?.map((s) => s.properties?.title ?? '')
+            .toSet() ??
+        {};
+
+    final required = [
+      (
+        title: 'exercise_records',
+        headers: [
+          'uuid',
+          'timestamp',
+          'updatedAt',
+          'exerciseType',
+          'exerciseName',
+          'currentSet',
+          'weight',
+          'reps',
+          'rpe'
+        ],
+        range: 'exercise_records!A1:I1',
+      ),
+      (
+        title: 'diet_records',
+        headers: [
+          'uuid',
+          'timestamp',
+          'updatedAt',
+          'mealType',
+          'foodName',
+          'totalCalories',
+          'carbs',
+          'protein',
+          'fat',
+          'satisfaction',
+          'memo'
+        ],
+        range: 'diet_records!A1:K1',
+      ),
+      (
+        title: 'exercise_templates',
+        headers: ['uuid', 'name', 'updatedAt'],
+        range: 'exercise_templates!A1:C1',
+      ),
+      (
+        title: 'food_templates',
+        headers: [
+          'uuid',
+          'name',
+          'calories',
+          'carbs',
+          'protein',
+          'fat',
+          'updatedAt'
+        ],
+        range: 'food_templates!A1:G1',
+      ),
+    ];
+
+    for (final config in required) {
+      if (!existingTitles.contains(config.title)) {
+        // 시트 생성
+        await api.spreadsheets.batchUpdate(
+          sheets.BatchUpdateSpreadsheetRequest(requests: [
+            sheets.Request(
+              addSheet: sheets.AddSheetRequest(
+                properties: sheets.SheetProperties(title: config.title),
+              ),
+            ),
+          ]),
+          spreadsheetId,
+        );
+        // 헤더 쓰기
+        await api.spreadsheets.values.update(
+          sheets.ValueRange(values: [config.headers]),
+          spreadsheetId,
+          config.range,
+          valueInputOption: 'RAW',
+        );
+      }
+    }
+  }
+
   /// 운동 기록 시트 헤더 초기화 (최초 1회)
   Future<void> initializeExerciseSheet() async {
     final api = await _api;
@@ -41,6 +138,28 @@ class GoogleSheetsService {
         'reps',
         'rpe'
       ]
+    ]);
+    await api.spreadsheets.values.update(values, spreadsheetId, range,
+        valueInputOption: 'RAW');
+  }
+
+  /// 운동 템플릿 시트 헤더 초기화 (최초 1회)
+  Future<void> initializeTemplatesSheet() async {
+    final api = await _api;
+    const range = 'exercise_templates!A1:C1';
+    final values = sheets.ValueRange(values: [
+      ['uuid', 'name', 'updatedAt']
+    ]);
+    await api.spreadsheets.values.update(values, spreadsheetId, range,
+        valueInputOption: 'RAW');
+  }
+
+  /// 음식 템플릿 시트 헤더 초기화 (최초 1회)
+  Future<void> initializeFoodTemplatesSheet() async {
+    final api = await _api;
+    const range = 'food_templates!A1:G1';
+    final values = sheets.ValueRange(values: [
+      ['uuid', 'name', 'calories', 'carbs', 'protein', 'fat', 'updatedAt']
     ]);
     await api.spreadsheets.values.update(values, spreadsheetId, range,
         valueInputOption: 'RAW');
@@ -95,7 +214,7 @@ class GoogleSheetsService {
     for (final record in records) {
       final rowNum = uuidToRow[record.uuid];
       
-      if (record.syncStatus.name == 'deleted') {
+      if (record.syncStatus == SyncStatus.deleted) {
         // 로컬에서 삭제된 경우, 시트에서도 삭제 대상으로 분류
         if (rowNum != null) {
           deleteRowIndices.add(rowNum - 1); // 0-based index for DimensionRange
@@ -177,7 +296,7 @@ class GoogleSheetsService {
     for (final record in records) {
       final rowNum = uuidToRow[record.uuid];
       
-      if (record.syncStatus.name == 'deleted') {
+      if (record.syncStatus == diet.SyncStatus.deleted) {
         // 로컬에서 삭제된 경우, 시트에서도 삭제 대상으로 분류
         if (rowNum != null) {
           deleteRowIndices.add(rowNum - 1); // 0-based index for DimensionRange
@@ -235,6 +354,183 @@ class GoogleSheetsService {
       final batchUpdateRequest = sheets.BatchUpdateSpreadsheetRequest(requests: requests);
       await api.spreadsheets.batchUpdate(batchUpdateRequest, spreadsheetId);
     }
+  }
+
+  // ==========================================================================
+  // Batch Push Templates (Local → Sheet)
+  // ==========================================================================
+
+  /// 운동 템플릿 Batch Push (생성/삭제만 지원 — 수정 없음)
+  Future<void> batchPushTemplates(List<ExerciseTemplate> templates) async {
+    if (templates.isEmpty) return;
+
+    final api = await _api;
+    // 1. A열 uuid 목록 읽기 및 매핑
+    final uuidResponse = await api.spreadsheets.values
+        .get(spreadsheetId, 'exercise_templates!A:A');
+    final uuidRows = uuidResponse.values ?? [];
+    final uuidToRow = <String, int>{};
+    for (int i = 0; i < uuidRows.length; i++) {
+      if (uuidRows[i].isNotEmpty) {
+        uuidToRow[uuidRows[i][0].toString()] = i + 1; // 1-based
+      }
+    }
+
+    final appendValues = <List<dynamic>>[];
+    final deleteRowIndices = <int>[];
+
+    for (final t in templates) {
+      final rowNum = uuidToRow[t.uuid];
+      if (t.syncStatus == TemplateSyncStatus.deleted) {
+        // 시트에서 해당 행 삭제
+        if (rowNum != null) deleteRowIndices.add(rowNum - 1); // 0-based
+      } else {
+        // created — 시트에 없는 경우에만 추가 (수정 없음)
+        if (rowNum == null) {
+          appendValues.add([
+            t.uuid,
+            t.name,
+            t.updatedAt.millisecondsSinceEpoch,
+          ]);
+        }
+      }
+    }
+
+    // 2. 신규 템플릿 일괄 추가 (Append)
+    if (appendValues.isNotEmpty) {
+      final appendBody = sheets.ValueRange(values: appendValues);
+      await api.spreadsheets.values.append(
+        appendBody, spreadsheetId, 'exercise_templates!A1',
+        valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS',
+      );
+    }
+
+    // 3. 삭제된 템플릿 일괄 행 삭제 (내림차순 정렬로 인덱스 꼬임 방지)
+    if (deleteRowIndices.isNotEmpty) {
+      final sheetId = await _getSheetId(api, 'exercise_templates');
+      deleteRowIndices.sort((a, b) => b.compareTo(a));
+      final requests = deleteRowIndices
+          .map((idx) => sheets.Request(
+                deleteDimension: sheets.DeleteDimensionRequest(
+                  range: sheets.DimensionRange(
+                    sheetId: sheetId,
+                    dimension: 'ROWS',
+                    startIndex: idx,
+                    endIndex: idx + 1,
+                  ),
+                ),
+              ))
+          .toList();
+      await api.spreadsheets.batchUpdate(
+        sheets.BatchUpdateSpreadsheetRequest(requests: requests),
+        spreadsheetId,
+      );
+    }
+  }
+
+  /// 음식 템플릿 Batch Push (생성/삭제만 지원 — 수정 없음)
+  Future<void> batchPushFoodTemplates(List<FoodTemplate> templates) async {
+    if (templates.isEmpty) return;
+
+    final api = await _api;
+    // 1. A열 uuid 목록 읽기 및 매핑
+    final uuidResponse = await api.spreadsheets.values
+        .get(spreadsheetId, 'food_templates!A:A');
+    final uuidRows = uuidResponse.values ?? [];
+    final uuidToRow = <String, int>{};
+    for (int i = 0; i < uuidRows.length; i++) {
+      if (uuidRows[i].isNotEmpty) {
+        uuidToRow[uuidRows[i][0].toString()] = i + 1; // 1-based
+      }
+    }
+
+    final appendValues = <List<dynamic>>[];
+    final deleteRowIndices = <int>[];
+
+    for (final t in templates) {
+      final rowNum = uuidToRow[t.uuid];
+      if (t.syncStatus == FoodTemplateSyncStatus.deleted) {
+        if (rowNum != null) deleteRowIndices.add(rowNum - 1); // 0-based
+      } else {
+        // created — 시트에 없는 경우에만 추가 (수정 없음)
+        if (rowNum == null) {
+          appendValues.add([
+            t.uuid,
+            t.name,
+            t.calories,
+            t.carbs,
+            t.protein,
+            t.fat,
+            t.updatedAt.millisecondsSinceEpoch,
+          ]);
+        }
+      }
+    }
+
+    // 2. 신규 템플릿 일괄 추가 (Append)
+    if (appendValues.isNotEmpty) {
+      final appendBody = sheets.ValueRange(values: appendValues);
+      await api.spreadsheets.values.append(
+        appendBody, spreadsheetId, 'food_templates!A1',
+        valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS',
+      );
+    }
+
+    // 3. 삭제된 템플릿 일괄 행 삭제 (내림차순 정렬로 인덱스 꼬임 방지)
+    if (deleteRowIndices.isNotEmpty) {
+      final sheetId = await _getSheetId(api, 'food_templates');
+      deleteRowIndices.sort((a, b) => b.compareTo(a));
+      final requests = deleteRowIndices
+          .map((idx) => sheets.Request(
+                deleteDimension: sheets.DeleteDimensionRequest(
+                  range: sheets.DimensionRange(
+                    sheetId: sheetId,
+                    dimension: 'ROWS',
+                    startIndex: idx,
+                    endIndex: idx + 1,
+                  ),
+                ),
+              ))
+          .toList();
+      await api.spreadsheets.batchUpdate(
+        sheets.BatchUpdateSpreadsheetRequest(requests: requests),
+        spreadsheetId,
+      );
+    }
+  }
+
+  // ==========================================================================
+  // Delta Pull Templates (Sheet → Local)
+  // ==========================================================================
+
+  /// 운동 템플릿 Delta Pull
+  Future<List<ExerciseTemplate>> readTemplatesDelta({DateTime? since}) async {
+    final api = await _api;
+    const range = 'exercise_templates!A2:C';
+
+    final response = await api.spreadsheets.values.get(spreadsheetId, range);
+    final rows = response.values ?? [];
+
+    return rows
+        .where((row) => row.length >= 3)
+        .map(_rowToTemplate)
+        .where((t) => since == null || t.updatedAt.isAfter(since))
+        .toList();
+  }
+
+  /// 음식 템플릿 Delta Pull
+  Future<List<FoodTemplate>> readFoodTemplatesDelta({DateTime? since}) async {
+    final api = await _api;
+    const range = 'food_templates!A2:G';
+
+    final response = await api.spreadsheets.values.get(spreadsheetId, range);
+    final rows = response.values ?? [];
+
+    return rows
+        .where((row) => row.length >= 7)
+        .map(_rowToFoodTemplate)
+        .where((t) => since == null || t.updatedAt.isAfter(since))
+        .toList();
   }
 
   // ==========================================================================
@@ -359,6 +655,30 @@ class GoogleSheetsService {
       fat: double.parse(row[8].toString()),
       satisfaction: int.parse(row[9].toString()),
       memo: row.length > 10 ? row[10].toString() : null,
+    );
+  }
+
+  ExerciseTemplate _rowToTemplate(List<dynamic> row) {
+    return ExerciseTemplate(
+      uuid: row[0].toString(),
+      name: row[1].toString(),
+      updatedAt:
+          DateTime.fromMillisecondsSinceEpoch(int.parse(row[2].toString())),
+      syncStatus: TemplateSyncStatus.synced,
+    );
+  }
+
+  FoodTemplate _rowToFoodTemplate(List<dynamic> row) {
+    return FoodTemplate(
+      uuid: row[0].toString(),
+      name: row[1].toString(),
+      calories: int.parse(row[2].toString()),
+      carbs: double.parse(row[3].toString()),
+      protein: double.parse(row[4].toString()),
+      fat: double.parse(row[5].toString()),
+      updatedAt:
+          DateTime.fromMillisecondsSinceEpoch(int.parse(row[6].toString())),
+      syncStatus: FoodTemplateSyncStatus.synced,
     );
   }
 }

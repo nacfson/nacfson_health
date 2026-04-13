@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../features/settings/presentation/providers/food_template_provider.dart';
 import '../../domain/entities/diet_record.dart';
 import '../providers/diet_provider.dart';
 
@@ -28,13 +29,17 @@ class _DietFormState extends ConsumerState<DietForm> {
 
   bool get _isEditMode => widget.initialRecord != null;
 
+  String? _selectedTemplateName;
+  bool get _isDirectInput => _selectedTemplateName == null;
+
   @override
   void initState() {
     super.initState();
     final r = widget.initialRecord;
+    final foodTemplates = ref.read(foodTemplatesProvider);
+
     if (r != null) {
       _mealTypeController.text = r.mealType;
-      _foodNameController.text = r.foodName;
       _caloriesController.text = r.totalCalories.toString();
       _carbsController.text = r.carbs % 1 == 0
           ? r.carbs.toInt().toString()
@@ -48,6 +53,13 @@ class _DietFormState extends ConsumerState<DietForm> {
       _memoController.text = r.memo ?? '';
       _satisfaction = r.satisfaction;
       _timestamp = r.timestamp;
+
+      // 기존 음식 이름이 템플릿에 있으면 선택, 없으면 직접 입력 모드
+      if (foodTemplates.any((t) => t.name == r.foodName)) {
+        _selectedTemplateName = r.foodName;
+      } else {
+        _foodNameController.text = r.foodName;
+      }
     }
   }
 
@@ -88,15 +100,43 @@ class _DietFormState extends ConsumerState<DietForm> {
     }
   }
 
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('삭제 확인'),
+        content: Text('"${widget.initialRecord!.foodName}"을(를) 삭제하시겠습니까?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      ref.read(dietRecordsProvider.notifier).deleteRecord(widget.initialRecord!.uuid);
+      Navigator.pop(context);
+    }
+  }
+
   void _submit() {
     if (_formKey.currentState!.validate()) {
+      final foodName = _isDirectInput
+          ? _foodNameController.text.trim()
+          : _selectedTemplateName!;
+
       final now = DateTime.now();
       if (_isEditMode) {
         final updated = widget.initialRecord!.copyWith(
           updatedAt: now,
           syncStatus: SyncStatus.modified,
           mealType: _mealTypeController.text,
-          foodName: _foodNameController.text,
+          foodName: foodName,
           totalCalories: int.parse(_caloriesController.text),
           carbs: double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text),
           protein: double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text),
@@ -111,7 +151,7 @@ class _DietFormState extends ConsumerState<DietForm> {
           timestamp: _timestamp,
           updatedAt: now,
           mealType: _mealTypeController.text,
-          foodName: _foodNameController.text,
+          foodName: foodName,
           totalCalories: int.parse(_caloriesController.text),
           carbs: double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text),
           protein: double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text),
@@ -127,6 +167,9 @@ class _DietFormState extends ConsumerState<DietForm> {
 
   @override
   Widget build(BuildContext context) {
+    final foodTemplates = ref.watch(foodTemplatesProvider);
+    final templateNames = foodTemplates.map((t) => t.name).toList();
+
     return Form(
       key: _formKey,
       child: Column(
@@ -144,11 +187,61 @@ class _DietFormState extends ConsumerState<DietForm> {
             validator: (v) => v == null ? '필수' : null,
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: _foodNameController,
-            decoration: const InputDecoration(labelText: '음식 이름'),
-            validator: (v) => v?.isEmpty ?? true ? '필수' : null,
-          ),
+          if (templateNames.isNotEmpty)
+            DropdownButtonFormField<String?>(
+              decoration: const InputDecoration(labelText: '음식 이름'),
+              initialValue: _selectedTemplateName,
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('직접 입력'),
+                ),
+                ...foodTemplates.map(
+                  (t) => DropdownMenuItem(value: t.name, child: Text(t.name)),
+                ),
+              ],
+              onChanged: (v) {
+                setState(() {
+                  _selectedTemplateName = v;
+                  _foodNameController.clear();
+                  if (v != null) {
+                    final template =
+                        foodTemplates.firstWhere((t) => t.name == v);
+                    _caloriesController.text = template.calories.toString();
+                    _carbsController.text = template.carbs % 1 == 0
+                        ? template.carbs.toInt().toString()
+                        : template.carbs.toString();
+                    _proteinController.text = template.protein % 1 == 0
+                        ? template.protein.toInt().toString()
+                        : template.protein.toString();
+                    _fatController.text = template.fat % 1 == 0
+                        ? template.fat.toInt().toString()
+                        : template.fat.toString();
+                  } else {
+                    _caloriesController.clear();
+                    _carbsController.clear();
+                    _proteinController.clear();
+                    _fatController.clear();
+                  }
+                });
+              },
+              validator: (v) =>
+                  (v == null && _foodNameController.text.isEmpty) ? '필수' : null,
+            )
+          else
+            TextFormField(
+              controller: _foodNameController,
+              decoration: const InputDecoration(labelText: '음식 이름'),
+              validator: (v) => v?.isEmpty ?? true ? '필수' : null,
+            ),
+          if (_isDirectInput && templateNames.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _foodNameController,
+              decoration: const InputDecoration(labelText: '음식 이름 입력'),
+              validator: (v) => v?.isEmpty ?? true ? '필수' : null,
+            ),
+          ],
           const SizedBox(height: 12),
           TextFormField(
             controller: _caloriesController,
@@ -226,6 +319,20 @@ class _DietFormState extends ConsumerState<DietForm> {
               child: Text(_isEditMode ? '수정' : '추가'),
             ),
           ),
+          if (_isEditMode) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  side: BorderSide(color: Theme.of(context).colorScheme.error),
+                ),
+                onPressed: _delete,
+                child: const Text('삭제'),
+              ),
+            ),
+          ],
         ],
       ),
     );

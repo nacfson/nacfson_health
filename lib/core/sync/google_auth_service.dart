@@ -2,8 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:googleapis/sheets/v4.dart' as sheets;
-import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
+
+/// Google 네이티브 SDK의 인증 헤더를 가로채서 API 요청에 동적으로 주입하는 클라이언트입니다.
+/// 이를 통해 Token 1시간 만료 제한을 우회하고, SDK가 알아서 갱신한 토큰을 매번 사용하게 됩니다.
+/// (Decorator 패턴 적용)
+class _GoogleAuthClient extends http.BaseClient {
+  final Map<String, String> _headers;
+  final http.Client _client = http.Client();
+
+  _GoogleAuthClient(this._headers);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    return _client.send(request..headers.addAll(_headers));
+  }
+}
 
 class GoogleAuthService {
   final GoogleSignIn _signIn = GoogleSignIn(
@@ -16,10 +30,22 @@ class GoogleAuthService {
   );
 
   GoogleSignInAccount? _currentAccount;
-  auth.AccessCredentials? _credentials;
 
   GoogleSignInAccount? get currentAccount => _currentAccount;
-  bool get isSignedIn => _currentAccount != null && _credentials != null;
+  bool get isSignedIn => _currentAccount != null;
+
+  /// 앱 초기 구동 시 보안 저장소(Keychain/Keystore)에서 세션을 안전하게 복구합니다.
+  Future<GoogleSignInAccount?> restoreSession() async {
+    debugPrint('[GoogleAuthService] ========== restoreSession() 시작 ==========');
+    try {
+      _currentAccount = await _signIn.signInSilently();
+      debugPrint('[GoogleAuthService] signInSilently 결과: ${_currentAccount?.email}');
+      return _currentAccount;
+    } catch (e) {
+      debugPrint('[GoogleAuthService] signInSilently 예외 발생: $e');
+      return null;
+    }
+  }
 
   Future<GoogleSignInAccount?> signIn() async {
     debugPrint('[GoogleAuthService] ========== signIn() 시작 ==========');
@@ -34,58 +60,50 @@ class GoogleAuthService {
 
     if (_currentAccount == null) {
       debugPrint('[GoogleAuthService] 사용자가 로그인을 취소함');
-      // 사용자가 직접 취소한 경우 — 오류 아님
       return null;
     }
 
-    debugPrint('[GoogleAuthService] _createCredentials() 호출 중...');
-    await _createCredentials();
     debugPrint('[GoogleAuthService] signIn() 성공: $_currentAccount');
     return _currentAccount;
   }
 
-  Future<void> _createCredentials() async {
-    debugPrint('[GoogleAuthService] _createCredentials() 시작');
-    final authentication = await _currentAccount!.authentication;
-    debugPrint('[GoogleAuthService] 인증 정보 획득: $authentication');
-    final accessToken = authentication.accessToken;
-    debugPrint('[GoogleAuthService] accessToken: ${accessToken != null ? '있음' : '없음'}');
-
-    if (accessToken == null) {
-      debugPrint('[GoogleAuthService] accessToken 없음 - 예외 발생');
-      throw GoogleSignInException.noToken();
-    }
-    debugPrint('[GoogleAuthService] _createCredentials() 완료');
-
-    _credentials = auth.AccessCredentials(
-      auth.AccessToken(
-        'Bearer',
-        accessToken,
-        DateTime.now().toUtc().add(const Duration(hours: 1)),
-      ),
-      null, // refreshToken
-      [sheets.SheetsApi.spreadsheetsScope, 'https://www.googleapis.com/auth/drive.file'],
-    );
-  }
-
-  Future<auth.AuthClient> get authClient async {
-    if (_credentials == null) {
+  Future<http.Client> get authClient async {
+    if (_currentAccount == null) {
       throw Exception('Not authenticated');
     }
-    return auth.authenticatedClient(http.Client(), _credentials!);
+    
+    debugPrint('[GoogleAuthService] 동적 authHeaders 확보 중...');
+    final headers = await _currentAccount!.authHeaders;
+    if (headers.isEmpty) {
+       throw GoogleSignInException.noToken();
+    }
+    
+    return _GoogleAuthClient(headers);
   }
 
   Future<String> createSpreadsheet(String title) async {
     final client = await authClient;
-    final driveApi = drive.DriveApi(client);
+    final sheetsApi = sheets.SheetsApi(client);
 
-    final spreadsheet = await driveApi.files.create(
-      drive.File()
-        ..name = title
-        ..mimeType = 'application/vnd.google-apps.spreadsheet',
+    final spreadsheet = await sheetsApi.spreadsheets.create(
+      sheets.Spreadsheet()
+        ..properties = (sheets.SpreadsheetProperties()..title = title)
+        ..sheets = [
+          sheets.Sheet()
+            ..properties =
+                (sheets.SheetProperties()..title = 'exercise_records'),
+          sheets.Sheet()
+            ..properties = (sheets.SheetProperties()..title = 'diet_records'),
+          sheets.Sheet()
+            ..properties =
+                (sheets.SheetProperties()..title = 'exercise_templates'),
+          sheets.Sheet()
+            ..properties =
+                (sheets.SheetProperties()..title = 'food_templates'),
+        ],
     );
 
-    return spreadsheet.id!;
+    return spreadsheet.spreadsheetId!;
   }
 
   Future<sheets.SheetsApi> createSheetsApi() async {
@@ -96,7 +114,6 @@ class GoogleAuthService {
   Future<void> signOut() async {
     await _signIn.signOut();
     _currentAccount = null;
-    _credentials = null;
   }
 
   Future<void> shareSpreadsheet(String spreadsheetId) async {

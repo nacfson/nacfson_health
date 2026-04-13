@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/sync/google_auth_service.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
+import 'features/settings/data/repositories/sqlite_exercise_template_repository.dart';
+import 'features/settings/domain/entities/exercise_template.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,10 +16,29 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final syncPrefs = SyncPreferences(prefs);
 
+  // Google 세션 복구 및 반영구적 로그인 적용
+  final authService = GoogleAuthService();
+  await authService.restoreSession();
+
+  // SharedPreferences 템플릿 → SQLite 1회 마이그레이션
+  final legacyTemplates = syncPrefs.exerciseTemplates;
+  if (legacyTemplates.isNotEmpty) {
+    final templateRepo = SqliteExerciseTemplateRepository();
+    for (final name in legacyTemplates) {
+      await templateRepo.add(ExerciseTemplate(
+        uuid: '',
+        name: name,
+        updatedAt: DateTime.now(),
+      ));
+    }
+    await syncPrefs.clearExerciseTemplates();
+  }
+
   runApp(
     ProviderScope(
       overrides: [
         syncPreferencesProvider.overrideWithValue(syncPrefs),
+        googleAuthServiceProvider.overrideWithValue(authService),
       ],
       child: const NacfsonHealthAppWithSync(),
     ),

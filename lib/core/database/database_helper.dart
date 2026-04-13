@@ -19,8 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -58,6 +59,59 @@ class DatabaseHelper {
         memo TEXT
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE exercise_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        name TEXT UNIQUE NOT NULL,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE food_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        name TEXT UNIQUE NOT NULL,
+        calories INTEGER NOT NULL DEFAULT 0,
+        carbs REAL NOT NULL DEFAULT 0,
+        protein REAL NOT NULL DEFAULT 0,
+        fat REAL NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1
+      )
+    ''');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS exercise_templates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          name TEXT UNIQUE NOT NULL,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS food_templates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          name TEXT UNIQUE NOT NULL,
+          calories INTEGER NOT NULL DEFAULT 0,
+          carbs REAL NOT NULL DEFAULT 0,
+          protein REAL NOT NULL DEFAULT 0,
+          fat REAL NOT NULL DEFAULT 0,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1
+        )
+      ''');
+    }
   }
 
   Future<void> close() async {

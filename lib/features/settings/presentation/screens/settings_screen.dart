@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/diet_target_card.dart';
+import '../widgets/exercise_template_card.dart';
+import '../widgets/food_template_card.dart';
 import '../widgets/google_sign_in_card.dart';
 import '../widgets/spreadsheet_status_card.dart';
 
@@ -15,6 +18,12 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const DietTargetCard(),
+          const SizedBox(height: 16),
+          const ExerciseTemplateCard(),
+          const SizedBox(height: 16),
+          const FoodTemplateCard(),
+          const SizedBox(height: 16),
           const GoogleSignInCard(),
           const SizedBox(height: 16),
           const SpreadsheetStatusCard(),
