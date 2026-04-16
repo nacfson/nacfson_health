@@ -34,25 +34,37 @@ class _WeightFormState extends ConsumerState<WeightForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final weightValue = double.parse(_weightController.text);
-    final now = DateTime.now();
+    try {
+      final weightValue = double.parse(_weightController.text);
+      final now = DateTime.now();
 
-    if (widget.initialRecord != null) {
-      final updated = widget.initialRecord!.copyWith(
-        weight: weightValue,
-        updatedAt: now,
-      );
-      await ref.read(weightRecordsProvider.notifier).updateRecord(updated);
-    } else {
-      final newRecord = WeightRecord(
-        timestamp: now,
-        updatedAt: now,
-        weight: weightValue,
-      );
-      await ref.read(weightRecordsProvider.notifier).addRecord(newRecord);
+      if (widget.initialRecord != null) {
+        final updated = widget.initialRecord!.copyWith(
+          weight: weightValue,
+          updatedAt: now,
+        );
+        await ref.read(weightRecordsProvider.notifier).updateRecord(updated);
+      } else {
+        final newRecord = WeightRecord(
+          timestamp: now,
+          updatedAt: now,
+          weight: weightValue,
+        );
+        await ref.read(weightRecordsProvider.notifier).addRecord(newRecord);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('저장 실패: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
