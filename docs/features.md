@@ -34,7 +34,7 @@
 - [x] 식단 기록 Push/Pull/HardDelete
 - [x] 운동 템플릿 양방향 동기화 (Push/Pull/HardDelete)
 - [x] 음식 템플릿 양방향 동기화 (Push/Pull/HardDelete, v4)
-- [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5)
+- [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5) ✅ 완성
 - [x] 스프레드시트 교체 시 전체 재동기화 (`resetAllSyncStatus`)
 - [x] 앱 포그라운드 전환 시 자동 동기화 (`AppLifecycleState.resumed`)
 
