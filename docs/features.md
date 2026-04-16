@@ -10,6 +10,7 @@
 ### 핵심 데이터 입력
 - [x] 운동 기록 CRUD (`ExerciseRecord` — 부위/종목/세트/중량/횟수/RPE)
 - [x] 식단 기록 CRUD (`DietRecord` — 식사유형/음식명/칼로리/탄단지/만족도/메모)
+- [x] 체중 기록 CRUD (`WeightRecord` — 체중)
 - [x] 운동 기록 날짜·부위별 그룹핑 뷰 (`todayExerciseGroupedProvider`)
 - [x] 식단 기록 식사유형별 그룹핑 뷰 (`todayDietGroupedProvider`)
 
@@ -17,6 +18,7 @@
 - [x] 일일 요약 화면 (`SummaryScreen` — fl_chart 기반)
 - [x] 영양 목표 대비 진행률 표시 (`dailySummaryProvider`)
 - [x] 운동 볼륨·RPE 계산 (`todayTotalVolumeProvider`)
+- [x] 체중 차트 시각화 (`WeightChartCard` — fl_chart)
 
 ### 설정 화면
 - [x] 영양 목표값 설정 (`DietTargetCard` — 칼로리/탄단지 목표)
@@ -32,6 +34,7 @@
 - [x] 식단 기록 Push/Pull/HardDelete
 - [x] 운동 템플릿 양방향 동기화 (Push/Pull/HardDelete)
 - [x] 음식 템플릿 양방향 동기화 (Push/Pull/HardDelete, v4)
+- [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5)
 - [x] 스프레드시트 교체 시 전체 재동기화 (`resetAllSyncStatus`)
 - [x] 앱 포그라운드 전환 시 자동 동기화 (`AppLifecycleState.resumed`)
 
@@ -41,6 +44,7 @@
 - [x] 탭 전환 시 모든 오버레이 자동 닫기 (`popAll`)
 - [x] `DietForm` — 음식 템플릿 드롭다운 + 자동 채움 (칼로리/탄단지 전체)
 - [x] `ExerciseForm` — 운동 템플릿 드롭다운 + 종목명 자동 채움
+- [x] `WeightScreen` — 체중 탭 (입력/차트 시각화)
 
 ---
 
@@ -63,7 +67,7 @@
 
 > 템플릿 계열 (`exercise_templates`, `food_templates`)은 `modified(2)` 없이 생성·삭제만,  
 > Pull 병합은 insert-or-skip (LWW 불필요).  
-> 레코드 계열 (`exercise_records`, `diet_records`)은 전체 CRUD + LWW Pull.
+> 레코드 계열 (`exercise_records`, `diet_records`, `weight_records`)은 전체 CRUD + LWW Pull.
 
 ---
 

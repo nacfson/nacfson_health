@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -83,6 +83,17 @@ class DatabaseHelper {
         sync_status INTEGER DEFAULT 1
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE weight_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        timestamp INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1,
+        weight REAL NOT NULL
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -109,6 +120,18 @@ class DatabaseHelper {
           fat REAL NOT NULL DEFAULT 0,
           updated_at INTEGER NOT NULL,
           sync_status INTEGER DEFAULT 1
+        )
+      ''');
+    }
+    if (oldVersion < 5) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS weight_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          timestamp INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1,
+          weight REAL NOT NULL
         )
       ''');
     }
