@@ -11,7 +11,8 @@ class BottomNavShell extends StatelessWidget {
     if (location.startsWith('/exercise')) return 0;
     if (location.startsWith('/diet')) return 1;
     if (location.startsWith('/summary')) return 2;
-    if (location.startsWith('/settings')) return 3;
+    if (location.startsWith('/weight')) return 3;
+    if (location.startsWith('/settings')) return 4;
     return 0;
   }
 
@@ -34,6 +35,8 @@ class BottomNavShell extends StatelessWidget {
       case 2:
         context.go('/summary');
       case 3:
+        context.go('/weight');
+      case 4:
         context.go('/settings');
     }
   }
@@ -49,6 +52,7 @@ class BottomNavShell extends StatelessWidget {
           NavigationDestination(icon: Icon(Icons.fitness_center), label: '운동'),
           NavigationDestination(icon: Icon(Icons.restaurant), label: '식단'),
           NavigationDestination(icon: Icon(Icons.insights), label: '요약'),
+          NavigationDestination(icon: Icon(Icons.scale), label: '체중'),
           NavigationDestination(icon: Icon(Icons.settings), label: '설정'),
         ],
       ),

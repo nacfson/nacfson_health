@@ -41,12 +41,20 @@
 - **높은 심각도 (DB 오픈 실패 등)**: `AlertDialog`
 - **금지사항**: `try/catch` 없는 `await`, 로그(`debugPrint`)만 남기고 UI 피드백을 생략하는 행위.
 
-## 7. 문서 업데이트 의무
+## 7. 빌드 및 프리뷰 규칙
+- **파일 수정 후 반드시** `flutter build web --release`를 실행하여 빌드 검증 후 프리뷰에 반영한다.
+  ```
+  cd "/Users/hyungjuyu/Projects/Flutter/nacfson_health copy" && flutter build web --release
+  ```
+- 빌드 성공 후 프리뷰 서버(`Flutter Web (Static)`, port 8080)가 실행 중인지 확인하고, 미실행 시 `preview_start`로 기동한다.
+- 프리뷰 URL 이동 방법: `window.location.href = 'http://localhost:8080/#/<route>';` (JS eval)
+
+## 9. 문서 업데이트 의무
 - 기능 추가/변경 시 관련 문서를 즉시 동기화할 것.
 - DB 테이블 변경 → `docs/db-schema.md` 업데이트 필수.
 - 기능 완료 → `docs/features.md` 체크박스 반영 필수.
 
-## 8. 참조 문서
+## 10. 참조 문서
 - `docs/db-schema.md` — DB 버전 이력, 전체 테이블 스키마, 마이그레이션 SQL
 - `docs/features.md` — 구현 완료 기능 체크리스트, 구현 패턴, 백로그
 - `docs/architecture.md` — 동기화 프로토콜, 도메인 분리 구조
