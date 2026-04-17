@@ -100,6 +100,9 @@ class GoogleAuthService {
           sheets.Sheet()
             ..properties =
                 (sheets.SheetProperties()..title = 'food_templates'),
+          sheets.Sheet()
+            ..properties =
+                (sheets.SheetProperties()..title = 'weight_records'),
         ],
     );
 

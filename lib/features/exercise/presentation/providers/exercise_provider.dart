@@ -1,9 +1,100 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../../data/repositories/exercise_repository.dart';
 import '../../data/repositories/sqlite_exercise_repository.dart';
 
+// Web 환경용 메모리 기반 Repository (임시 구현)
+class _MemoryExerciseRepository implements ExerciseRepository {
+  final List<ExerciseRecord> _records = [];
+
+  @override
+  Future<List<ExerciseRecord>> getAll() async => List.from(_records);
+
+  @override
+  Future<ExerciseRecord?> getById(String id) async =>
+      _records.cast<ExerciseRecord?>().firstWhere(
+            (r) => r?.uuid == id,
+            orElse: () => null,
+          );
+
+  @override
+  Future<List<ExerciseRecord>> getByDate(DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    return _records
+        .where((r) =>
+            r.timestamp.isAfter(startOfDay) && r.timestamp.isBefore(endOfDay))
+        .toList();
+  }
+
+  @override
+  Future<void> add(ExerciseRecord record) async => _records.add(record);
+
+  @override
+  Future<void> update(ExerciseRecord record) async {
+    final index = _records.indexWhere((r) => r.uuid == record.uuid);
+    if (index != -1) _records[index] = record;
+  }
+
+  @override
+  Future<void> delete(String id) async =>
+      _records.removeWhere((r) => r.uuid == id);
+
+  @override
+  Future<void> deleteAll() async => _records.clear();
+
+  @override
+  Future<int> sync(List<ExerciseRecord> records) async {
+    _records.clear();
+    _records.addAll(records);
+    return records.length;
+  }
+
+  @override
+  Future<List<ExerciseRecord>> getPendingSync() async =>
+      _records.where((r) => r.syncStatus != 0).toList();
+
+  @override
+  Future<void> markAsSynced(List<String> uuids) async {
+    for (final uuid in uuids) {
+      final index = _records.indexWhere((r) => r.uuid == uuid);
+      if (index != -1) {
+        final record = _records[index];
+        _records[index] = record.copyWith(syncStatus: SyncStatus.synced);
+      }
+    }
+  }
+
+  @override
+  Future<void> mergeRemoteRecords(List<ExerciseRecord> remote) async {
+    for (final remoteRecord in remote) {
+      final index = _records.indexWhere((r) => r.uuid == remoteRecord.uuid);
+      if (index == -1) {
+        _records.add(remoteRecord);
+      } else if (remoteRecord.updatedAt.isAfter(_records[index].updatedAt)) {
+        _records[index] = remoteRecord;
+      }
+    }
+  }
+
+  @override
+  Future<void> hardDeleteSyncedDeleted() async {
+    _records.removeWhere((r) => r.syncStatus == SyncStatus.deleted);
+  }
+
+  @override
+  Future<void> resetAllSyncStatus() async {
+    for (int i = 0; i < _records.length; i++) {
+      _records[i] = _records[i].copyWith(syncStatus: SyncStatus.created);
+    }
+  }
+}
+
 final exerciseRepositoryProvider = Provider<ExerciseRepository>((ref) {
+  if (kIsWeb) {
+    return _MemoryExerciseRepository();
+  }
   return SqliteExerciseRepository();
 });
 
@@ -63,15 +154,27 @@ final todayExerciseRecordsProvider = Provider<List<ExerciseRecord>>((ref) {
     ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 });
 
-/// 오늘 운동 기록 - exerciseType별 그룹핑 (표시 순서 고정)
+/// 오늘 운동 기록 - exerciseType별 및 exerciseName별 이중 그룹핑
 final todayExerciseGroupedProvider =
-    Provider<Map<String, List<ExerciseRecord>>>((ref) {
+    Provider<Map<String, Map<String, List<ExerciseRecord>>>>((ref) {
   final records = ref.watch(todayExerciseRecordsProvider);
   const typeOrder = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
-  final Map<String, List<ExerciseRecord>> grouped = {};
+  final Map<String, Map<String, List<ExerciseRecord>>> grouped = {};
+
   for (final type in typeOrder) {
-    final list = records.where((r) => r.exerciseType == type).toList();
-    if (list.isNotEmpty) grouped[type] = list;
+    final typeRecords = records.where((r) => r.exerciseType == type).toList();
+    if (typeRecords.isNotEmpty) {
+      final Map<String, List<ExerciseRecord>> nameGrouped = {};
+      // 최신순으로 정렬된 기록을 이름별로 묶음
+      for (final r in typeRecords) {
+        nameGrouped.putIfAbsent(r.exerciseName, () => []).add(r);
+      }
+      // 세트 번호 순서(또는 시간 순서)로 다시 정렬하고 싶다면 여기서 수행
+      for (final name in nameGrouped.keys) {
+        nameGrouped[name]!.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      }
+      grouped[type] = nameGrouped;
+    }
   }
   return grouped;
 });

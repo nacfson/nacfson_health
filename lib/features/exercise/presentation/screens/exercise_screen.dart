@@ -5,6 +5,7 @@ import '../../../../shared/widgets/empty_state.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../providers/exercise_provider.dart';
 import '../widgets/exercise_form.dart';
+import '../widgets/exercise_group_card.dart';
 import '../widgets/exercise_record_card.dart';
 
 class ExerciseScreen extends ConsumerWidget {
@@ -59,26 +60,29 @@ class ExerciseScreen extends ConsumerWidget {
               ),
             )
           else
-            for (final entry in grouped.entries) ...[
+            for (final typeEntry in grouped.entries) ...[
               SliverToBoxAdapter(
                 child: _SectionHeader(
-                  exerciseType: entry.key,
-                  count: entry.value.length,
+                  exerciseType: typeEntry.key,
+                  count: typeEntry.value.values
+                      .fold(0, (sum, list) => sum + list.length),
                 ),
               ),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) {
-                    final record = entry.value[i];
-                    return ExerciseRecordCard(
-                      record: record,
-                      onTap: () => _openEditSheet(context, record),
-                      onDelete: () => ref
+                    final nameEntry = typeEntry.value.entries.elementAt(i);
+                    return ExerciseGroupCard(
+                      exerciseName: nameEntry.key,
+                      exerciseType: typeEntry.key,
+                      records: nameEntry.value,
+                      onEdit: (record) => _openEditSheet(context, record),
+                      onDelete: (uuid) => ref
                           .read(exerciseRecordsProvider.notifier)
-                          .deleteRecord(record.uuid),
+                          .deleteRecord(uuid),
                     );
                   },
-                  childCount: entry.value.length,
+                  childCount: typeEntry.value.length,
                 ),
               ),
             ],
@@ -108,7 +112,7 @@ class _TodayExerciseBanner extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),

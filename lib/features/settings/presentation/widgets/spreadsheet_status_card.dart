@@ -9,6 +9,7 @@ import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 import '../../../diet/presentation/providers/diet_provider.dart';
 import '../../../exercise/presentation/providers/exercise_provider.dart';
+import '../../../weight/presentation/providers/weight_provider.dart';
 import '../../presentation/providers/exercise_template_provider.dart';
 import '../../presentation/providers/food_template_provider.dart';
 import '../../utils/date_time_utils.dart';
@@ -512,6 +513,7 @@ class SpreadsheetStatusCard extends ConsumerWidget {
     await ref.read(dietRepositoryProvider).resetAllSyncStatus();
     await ref.read(exerciseTemplateRepositoryProvider).resetAllSyncStatus();
     await ref.read(foodTemplateRepositoryProvider).resetAllSyncStatus();
+    await ref.read(weightRepositoryProvider).resetAllSyncStatus(); // v5 신규
     // 2. 마지막 동기화 시간 초기화 (전체 pull 강제)
     await prefs.clearLastSyncTimestamp();
     // 3. 새 ID 저장 후 provider chain 갱신

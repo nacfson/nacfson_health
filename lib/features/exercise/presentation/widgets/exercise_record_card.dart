@@ -17,7 +17,7 @@ class ExerciseRecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final typeColor = _exerciseTypeColor(record.exerciseType);
+    final typeColor = getExerciseTypeColor(record.exerciseType);
     final timeStr = _formatTime(record.timestamp);
 
     return Dismissible(
@@ -105,7 +105,7 @@ class ExerciseRecordCard extends StatelessWidget {
   }
 }
 
-Color _exerciseTypeColor(String type) {
+Color getExerciseTypeColor(String type) {
   return switch (type) {
     '가슴' => const Color(0xFFFFE0B2),
     '등' => const Color(0xFFE3F2FD),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -14,12 +15,16 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB(String filePath) async {
+    if (kIsWeb) {
+      throw UnsupportedError('Database operations are not supported on web platform');
+    }
+
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -65,6 +70,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         uuid TEXT UNIQUE NOT NULL,
         name TEXT UNIQUE NOT NULL,
+        exercise_type TEXT NOT NULL DEFAULT '',
         updated_at INTEGER NOT NULL,
         sync_status INTEGER DEFAULT 1
       )
@@ -81,6 +87,17 @@ class DatabaseHelper {
         fat REAL NOT NULL DEFAULT 0,
         updated_at INTEGER NOT NULL,
         sync_status INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE weight_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        timestamp INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1,
+        weight REAL NOT NULL
       )
     ''');
   }
@@ -110,6 +127,33 @@ class DatabaseHelper {
           updated_at INTEGER NOT NULL,
           sync_status INTEGER DEFAULT 1
         )
+      ''');
+    }
+    if (oldVersion < 5) {
+      // v5: exercise_templates에 exercise_type 컬럼 추가 및 weight_records 테이블 생성
+      try {
+        await db.execute('''
+          ALTER TABLE exercise_templates
+          ADD COLUMN exercise_type TEXT NOT NULL DEFAULT ''
+        ''');
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS weight_records (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          timestamp INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1,
+          weight REAL NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 6) {
+      // v6: exercise_type이 빈 문자열인 템플릿 삭제 (v5 마이그레이션 당시 기본값)
+      await db.execute('''
+        DELETE FROM exercise_templates WHERE exercise_type = ''
       ''');
     }
   }

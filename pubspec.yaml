@@ -53,17 +53,22 @@ dependencies:
   shared_preferences: ^2.3.0
   uuid: ^4.5.1
   fl_chart: ^0.69.0
+  intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # 테스트용 Mock 라이브러리
+  mocktail: ^1.0.4
+
+  # sqflite 테스트용 (인메모리 DB, 데스크톱 환경 지원)
+  sqflite_common_ffi: ^2.3.4+1
+
+  # Web 환경에서 sqflite 지원
+  sqflite_common_ffi_web: ^1.1.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

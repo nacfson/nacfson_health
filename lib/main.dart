@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,18 +21,20 @@ void main() async {
   final authService = GoogleAuthService();
   await authService.restoreSession();
 
-  // SharedPreferences 템플릿 → SQLite 1회 마이그레이션
-  final legacyTemplates = syncPrefs.exerciseTemplates;
-  if (legacyTemplates.isNotEmpty) {
-    final templateRepo = SqliteExerciseTemplateRepository();
-    for (final name in legacyTemplates) {
-      await templateRepo.add(ExerciseTemplate(
-        uuid: '',
-        name: name,
-        updatedAt: DateTime.now(),
-      ));
+  // SharedPreferences 템플릿 → SQLite 1회 마이그레이션 (Web 환경 제외)
+  if (!kIsWeb) {
+    final legacyTemplates = syncPrefs.exerciseTemplates;
+    if (legacyTemplates.isNotEmpty) {
+      final templateRepo = SqliteExerciseTemplateRepository();
+      for (final name in legacyTemplates) {
+        await templateRepo.add(ExerciseTemplate(
+          uuid: '',
+          name: name,
+          updatedAt: DateTime.now(),
+        ));
+      }
+      await syncPrefs.clearExerciseTemplates();
     }
-    await syncPrefs.clearExerciseTemplates();
   }
 
   runApp(

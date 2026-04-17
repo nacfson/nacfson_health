@@ -5,6 +5,7 @@ import '../../features/exercise/presentation/screens/exercise_screen.dart';
 import '../../features/diet/presentation/screens/diet_screen.dart';
 import '../../features/summary/presentation/screens/summary_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/weight/presentation/screens/weight_screen.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -33,6 +34,12 @@ final appRouter = GoRouter(
           path: '/summary',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: SummaryScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/weight',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: WeightScreen(),
           ),
         ),
         GoRoute(

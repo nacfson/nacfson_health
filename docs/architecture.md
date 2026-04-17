@@ -19,7 +19,8 @@
 |--------|------|--------|
 | **운동** | 날짜별 부위, 종목, 세트, 중량, RPE 누적 기록 및 추적 | `ExerciseRecord` |
 | **식단** | 날짜별 식사 종류(아침, 점심, 저녁, 간식), 음식명, 매크로(탄/단/지), 만족도 기록 | `DietRecord` |
-| **요약** | 두 데이터 병합 → 하루 목표 대비 현재 섭취량/운동 소비량 통합 표시 | `DailySummary` |
+| **체중** | 일별 체중 기록, 주/월/년 추세 시각화 (fl_chart) | `WeightRecord` |
+| **요약** | 운동·식단·체중 데이터 병합 → 하루 목표 대비 통합 표시 | `DailySummary` |
 | **운동 템플릿** | 운동 종목 프리셋 관리, SQLite + Sheets 동기화 (생성·삭제만) | `ExerciseTemplate` |
 | **음식 템플릿** | 음식 프리셋 관리 (이름·칼로리·탄단지), SQLite + Sheets 동기화 (생성·삭제만) | `FoodTemplate` |
 
@@ -58,7 +59,7 @@
 
 전체 테이블 스키마 및 버전 이력은 `docs/db-schema.md` 참조.
 
-**현재 DB 버전**: v4 (테이블 4개: exercise_records · diet_records · exercise_templates · food_templates)
+**현재 DB 버전**: v6 (테이블 5개: exercise_records · diet_records · exercise_templates · food_templates · weight_records)
 
 ---
 

@@ -4,6 +4,7 @@ import '../../features/diet/domain/entities/diet_record.dart' as diet;
 import '../../features/exercise/domain/entities/exercise_record.dart';
 import '../../features/settings/domain/entities/exercise_template.dart';
 import '../../features/settings/domain/entities/food_template.dart';
+import '../../features/weight/domain/entities/weight_record.dart' as weight;
 import 'google_auth_service.dart';
 
 class GoogleSheetsService {
@@ -33,6 +34,7 @@ class GoogleSheetsService {
     await initializeDietSheet();
     await initializeTemplatesSheet();
     await initializeFoodTemplatesSheet();
+    await initializeWeightSheet();
   }
 
   /// 동기화 전 필수 시트 3개가 모두 존재함을 보장 (멱등 연산).
@@ -80,8 +82,8 @@ class GoogleSheetsService {
       ),
       (
         title: 'exercise_templates',
-        headers: ['uuid', 'name', 'updatedAt'],
-        range: 'exercise_templates!A1:C1',
+        headers: ['uuid', 'name', 'exerciseType', 'updatedAt'],
+        range: 'exercise_templates!A1:D1',
       ),
       (
         title: 'food_templates',
@@ -95,6 +97,11 @@ class GoogleSheetsService {
           'updatedAt'
         ],
         range: 'food_templates!A1:G1',
+      ),
+      (
+        title: 'weight_records',
+        headers: ['uuid', 'timestamp', 'updatedAt', 'weight'],
+        range: 'weight_records!A1:D1',
       ),
     ];
 
@@ -143,12 +150,12 @@ class GoogleSheetsService {
         valueInputOption: 'RAW');
   }
 
-  /// 운동 템플릿 시트 헤더 초기화 (최초 1회)
+  /// 운동 템플릿 시트 헤더 초기화 (최초 1회, v5: exerciseType 추가)
   Future<void> initializeTemplatesSheet() async {
     final api = await _api;
-    const range = 'exercise_templates!A1:C1';
+    const range = 'exercise_templates!A1:D1';
     final values = sheets.ValueRange(values: [
-      ['uuid', 'name', 'updatedAt']
+      ['uuid', 'name', 'exerciseType', 'updatedAt']
     ]);
     await api.spreadsheets.values.update(values, spreadsheetId, range,
         valueInputOption: 'RAW');
@@ -183,6 +190,17 @@ class GoogleSheetsService {
         'satisfaction',
         'memo'
       ]
+    ]);
+    await api.spreadsheets.values.update(values, spreadsheetId, range,
+        valueInputOption: 'RAW');
+  }
+
+  /// 체중 기록 시트 헤더 초기화 (최초 1회, v5 신규)
+  Future<void> initializeWeightSheet() async {
+    final api = await _api;
+    const range = 'weight_records!A1:D1';
+    final values = sheets.ValueRange(values: [
+      ['uuid', 'timestamp', 'updatedAt', 'weight']
     ]);
     await api.spreadsheets.values.update(values, spreadsheetId, range,
         valueInputOption: 'RAW');
@@ -390,6 +408,7 @@ class GoogleSheetsService {
           appendValues.add([
             t.uuid,
             t.name,
+            t.exerciseType, // v5: exerciseType 추가
             t.updatedAt.millisecondsSinceEpoch,
           ]);
         }
@@ -499,14 +518,97 @@ class GoogleSheetsService {
     }
   }
 
+  /// 체중 기록 Batch Push (Upsert & Delete 최적화 적용, v5 신규)
+  Future<void> batchPushWeightRecords(List<weight.WeightRecord> records) async {
+    if (records.isEmpty) return;
+
+    final api = await _api;
+    // 1. A열 전체 가져오기 및 매핑 (최적화)
+    final uuidResponse = await api.spreadsheets.values.get(spreadsheetId, 'weight_records!A:A');
+    final uuidRows = uuidResponse.values ?? [];
+    final uuidToRow = <String, int>{};
+    for (int i = 0; i < uuidRows.length; i++) {
+      if (uuidRows[i].isNotEmpty) {
+        uuidToRow[uuidRows[i][0].toString()] = i + 1; // 1-based index
+      }
+    }
+
+    final updateData = <sheets.ValueRange>[];
+    final appendValues = <List<dynamic>>[];
+    final deleteRowIndices = <int>[];
+
+    for (final record in records) {
+      final rowNum = uuidToRow[record.uuid];
+
+      if (record.syncStatus == weight.SyncStatus.deleted) {
+        // 로컬에서 삭제된 경우, 시트에서도 삭제 대상으로 분류
+        if (rowNum != null) {
+          deleteRowIndices.add(rowNum - 1); // 0-based index for DimensionRange
+        }
+      } else {
+        final rowTemplate = _weightRecordToRow(record);
+        if (rowNum != null) {
+          // 존재하는 UUID는 해당 행만 부분 업데이트 (Update)
+          updateData.add(sheets.ValueRange(
+            range: 'weight_records!A$rowNum:D$rowNum',
+            values: [rowTemplate],
+          ));
+        } else {
+          // 존재하지 않는 새로운 UUID는 맨 아래 추가 (Append)
+          appendValues.add(rowTemplate);
+        }
+      }
+    }
+
+    // 2. 존재하는 기록 일괄 덮어쓰기 (Batch Update)
+    if (updateData.isNotEmpty) {
+      final batchUpdateRequest = sheets.BatchUpdateValuesRequest(
+        data: updateData,
+        valueInputOption: 'RAW',
+      );
+      await api.spreadsheets.values.batchUpdate(batchUpdateRequest, spreadsheetId);
+    }
+
+    // 3. 새로운 기록 일괄 추가 (Append)
+    if (appendValues.isNotEmpty) {
+      final appendBody = sheets.ValueRange(values: appendValues);
+      await api.spreadsheets.values.append(
+        appendBody, spreadsheetId, 'weight_records!A1',
+        valueInputOption: 'RAW', insertDataOption: 'INSERT_ROWS',
+      );
+    }
+
+    // 4. 삭제된 기록 일괄 행 삭제 (내림차순 정렬로 인덱스 꼬임 방지)
+    if (deleteRowIndices.isNotEmpty) {
+      final sheetId = await _getSheetId(api, 'weight_records');
+      deleteRowIndices.sort((a, b) => b.compareTo(a));
+      final requests = deleteRowIndices
+          .map((idx) => sheets.Request(
+                deleteDimension: sheets.DeleteDimensionRequest(
+                  range: sheets.DimensionRange(
+                    sheetId: sheetId,
+                    dimension: 'ROWS',
+                    startIndex: idx,
+                    endIndex: idx + 1,
+                  ),
+                ),
+              ))
+          .toList();
+      await api.spreadsheets.batchUpdate(
+        sheets.BatchUpdateSpreadsheetRequest(requests: requests),
+        spreadsheetId,
+      );
+    }
+  }
+
   // ==========================================================================
   // Delta Pull Templates (Sheet → Local)
   // ==========================================================================
 
-  /// 운동 템플릿 Delta Pull
+  /// 운동 템플릿 Delta Pull (v5: exerciseType 포함)
   Future<List<ExerciseTemplate>> readTemplatesDelta({DateTime? since}) async {
     final api = await _api;
-    const range = 'exercise_templates!A2:C';
+    const range = 'exercise_templates!A2:D';
 
     final response = await api.spreadsheets.values.get(spreadsheetId, range);
     final rows = response.values ?? [];
@@ -530,6 +632,21 @@ class GoogleSheetsService {
         .where((row) => row.length >= 7)
         .map(_rowToFoodTemplate)
         .where((t) => since == null || t.updatedAt.isAfter(since))
+        .toList();
+  }
+
+  /// 체중 기록 Delta Pull (v5 신규)
+  Future<List<weight.WeightRecord>> readWeightRecordsDelta({DateTime? since}) async {
+    final api = await _api;
+    const range = 'weight_records!A2:D';
+
+    final response = await api.spreadsheets.values.get(spreadsheetId, range);
+    final rows = response.values ?? [];
+
+    return rows
+        .where((row) => row.length >= 4)
+        .map(_rowToWeightRecord)
+        .where((record) => since == null || record.updatedAt.isAfter(since))
         .toList();
   }
 
@@ -659,11 +776,18 @@ class GoogleSheetsService {
   }
 
   ExerciseTemplate _rowToTemplate(List<dynamic> row) {
+    // v5 마이그레이션: exerciseType 컬럼 추가
+    // v4 형식: [uuid, name, updatedAt] (3컬럼)
+    // v5 형식: [uuid, name, exerciseType, updatedAt] (4컬럼)
+    // 하위호환성: 두 형식 모두 지원
+    final hasExerciseType = row.length >= 4;
     return ExerciseTemplate(
       uuid: row[0].toString(),
       name: row[1].toString(),
-      updatedAt:
-          DateTime.fromMillisecondsSinceEpoch(int.parse(row[2].toString())),
+      exerciseType: hasExerciseType ? row[2].toString() : '',
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        int.parse(row[hasExerciseType ? 3 : 2].toString()),
+      ),
       syncStatus: TemplateSyncStatus.synced,
     );
   }
@@ -679,6 +803,27 @@ class GoogleSheetsService {
       updatedAt:
           DateTime.fromMillisecondsSinceEpoch(int.parse(row[6].toString())),
       syncStatus: FoodTemplateSyncStatus.synced,
+    );
+  }
+
+  List<dynamic> _weightRecordToRow(weight.WeightRecord r) => [
+        r.uuid,
+        r.timestamp.millisecondsSinceEpoch,
+        r.updatedAt.millisecondsSinceEpoch,
+        r.weight,
+      ];
+
+  weight.WeightRecord _rowToWeightRecord(List<dynamic> row) {
+    return weight.WeightRecord(
+      uuid: row[0].toString(),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(
+        int.parse(row[1].toString()),
+      ),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+        int.parse(row[2].toString()),
+      ),
+      syncStatus: weight.SyncStatus.synced,
+      weight: double.parse(row[3].toString()),
     );
   }
 }
