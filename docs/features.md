@@ -10,7 +10,7 @@
 ### 핵심 데이터 입력
 - [x] 운동 기록 CRUD (`ExerciseRecord` — 부위/종목/세트/중량/횟수/RPE)
 - [x] 식단 기록 CRUD (`DietRecord` — 식사유형/음식명/칼로리/탄단지/만족도/메모)
-- [x] 체중 기록 CRUD (`WeightRecord` — 날짜/체중)
+- [x] 체중 기록 CRUD (`WeightRecord` — 체중)
 - [x] 운동 기록 날짜·부위별 그룹핑 뷰 (`todayExerciseGroupedProvider`)
 - [x] 식단 기록 식사유형별 그룹핑 뷰 (`todayDietGroupedProvider`)
 
@@ -18,8 +18,7 @@
 - [x] 일일 요약 화면 (`SummaryScreen` — fl_chart 기반)
 - [x] 영양 목표 대비 진행률 표시 (`dailySummaryProvider`)
 - [x] 운동 볼륨·RPE 계산 (`todayTotalVolumeProvider`)
-- [x] 체중 추세 차트 — 주/월/년 필터 (`weightChartDataProvider`, `chartViewTypeProvider`)
-- [x] 최근 체중 표시 (`latestWeightProvider`, `todayWeightProvider`)
+- [x] 체중 차트 시각화 (`WeightChartCard` — fl_chart)
 
 ### 설정 화면
 - [x] 영양 목표값 설정 (`DietTargetCard` — 칼로리/탄단지 목표)
@@ -33,26 +32,38 @@
 - [x] 스프레드시트 자동 생성 + 필수 시트 보장 (`ensureAllRequiredSheets`)
 - [x] 운동 기록 Push/Pull/HardDelete
 - [x] 식단 기록 Push/Pull/HardDelete
-- [x] 체중 기록 Push/Pull/HardDelete
 - [x] 운동 템플릿 양방향 동기화 (Push/Pull/HardDelete)
 - [x] 음식 템플릿 양방향 동기화 (Push/Pull/HardDelete, v4)
+- [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5) ✅ 완성
 - [x] 스프레드시트 교체 시 전체 재동기화 (`resetAllSyncStatus`)
 - [x] 앱 포그라운드 전환 시 자동 동기화 (`AppLifecycleState.resumed`)
 
 ### UI/UX
 - [x] `ErrorOverlay` — 자동 닫힘 오류 표시 (낮은 심각도)
-- [x] `EmptyState` — 빈 상태 공통 위젯 (아이콘+텍스트+버튼)
 - [x] Bottom Sheet 슬라이드/페이드 애니메이션 (`RecordFormSheet`)
 - [x] 탭 전환 시 모든 오버레이 자동 닫기 (`popAll`)
 - [x] `DietForm` — 음식 템플릿 드롭다운 + 자동 채움 (칼로리/탄단지 전체)
 - [x] `ExerciseForm` — 운동 템플릿 드롭다운 + 종목명 자동 채움
-- [x] `HomeWidgetService` — iOS 홈 위젯 영양 데이터 연동
+- [x] `WeightScreen` — 체중 탭 (입력/차트 시각화)
 
 ---
 
 ## 구현 패턴 요약
 
-새 도메인(테이블) 추가 시 구현 10단계 및 SyncStatus 규칙은 `docs/implementation-guide.md` 참조.
+새 도메인(테이블) 추가 시 아래 순서로 구현:
+
+```
+1. Entity           lib/features/{domain}/domain/entities/{entity}.dart
+2. DB 마이그레이션   lib/core/database/database_helper.dart (version++, onCreate, onUpgrade)
+3. Repository 인터페이스  lib/features/{domain}/data/repositories/{entity}_repository.dart
+4. SQLite 구현체     lib/features/{domain}/data/repositories/sqlite_{entity}_repository.dart
+5. Provider         lib/features/{domain}/presentation/providers/{entity}_provider.dart
+6. GoogleSheetsService  ensureAllRequiredSheets + push + pull 메서드 추가
+7. GoogleAuthService    createSpreadsheet 시트 목록에 추가
+8. sync_state.dart  SyncStateNotifier 주입 + _syncAll 단계 추가
+9. UI 위젯          설정 카드 or 폼 드롭다운
+10. docs 업데이트    db-schema.md + features.md + architecture.md
+```
 
 > 템플릿 계열 (`exercise_templates`, `food_templates`)은 `modified(2)` 없이 생성·삭제만,  
 > Pull 병합은 insert-or-skip (LWW 불필요).  

@@ -80,8 +80,10 @@ final syncStateProvider =
   final prefs = ref.read(syncPreferencesProvider);
   final exerciseRepo = ref.read(exerciseRepositoryProvider);
   final dietRepo = ref.read(dietRepositoryProvider);
+  final weightRepo = ref.read(weightRepositoryProvider);
   final exerciseNotifier = ref.read(exerciseRecordsProvider.notifier);
   final dietNotifier = ref.read(dietRecordsProvider.notifier);
+  final weightNotifier = ref.read(weightRecordsProvider.notifier);
   final templateRepo = ref.read(exerciseTemplateRepositoryProvider);
   final templateNotifier = ref.read(exerciseTemplatesProvider.notifier);
   final foodTemplateRepo = ref.read(foodTemplateRepositoryProvider);
@@ -94,8 +96,10 @@ final syncStateProvider =
     prefs: prefs,
     exerciseRepo: exerciseRepo,
     dietRepo: dietRepo,
+    weightRepo: weightRepo,
     exerciseNotifier: exerciseNotifier,
     dietNotifier: dietNotifier,
+    weightNotifier: weightNotifier,
     templateRepo: templateRepo,
     templateNotifier: templateNotifier,
     foodTemplateRepo: foodTemplateRepo,
@@ -111,8 +115,10 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   final SyncPreferences _prefs;
   final dynamic _exerciseRepo;
   final dynamic _dietRepo;
+  final dynamic _weightRepo;
   final ExerciseNotifier _exerciseNotifier;
   final DietNotifier _dietNotifier;
+  final dynamic _weightNotifier;
   final ExerciseTemplateRepository _templateRepo;
   final ExerciseTemplateNotifier _templateNotifier;
   final FoodTemplateRepository _foodTemplateRepo;
@@ -125,8 +131,10 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
     required SyncPreferences prefs,
     required dynamic exerciseRepo,
     required dynamic dietRepo,
+    required dynamic weightRepo,
     required ExerciseNotifier exerciseNotifier,
     required DietNotifier dietNotifier,
+    required dynamic weightNotifier,
     required ExerciseTemplateRepository templateRepo,
     required ExerciseTemplateNotifier templateNotifier,
     required FoodTemplateRepository foodTemplateRepo,
@@ -137,8 +145,10 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _prefs = prefs,
         _exerciseRepo = exerciseRepo,
         _dietRepo = dietRepo,
+        _weightRepo = weightRepo,
         _exerciseNotifier = exerciseNotifier,
         _dietNotifier = dietNotifier,
+        _weightNotifier = weightNotifier,
         _templateRepo = templateRepo,
         _templateNotifier = templateNotifier,
         _foodTemplateRepo = foodTemplateRepo,
@@ -162,15 +172,17 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _sheetsService,
         _exerciseRepo,
         _dietRepo,
+        _weightRepo,
         _templateRepo,
         _foodTemplateRepo,
         _weightRepo,
         _prefs,
       );
       // 동기화 완료 후 UI 상태를 DB 최신 데이터로 갱신
-      await Future.wait([
+      await Future.wait<void>([
         _exerciseNotifier.refresh(),
         _dietNotifier.refresh(),
+        _weightNotifier.refresh(),
         _templateNotifier.refresh(),
         _foodTemplateNotifier.refresh(),
         _weightNotifier.refresh(),
@@ -301,6 +313,7 @@ Future<SyncResult> _syncAll(
   GoogleSheetsService sheetsService,
   dynamic exerciseRepo,
   dynamic dietRepo,
+  dynamic weightRepo,
   ExerciseTemplateRepository templateRepo,
   FoodTemplateRepository foodTemplateRepo,
   WeightRepository weightRepo,
@@ -321,13 +334,15 @@ Future<SyncResult> _syncAll(
   try {
     final pendingExercise = await exerciseRepo.getPendingSync();
     final pendingDiet = await dietRepo.getPendingSync();
+    final pendingWeight = await weightRepo.getPendingSync();
 
     final exerciseToPush = pendingExercise; // 삭제 대상도 시트 연동을 위해 포함
     final dietToPush = pendingDiet;
+    final weightToPush = pendingWeight;
 
     if (exerciseToPush.isNotEmpty) {
       await sheetsService.batchPushExerciseRecords(exerciseToPush);
-      
+
       // 시트에 업로드가 끝난 후, 삭제(deleted) 상태가 아닌 것만 synced 로 상태 변경
       // 삭제 상태인 항목은 그대로 두어 이후 step 3 (hardDelete) 에서 완전히 로컬 삭제되도록 유도
       final uuidsToMarkSynced = exerciseToPush
@@ -341,7 +356,7 @@ Future<SyncResult> _syncAll(
 
     if (dietToPush.isNotEmpty) {
       await sheetsService.batchPushDietRecords(dietToPush);
-      
+
       final uuidsToMarkSynced = dietToPush
           .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
           .map<String>((r) => r.uuid as String)
@@ -351,7 +366,19 @@ Future<SyncResult> _syncAll(
       }
     }
 
-    pushed = exerciseToPush.length + dietToPush.length;
+    if (weightToPush.isNotEmpty) {
+      await sheetsService.batchPushWeightRecords(weightToPush);
+
+      final uuidsToMarkSynced = weightToPush
+          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
+          .map<String>((r) => r.uuid as String)
+          .toList();
+      if (uuidsToMarkSynced.isNotEmpty) {
+        await weightRepo.markAsSynced(uuidsToMarkSynced);
+      }
+    }
+
+    pushed = exerciseToPush.length + dietToPush.length + weightToPush.length;
   } catch (e) {
     errors.add('Push 오류: $e');
   }
@@ -418,11 +445,13 @@ Future<SyncResult> _syncAll(
     final remoteExercise =
         await sheetsService.readExerciseRecordsDelta(since: lastSync);
     final remoteDiet = await sheetsService.readDietRecordsDelta(since: lastSync);
+    final remoteWeight = await sheetsService.readWeightRecordsDelta(since: lastSync);
 
     await exerciseRepo.mergeRemoteRecords(remoteExercise);
     await dietRepo.mergeRemoteRecords(remoteDiet);
+    await weightRepo.mergeRemoteRecords(remoteWeight);
 
-    pulled = remoteExercise.length + remoteDiet.length;
+    pulled = remoteExercise.length + remoteDiet.length + remoteWeight.length;
   } catch (e) {
     errors.add('Pull 오류: $e');
   }
@@ -464,6 +493,7 @@ Future<SyncResult> _syncAll(
   try {
     await exerciseRepo.hardDeleteSyncedDeleted();
     await dietRepo.hardDeleteSyncedDeleted();
+    await weightRepo.hardDeleteSyncedDeleted();
   } catch (e) {
     errors.add('Hard Delete 오류: $e');
   }

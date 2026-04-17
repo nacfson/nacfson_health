@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v6  
+> **현재 버전**: v5  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -8,14 +8,13 @@
 
 ## 버전 이력
 
-| 버전 | 추가 테이블 / 변경 | 비고 |
-|------|------------------|------|
+| 버전 | 추가 테이블 | 비고 |
+|------|-----------|------|
 | v1 | `exercise_records` | 초기 출시 |
 | v2 | `diet_records` | 식단 기록 추가 |
 | v3 | `exercise_templates` | 운동 종목 프리셋 |
 | v4 | `food_templates` | 음식 프리셋 (2026-04) |
-| v5 | `exercise_templates` + `exercise_type` 컬럼, `weight_records` 신규 | 운동 유형 분류, 체중 기록 (2026-04) |
-| v6 | `exercise_templates` — `exercise_type = ''` 데이터 삭제 | 빈 유형 데이터 정리 (2026-04) |
+| v5 | `weight_records` | 체중 기록 (2026-04) |
 
 ---
 
@@ -73,14 +72,13 @@
 
 ---
 
-### 3. `exercise_templates` _(v5 이상)_
+### 3. `exercise_templates`
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | `id` | INTEGER PK | 로컬 자동증가 (시트 연동 금지) |
 | `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
 | `name` | TEXT UNIQUE | 종목명 |
-| `exercise_type` | TEXT | 운동 유형 (가슴/등/팔/하체/어깨/코어) — v6에서 빈 값(`''`) 삭제됨 |
 | `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
 | `sync_status` | INTEGER | TemplateSyncStatus 값 |
 
@@ -123,8 +121,7 @@
 | `weight` | REAL | 체중 (kg) |
 
 **SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
-**지원 연산**: Create · Read · Update · Delete (전체 CRUD)  
-**병합 전략**: LWW (Last-Write-Wins) — `updated_at` 기준으로 최신 레코드 우선
+**지원 연산**: Create · Read · Update · Delete (전체 CRUD)
 
 ---
 
@@ -132,11 +129,11 @@
 
 | DB 테이블 | Sheets 탭 | 헤더 범위 |
 |----------|-----------|---------|
-| `exercise_records` | `exercise_records` | A1:K1 |
-| `diet_records` | `diet_records` | A1:M1 |
-| `exercise_templates` | `exercise_templates` | A1:E1 (uuid/name/exerciseType/updatedAt) |
-| `food_templates` | `food_templates` | A1:G1 (uuid/name/calories/carbs/protein/fat/updatedAt) |
-| `weight_records` | `weight_records` | A1:F1 (uuid/timestamp/updatedAt/syncStatus/weight) |
+| `exercise_records` | `exercise_records` | A1:I1 |
+| `diet_records` | `diet_records` | A1:K1 |
+| `exercise_templates` | `exercise_templates` | A1:C1 |
+| `food_templates` | `food_templates` | A1:G1 |
+| `weight_records` | `weight_records` | A1:D1 (uuid/timestamp/updatedAt/weight) |
 
 > **동기화 메타데이터** (spreadsheetId, lastSyncTime, 영양 목표값 등)는 `SharedPreferences`에 저장 — DB 외부.
 

@@ -55,7 +55,7 @@ class SqliteWeightRepository implements WeightRepository {
     final now = DateTime.now();
     final newRecord = record.copyWith(
       uuid: record.uuid.isEmpty ? _uuid.v4() : record.uuid,
-      updatedAt: now,
+      updatedAt: record.timestamp.isBefore(now) ? record.timestamp : now,
       syncStatus: SyncStatus.created,
     );
     await db.insert('weight_records', _toMap(newRecord));
@@ -119,13 +119,13 @@ class SqliteWeightRepository implements WeightRepository {
       final existing = await _findByUuid(remoteRecord.uuid);
 
       if (existing == null) {
-        await _hardInsert(remoteRecord.copyWith(syncStatus: SyncStatus.synced));
+        await add(remoteRecord);
       } else {
         final remoteTime = remoteRecord.updatedAt.millisecondsSinceEpoch;
         final localTime = existing.updatedAt.millisecondsSinceEpoch;
 
         if (remoteTime > localTime) {
-          await _hardUpdate(remoteRecord.copyWith(syncStatus: SyncStatus.synced));
+          await _hardUpdate(remoteRecord);
         }
       }
     }
@@ -162,11 +162,6 @@ class SqliteWeightRepository implements WeightRepository {
     );
     if (result.isEmpty) return null;
     return _fromMap(result.first);
-  }
-
-  Future<void> _hardInsert(WeightRecord record) async {
-    final db = await _dbHelper.database;
-    await db.insert('weight_records', _toMap(record));
   }
 
   Future<void> _hardUpdate(WeightRecord record) async {
