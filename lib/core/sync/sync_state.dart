@@ -88,8 +88,6 @@ final syncStateProvider =
   final templateNotifier = ref.read(exerciseTemplatesProvider.notifier);
   final foodTemplateRepo = ref.read(foodTemplateRepositoryProvider);
   final foodTemplateNotifier = ref.read(foodTemplatesProvider.notifier);
-  final weightRepo = ref.read(weightRepositoryProvider);
-  final weightNotifier = ref.read(weightRecordsProvider.notifier);
 
   return SyncStateNotifier(
     sheetsService: sheetsService,
@@ -104,8 +102,6 @@ final syncStateProvider =
     templateNotifier: templateNotifier,
     foodTemplateRepo: foodTemplateRepo,
     foodTemplateNotifier: foodTemplateNotifier,
-    weightRepo: weightRepo,
-    weightNotifier: weightNotifier,
   );
 });
 
@@ -115,10 +111,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   final SyncPreferences _prefs;
   final dynamic _exerciseRepo;
   final dynamic _dietRepo;
-  final dynamic _weightRepo;
   final ExerciseNotifier _exerciseNotifier;
   final DietNotifier _dietNotifier;
-  final dynamic _weightNotifier;
   final ExerciseTemplateRepository _templateRepo;
   final ExerciseTemplateNotifier _templateNotifier;
   final FoodTemplateRepository _foodTemplateRepo;
@@ -131,10 +125,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
     required SyncPreferences prefs,
     required dynamic exerciseRepo,
     required dynamic dietRepo,
-    required dynamic weightRepo,
     required ExerciseNotifier exerciseNotifier,
     required DietNotifier dietNotifier,
-    required dynamic weightNotifier,
     required ExerciseTemplateRepository templateRepo,
     required ExerciseTemplateNotifier templateNotifier,
     required FoodTemplateRepository foodTemplateRepo,
@@ -145,10 +137,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _prefs = prefs,
         _exerciseRepo = exerciseRepo,
         _dietRepo = dietRepo,
-        _weightRepo = weightRepo,
         _exerciseNotifier = exerciseNotifier,
         _dietNotifier = dietNotifier,
-        _weightNotifier = weightNotifier,
         _templateRepo = templateRepo,
         _templateNotifier = templateNotifier,
         _foodTemplateRepo = foodTemplateRepo,
@@ -172,7 +162,6 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _sheetsService,
         _exerciseRepo,
         _dietRepo,
-        _weightRepo,
         _templateRepo,
         _foodTemplateRepo,
         _weightRepo,
@@ -185,7 +174,6 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _weightNotifier.refresh(),
         _templateNotifier.refresh(),
         _foodTemplateNotifier.refresh(),
-        _weightNotifier.refresh(),
       ]);
       state = SyncState.idle;
       return result;
@@ -313,7 +301,6 @@ Future<SyncResult> _syncAll(
   GoogleSheetsService sheetsService,
   dynamic exerciseRepo,
   dynamic dietRepo,
-  dynamic weightRepo,
   ExerciseTemplateRepository templateRepo,
   FoodTemplateRepository foodTemplateRepo,
   WeightRepository weightRepo,
@@ -419,25 +406,6 @@ Future<SyncResult> _syncAll(
     errors.add('음식 템플릿 Push 오류: $e');
   }
 
-  // 1-5. 체중 기록 Push: 로컬 → 시트 (v5 신규)
-  try {
-    final pendingWeight = await weightRepo.getPendingSync();
-    if (pendingWeight.isNotEmpty) {
-      await sheetsService.batchPushWeightRecords(pendingWeight);
-
-      final uuidsToMarkSynced = pendingWeight
-          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
-          .map<String>((r) => r.uuid)
-          .toList();
-      if (uuidsToMarkSynced.isNotEmpty) {
-        await weightRepo.markAsSynced(uuidsToMarkSynced);
-      }
-    }
-    pushed += pendingWeight.length;
-  } catch (e) {
-    errors.add('체중 기록 Push 오류: $e');
-  }
-
   // 2. Pull: 시트 → 로컬
   try {
     final lastSync = prefs.lastSyncTime;
@@ -478,17 +446,6 @@ Future<SyncResult> _syncAll(
     errors.add('음식 템플릿 Pull 오류: $e');
   }
 
-  // 2-5. 체중 기록 Pull: 시트 → 로컬 (v5 신규)
-  try {
-    final lastSync = prefs.lastSyncTime;
-    final remoteWeight =
-        await sheetsService.readWeightRecordsDelta(since: lastSync);
-    await weightRepo.mergeRemoteRecords(remoteWeight);
-    pulled += remoteWeight.length;
-  } catch (e) {
-    errors.add('체중 기록 Pull 오류: $e');
-  }
-
   // 3. Hard Delete: sync_status == deleted
   try {
     await exerciseRepo.hardDeleteSyncedDeleted();
@@ -510,13 +467,6 @@ Future<SyncResult> _syncAll(
     await foodTemplateRepo.hardDeleteSyncedDeleted();
   } catch (e) {
     errors.add('음식 템플릿 Hard Delete 오류: $e');
-  }
-
-  // 3-5. 체중 기록 Hard Delete (v5 신규)
-  try {
-    await weightRepo.hardDeleteSyncedDeleted();
-  } catch (e) {
-    errors.add('체중 기록 Hard Delete 오류: $e');
   }
 
   // 4. last_sync_timestamp 업데이트 (완벽하게 성공했을 때만 갱신)
