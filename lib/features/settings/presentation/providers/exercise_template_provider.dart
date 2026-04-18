@@ -31,10 +31,11 @@ class ExerciseTemplateNotifier
   /// 동기화 완료 후 DB에서 최신 상태를 다시 로드합니다.
   Future<void> refresh() => _load();
 
-  Future<void> addTemplate(String name) async {
+  Future<void> addTemplate(String name, String exerciseType) async {
     await _repository.add(ExerciseTemplate(
       uuid: '',
       name: name,
+      exerciseType: exerciseType,
       updatedAt: DateTime.now(),
     ));
     state = await _repository.getAll();

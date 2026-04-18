@@ -127,6 +127,7 @@ class SqliteExerciseTemplateRepository implements ExerciseTemplateRepository {
   Map<String, dynamic> _toMap(ExerciseTemplate t) => {
         'uuid': t.uuid,
         'name': t.name,
+        'exercise_type': t.exerciseType,
         'updated_at': t.updatedAt.millisecondsSinceEpoch,
         'sync_status': t.syncStatus.value,
       };
@@ -135,6 +136,7 @@ class SqliteExerciseTemplateRepository implements ExerciseTemplateRepository {
         id: map['id'] as int?,
         uuid: map['uuid'] as String,
         name: map['name'] as String,
+        exerciseType: map['exercise_type'] as String? ?? '',
         updatedAt:
             DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
         syncStatus: TemplateSyncStatus.fromInt(map['sync_status'] as int),

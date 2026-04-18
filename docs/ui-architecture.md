@@ -111,6 +111,9 @@ int _calculateSelectedIndex(BuildContext context) {
 
 - **ExerciseForm**: 운동 기록 (exerciseType, exerciseName, currentSet, weight, reps, rpe)
 - **DietForm**: 식단 기록 (mealType, foodName, totalCalories, carbs, protein, fat, satisfaction, memo, timestamp)
+- **WeightForm**: 체중 기록 (weight, timestamp) — `showDatePicker`로 날짜 선택, `DateTime(y, m, d)` 자정 저장
+
+> **날짜 선택 패턴**: 날짜만 선택할 경우 `DateTime(year, month, day)` 자정 저장. `todayWeightProvider`는 year/month/day 비교이므로 자정 타임스탬프와 호환됨.
 
 자세한 필드 정의는 `CLAUDE.md` Entity 스키마 참고.
 

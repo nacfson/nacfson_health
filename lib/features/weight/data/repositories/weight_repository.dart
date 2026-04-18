@@ -4,6 +4,7 @@ abstract class WeightRepository {
   Future<List<WeightRecord>> getAll();
   Future<WeightRecord?> getLatest();
   Future<List<WeightRecord>> getByDateRange(DateTime start, DateTime end);
+  Future<WeightRecord?> getByDate(DateTime date);
   Future<void> add(WeightRecord record);
   Future<void> update(WeightRecord record);
   Future<void> delete(String uuid);

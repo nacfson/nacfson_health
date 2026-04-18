@@ -46,7 +46,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '운동 및 식단 기록을 Google Sheets에 자동 백업합니다.\n'
+                    '운동 및 식단 기록을 Supabase에 자동 백업합니다.\n'
                     '데이터 손실 방지와 멀티 디바이스 동기화가 가능합니다.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.grey[600],

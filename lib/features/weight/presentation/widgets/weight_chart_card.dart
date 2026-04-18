@@ -115,7 +115,7 @@ class WeightChartCard extends ConsumerWidget {
             reservedSize: 30,
             interval: _getBottomInterval(viewType),
             getTitlesWidget: (value, meta) {
-              return _getBottomTitles(value, viewType);
+              return _getBottomTitles(value, meta, viewType);
             },
           ),
         ),
@@ -124,9 +124,12 @@ class WeightChartCard extends ConsumerWidget {
             showTitles: true,
             reservedSize: 40,
             getTitlesWidget: (value, meta) {
-              return Text(
-                value.toStringAsFixed(1),
-                style: const TextStyle(fontSize: 10),
+              return SideTitleWidget(
+                meta: meta,
+                child: Text(
+                  value.toStringAsFixed(1),
+                  style: const TextStyle(fontSize: 10),
+                ),
               );
             },
           ),
@@ -180,7 +183,7 @@ class WeightChartCard extends ConsumerWidget {
     }
   }
 
-  Widget _getBottomTitles(double value, ChartViewType viewType) {
+  Widget _getBottomTitles(double value, TitleMeta meta, ChartViewType viewType) {
     final date = DateTime.fromMillisecondsSinceEpoch(value.toInt());
     String text = '';
     switch (viewType) {
@@ -195,7 +198,7 @@ class WeightChartCard extends ConsumerWidget {
         break;
     }
     return SideTitleWidget(
-      axisSide: AxisSide.bottom,
+      meta: meta,
       child: Text(text, style: const TextStyle(fontSize: 10)),
     );
   }

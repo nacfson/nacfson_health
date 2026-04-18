@@ -68,16 +68,27 @@
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
+		<!-- Supabase 인증 콜백용 URL 스킴 -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.410327801063-iujf05260o95fjdhv3au63kvjnrt0nmj</string>
+				<string>io.supabase.nacfson</string>
+			</array>
+		</dict>
+		<!-- Google 로그인 OAuth 콜백용 역방향 클라이언트 ID
+			 Google Cloud Console > APIs & Services > Credentials > iOS 클라이언트 ID를 확인 후
+			 아래 YOUR_REVERSED_CLIENT_ID 를 실제 값으로 교체하세요.
+			 형식 예시: com.googleusercontent.apps.123456789-abcdefg -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>YOUR_REVERSED_CLIENT_ID</string>
 			</array>
 		</dict>
 	</array>
-	<key>GIDClientID</key>
-	<string>410327801063-iujf05260o95fjdhv3au63kvjnrt0nmj.apps.googleusercontent.com</string>
 </dict>
 </plist>

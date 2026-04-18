@@ -5,6 +5,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 import '../providers/exercise_template_provider.dart';
 
+const _exerciseTypes = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
+
 class ExerciseTemplateCard extends ConsumerStatefulWidget {
   const ExerciseTemplateCard({super.key});
 
@@ -15,6 +17,7 @@ class ExerciseTemplateCard extends ConsumerStatefulWidget {
 
 class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
   late final TextEditingController _templateNameCtrl;
+  String? _selectedExerciseType;
 
   @override
   void initState() {
@@ -31,32 +34,29 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
   Future<void> _addTemplate() async {
     final name = _templateNameCtrl.text.trim();
     if (name.isEmpty) {
-      ErrorOverlay.show(
-        title: '입력 오류',
-        message: '운동 이름을 입력해주세요.',
-      );
+      ErrorOverlay.show(title: '입력 오류', message: '운동 이름을 입력해주세요.');
+      return;
+    }
+    if (_selectedExerciseType == null) {
+      ErrorOverlay.show(title: '입력 오류', message: '운동 유형을 선택해주세요.');
       return;
     }
 
     final templates = ref.read(exerciseTemplatesProvider);
     if (templates.any((t) => t.name == name)) {
-      ErrorOverlay.show(
-        title: '중복 오류',
-        message: '이미 있는 템플릿입니다.',
-      );
+      ErrorOverlay.show(title: '중복 오류', message: '이미 있는 템플릿입니다.');
       return;
     }
 
     try {
-      await ref.read(exerciseTemplatesProvider.notifier).addTemplate(name);
+      await ref
+          .read(exerciseTemplatesProvider.notifier)
+          .addTemplate(name, _selectedExerciseType!);
       _templateNameCtrl.clear();
     } catch (e) {
       debugPrint('ExerciseTemplateCard._addTemplate error: $e');
       if (rootNavigatorKey.currentState?.overlay != null) {
-        ErrorOverlay.show(
-          title: '저장 실패',
-          message: '템플릿 추가 중 오류가 발생했습니다: $e',
-        );
+        ErrorOverlay.show(title: '저장 실패', message: '템플릿 추가 중 오류가 발생했습니다: $e');
       }
     }
   }
@@ -67,10 +67,7 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     } catch (e) {
       debugPrint('ExerciseTemplateCard._deleteTemplate error: $e');
       if (rootNavigatorKey.currentState?.overlay != null) {
-        ErrorOverlay.show(
-          title: '삭제 실패',
-          message: '템플릿 삭제 중 오류가 발생했습니다: $e',
-        );
+        ErrorOverlay.show(title: '삭제 실패', message: '템플릿 삭제 중 오류가 발생했습니다: $e');
       }
     }
   }
@@ -79,6 +76,16 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final templates = ref.watch(exerciseTemplatesProvider);
+
+    // 유형별 그룹화 (typeOrder 순서 유지)
+    final grouped = <String, List<String>>{};
+    for (final type in _exerciseTypes) {
+      final names = templates
+          .where((t) => t.exerciseType == type)
+          .map((t) => t.name)
+          .toList();
+      if (names.isNotEmpty) grouped[type] = names;
+    }
 
     return Card(
       child: Padding(
@@ -96,24 +103,58 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
             const SizedBox(height: 4),
             Text(
               '자주 사용하는 운동 이름을 미리 등록하세요.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.outline),
-            ),
-            const SizedBox(height: 16),
-            if (templates.isNotEmpty)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final template in templates)
-                    Chip(
-                      label: Text(template.name),
-                      onDeleted: () => _deleteTemplate(template.uuid),
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                    ),
-                ],
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
               ),
-            if (templates.isNotEmpty) const SizedBox(height: 12),
+            ),
+            if (grouped.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              for (final entry in grouped.entries) ...[
+                Text(
+                  '[${entry.key}]',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final name in entry.value)
+                      Chip(
+                        label: Text(name),
+                        onDeleted: () {
+                          final t = templates.firstWhere((t) => t.name == name);
+                          _deleteTemplate(t.uuid);
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 18),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              decoration: InputDecoration(
+                labelText: '운동 유형',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
+              initialValue: _selectedExerciseType,
+              items: _exerciseTypes
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedExerciseType = v),
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(

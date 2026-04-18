@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/diet/presentation/providers/diet_provider.dart';
 import '../../features/exercise/presentation/providers/exercise_provider.dart';
@@ -11,7 +12,7 @@ import '../../features/settings/presentation/providers/food_template_provider.da
 import '../../features/weight/data/repositories/weight_repository.dart';
 import '../../features/weight/presentation/providers/weight_provider.dart';
 import 'google_auth_service.dart';
-import 'google_sheets_service.dart';
+import 'supabase_service.dart';
 import 'sync_preferences.dart';
 
 // ============================================================================
@@ -29,14 +30,6 @@ final syncPreferencesProvider = Provider<SyncPreferences>((ref) {
 });
 
 // ============================================================================
-// Provider: Spreadsheet ID
-// ============================================================================
-
-final spreadsheetIdProvider = StateProvider<String?>((ref) {
-  return ref.watch(syncPreferencesProvider).spreadsheetId;
-});
-
-// ============================================================================
 // Provider: Last Sync Time
 // ============================================================================
 
@@ -45,7 +38,7 @@ final lastSyncTimeProvider = Provider<DateTime?>((ref) {
 });
 
 // ============================================================================
-// Provider: GoogleAuthService
+// Provider: GoogleAuthService (Supabase 구현체 래퍼)
 // ============================================================================
 
 final googleAuthServiceProvider = Provider<GoogleAuthService>((ref) {
@@ -53,30 +46,29 @@ final googleAuthServiceProvider = Provider<GoogleAuthService>((ref) {
 });
 
 // ============================================================================
-// Provider: GoogleSheetsService
+// Provider: SupabaseService
 // ============================================================================
 
-final googleSheetsServiceProvider = Provider<GoogleSheetsService?>((ref) {
-  final authService = ref.watch(googleAuthServiceProvider);
-  final spreadsheetId = ref.watch(spreadsheetIdProvider);
+final supabaseServiceProvider = Provider<SupabaseService>((ref) {
+  return SupabaseService();
+});
 
-  if (spreadsheetId == null) {
-    return null;
-  }
+// ============================================================================
+// Provider: Supabase Auth Stream (반응형 로그인 상태)
+// ============================================================================
 
-  return GoogleSheetsService(authService, spreadsheetId);
+final supabaseAuthStreamProvider = StreamProvider<AuthState>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange;
 });
 
 // ============================================================================
 // Provider: SyncStateNotifier
 // ============================================================================
 
-final syncStateProvider =
-    StateNotifierProvider<SyncStateNotifier, SyncState>((ref) {
-  // 생성자 주입(DI) — Provider 빌드 시 종속성을 미리 읽어서 Notifier에 전달합니다.
-  // ref.read를 사용하는 이유: Provider 초기화 중에는 watch 구독이 아닌
-  // 일회성 읽기만 허용되기 때문입니다.
-  final sheetsService = ref.read(googleSheetsServiceProvider);
+final syncStateProvider = StateNotifierProvider<SyncStateNotifier, SyncState>((
+  ref,
+) {
+  final supabaseService = ref.read(supabaseServiceProvider);
   final prefs = ref.read(syncPreferencesProvider);
   final exerciseRepo = ref.read(exerciseRepositoryProvider);
   final dietRepo = ref.read(dietRepositoryProvider);
@@ -88,18 +80,14 @@ final syncStateProvider =
   final templateNotifier = ref.read(exerciseTemplatesProvider.notifier);
   final foodTemplateRepo = ref.read(foodTemplateRepositoryProvider);
   final foodTemplateNotifier = ref.read(foodTemplatesProvider.notifier);
-  final weightRepo = ref.read(weightRepositoryProvider);
-  final weightNotifier = ref.read(weightRecordsProvider.notifier);
 
   return SyncStateNotifier(
-    sheetsService: sheetsService,
+    supabaseService: supabaseService,
     prefs: prefs,
     exerciseRepo: exerciseRepo,
     dietRepo: dietRepo,
-    weightRepo: weightRepo,
     exerciseNotifier: exerciseNotifier,
     dietNotifier: dietNotifier,
-    weightNotifier: weightNotifier,
     templateRepo: templateRepo,
     templateNotifier: templateNotifier,
     foodTemplateRepo: foodTemplateRepo,
@@ -110,15 +98,12 @@ final syncStateProvider =
 });
 
 class SyncStateNotifier extends StateNotifier<SyncState> {
-  // 외부 서비스를 생성자로 주입받습니다 (Facade 패턴)
-  final GoogleSheetsService? _sheetsService;
+  final SupabaseService _supabaseService;
   final SyncPreferences _prefs;
   final dynamic _exerciseRepo;
   final dynamic _dietRepo;
-  final dynamic _weightRepo;
   final ExerciseNotifier _exerciseNotifier;
   final DietNotifier _dietNotifier;
-  final dynamic _weightNotifier;
   final ExerciseTemplateRepository _templateRepo;
   final ExerciseTemplateNotifier _templateNotifier;
   final FoodTemplateRepository _foodTemplateRepo;
@@ -127,28 +112,24 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   final WeightNotifier _weightNotifier;
 
   SyncStateNotifier({
-    required GoogleSheetsService? sheetsService,
+    required SupabaseService supabaseService,
     required SyncPreferences prefs,
     required dynamic exerciseRepo,
     required dynamic dietRepo,
-    required dynamic weightRepo,
     required ExerciseNotifier exerciseNotifier,
     required DietNotifier dietNotifier,
-    required dynamic weightNotifier,
     required ExerciseTemplateRepository templateRepo,
     required ExerciseTemplateNotifier templateNotifier,
     required FoodTemplateRepository foodTemplateRepo,
     required FoodTemplateNotifier foodTemplateNotifier,
     required WeightRepository weightRepo,
     required WeightNotifier weightNotifier,
-  })  : _sheetsService = sheetsService,
+  })  : _supabaseService = supabaseService,
         _prefs = prefs,
         _exerciseRepo = exerciseRepo,
         _dietRepo = dietRepo,
-        _weightRepo = weightRepo,
         _exerciseNotifier = exerciseNotifier,
         _dietNotifier = dietNotifier,
-        _weightNotifier = weightNotifier,
         _templateRepo = templateRepo,
         _templateNotifier = templateNotifier,
         _foodTemplateRepo = foodTemplateRepo,
@@ -157,35 +138,29 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _weightNotifier = weightNotifier,
         super(SyncState.idle);
 
-  /// 동기화를 수행합니다.
-  /// 완료 후 ExerciseNotifier와 DietNotifier를 갱신해 UI를 최신 상태로 반영합니다.
   Future<SyncResult> performSync() async {
-    if (_sheetsService == null) {
-      throw Exception('Google Sheets가 연동되지 않았습니다');
+    if (Supabase.instance.client.auth.currentUser == null) {
+      throw Exception('로그인이 필요합니다');
     }
 
-    // 자기 자신의 state 변경 → Riverpod 규칙상 완전히 합법
     state = SyncState.syncing;
 
     try {
       final result = await _syncAll(
-        _sheetsService,
+        _supabaseService,
         _exerciseRepo,
         _dietRepo,
-        _weightRepo,
         _templateRepo,
         _foodTemplateRepo,
         _weightRepo,
         _prefs,
       );
-      // 동기화 완료 후 UI 상태를 DB 최신 데이터로 갱신
       await Future.wait<void>([
         _exerciseNotifier.refresh(),
         _dietNotifier.refresh(),
         _weightNotifier.refresh(),
         _templateNotifier.refresh(),
         _foodTemplateNotifier.refresh(),
-        _weightNotifier.refresh(),
       ]);
       state = SyncState.idle;
       return result;
@@ -205,19 +180,21 @@ final isSyncingProvider = Provider<bool>((ref) {
 });
 
 // ============================================================================
-// Provider: Is Signed In
+// Provider: Is Signed In (Supabase auth stream 기반)
 // ============================================================================
 
 final isSignedInProvider = Provider<bool>((ref) {
-  return ref.watch(googleAuthServiceProvider).isSignedIn;
+  ref.watch(supabaseAuthStreamProvider);
+  return Supabase.instance.client.auth.currentUser != null;
 });
 
 // ============================================================================
-// Provider: Current Account
+// Provider: Current Account (Supabase User)
 // ============================================================================
 
-final currentAccountProvider = Provider<dynamic>((ref) {
-  return ref.watch(googleAuthServiceProvider).currentAccount;
+final currentAccountProvider = Provider<User?>((ref) {
+  ref.watch(supabaseAuthStreamProvider);
+  return Supabase.instance.client.auth.currentUser;
 });
 
 // ============================================================================
@@ -274,12 +251,14 @@ class NutritionTargetsNotifier extends StateNotifier<NutritionTargets> {
   final SyncPreferences _prefs;
 
   NutritionTargetsNotifier(this._prefs)
-      : super(NutritionTargets(
-          calories: _prefs.targetCalories,
-          carbs: _prefs.targetCarbs,
-          protein: _prefs.targetProtein,
-          fat: _prefs.targetFat,
-        ));
+      : super(
+          NutritionTargets(
+            calories: _prefs.targetCalories,
+            carbs: _prefs.targetCarbs,
+            protein: _prefs.targetProtein,
+            fat: _prefs.targetFat,
+          ),
+        );
 
   Future<void> update({
     int? calories,
@@ -301,19 +280,21 @@ class NutritionTargetsNotifier extends StateNotifier<NutritionTargets> {
 }
 
 final nutritionTargetsProvider =
-    StateNotifierProvider<NutritionTargetsNotifier, NutritionTargets>((ref) {
-  return NutritionTargetsNotifier(ref.read(syncPreferencesProvider));
+    StateNotifierProvider<NutritionTargetsProvider, NutritionTargets>((ref) {
+  return NutritionTargetsProvider(ref.read(syncPreferencesProvider));
 });
+
+// NutritionTargetsProvider alias to avoid name collision
+typedef NutritionTargetsProvider = NutritionTargetsNotifier;
 
 // ============================================================================
 // Sync All Helper (Internal)
 // ============================================================================
 
 Future<SyncResult> _syncAll(
-  GoogleSheetsService sheetsService,
+  SupabaseService supabaseService,
   dynamic exerciseRepo,
   dynamic dietRepo,
-  dynamic weightRepo,
   ExerciseTemplateRepository templateRepo,
   FoodTemplateRepository foodTemplateRepo,
   WeightRepository weightRepo,
@@ -323,71 +304,62 @@ Future<SyncResult> _syncAll(
   int pushed = 0;
   int pulled = 0;
 
-  // 0. 필수 시트 존재 보장 (멱등 — 없는 시트만 생성)
-  try {
-    await sheetsService.ensureAllRequiredSheets();
-  } catch (e) {
-    errors.add('시트 초기화 오류: $e');
-  }
-
-  // 1. Push: 로컬 → 시트
+  // 1. Push: 로컬 → Supabase
   try {
     final pendingExercise = await exerciseRepo.getPendingSync();
-    final pendingDiet = await dietRepo.getPendingSync();
-    final pendingWeight = await weightRepo.getPendingSync();
-
-    final exerciseToPush = pendingExercise; // 삭제 대상도 시트 연동을 위해 포함
-    final dietToPush = pendingDiet;
-    final weightToPush = pendingWeight;
-
-    if (exerciseToPush.isNotEmpty) {
-      await sheetsService.batchPushExerciseRecords(exerciseToPush);
-
-      // 시트에 업로드가 끝난 후, 삭제(deleted) 상태가 아닌 것만 synced 로 상태 변경
-      // 삭제 상태인 항목은 그대로 두어 이후 step 3 (hardDelete) 에서 완전히 로컬 삭제되도록 유도
-      final uuidsToMarkSynced = exerciseToPush
-          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
+    if (pendingExercise.isNotEmpty) {
+      await supabaseService.batchPushExerciseRecords(pendingExercise);
+      final uuidsToMark = pendingExercise
+          .where((r) => r.syncStatus.value != 3)
           .map<String>((r) => r.uuid as String)
           .toList();
-      if (uuidsToMarkSynced.isNotEmpty) {
-        await exerciseRepo.markAsSynced(uuidsToMarkSynced);
+      if (uuidsToMark.isNotEmpty) {
+        await exerciseRepo.markAsSynced(uuidsToMark);
       }
     }
-
-    if (dietToPush.isNotEmpty) {
-      await sheetsService.batchPushDietRecords(dietToPush);
-
-      final uuidsToMarkSynced = dietToPush
-          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
-          .map<String>((r) => r.uuid as String)
-          .toList();
-      if (uuidsToMarkSynced.isNotEmpty) {
-        await dietRepo.markAsSynced(uuidsToMarkSynced);
-      }
-    }
-
-    if (weightToPush.isNotEmpty) {
-      await sheetsService.batchPushWeightRecords(weightToPush);
-
-      final uuidsToMarkSynced = weightToPush
-          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
-          .map<String>((r) => r.uuid as String)
-          .toList();
-      if (uuidsToMarkSynced.isNotEmpty) {
-        await weightRepo.markAsSynced(uuidsToMarkSynced);
-      }
-    }
-
-    pushed = exerciseToPush.length + dietToPush.length + weightToPush.length;
+    pushed += (pendingExercise as List).length;
   } catch (e) {
-    errors.add('Push 오류: $e');
+    errors.add('운동 기록 Push 오류: $e');
   }
 
-  // 1-3. 템플릿 Push: 로컬 → 시트
+  try {
+    final pendingDiet = await dietRepo.getPendingSync();
+    if (pendingDiet.isNotEmpty) {
+      await supabaseService.batchPushDietRecords(pendingDiet);
+      final uuidsToMark = pendingDiet
+          .where((r) => r.syncStatus.value != 3)
+          .map<String>((r) => r.uuid as String)
+          .toList();
+      if (uuidsToMark.isNotEmpty) {
+        await dietRepo.markAsSynced(uuidsToMark);
+      }
+    }
+    pushed += (pendingDiet as List).length;
+  } catch (e) {
+    errors.add('식단 기록 Push 오류: $e');
+  }
+
+  try {
+    final pendingWeight = await weightRepo.getPendingSync();
+    if (pendingWeight.isNotEmpty) {
+      await supabaseService.batchPushWeightRecords(pendingWeight);
+      final uuidsToMark = pendingWeight
+          .where((r) => r.syncStatus.value != 3)
+          .map<String>((r) => r.uuid)
+          .toList();
+      if (uuidsToMark.isNotEmpty) {
+        await weightRepo.markAsSynced(uuidsToMark);
+      }
+    }
+    pushed += pendingWeight.length;
+  } catch (e) {
+    errors.add('체중 기록 Push 오류: $e');
+  }
+
   try {
     final pendingTemplates = await templateRepo.getPendingSync();
     if (pendingTemplates.isNotEmpty) {
-      await sheetsService.batchPushTemplates(pendingTemplates);
+      await supabaseService.batchPushTemplates(pendingTemplates);
       final uuidsToMark = pendingTemplates
           .where((t) => t.syncStatus != TemplateSyncStatus.deleted)
           .map((t) => t.uuid)
@@ -398,14 +370,13 @@ Future<SyncResult> _syncAll(
     }
     pushed += pendingTemplates.length;
   } catch (e) {
-    errors.add('템플릿 Push 오류: $e');
+    errors.add('운동 템플릿 Push 오류: $e');
   }
 
-  // 1-4. 음식 템플릿 Push: 로컬 → 시트
   try {
     final pendingFoodTemplates = await foodTemplateRepo.getPendingSync();
     if (pendingFoodTemplates.isNotEmpty) {
-      await sheetsService.batchPushFoodTemplates(pendingFoodTemplates);
+      await supabaseService.batchPushFoodTemplates(pendingFoodTemplates);
       final uuidsToMark = pendingFoodTemplates
           .where((t) => t.syncStatus != FoodTemplateSyncStatus.deleted)
           .map((t) => t.uuid)
@@ -419,74 +390,52 @@ Future<SyncResult> _syncAll(
     errors.add('음식 템플릿 Push 오류: $e');
   }
 
-  // 1-5. 체중 기록 Push: 로컬 → 시트 (v5 신규)
+  // 2. Pull: Supabase → 로컬
+  final lastSync = prefs.lastSyncTime;
+
   try {
-    final pendingWeight = await weightRepo.getPendingSync();
-    if (pendingWeight.isNotEmpty) {
-      await sheetsService.batchPushWeightRecords(pendingWeight);
-
-      final uuidsToMarkSynced = pendingWeight
-          .where((r) => r.syncStatus.value != 3) // 3 = SyncStatus.deleted
-          .map<String>((r) => r.uuid)
-          .toList();
-      if (uuidsToMarkSynced.isNotEmpty) {
-        await weightRepo.markAsSynced(uuidsToMarkSynced);
-      }
-    }
-    pushed += pendingWeight.length;
-  } catch (e) {
-    errors.add('체중 기록 Push 오류: $e');
-  }
-
-  // 2. Pull: 시트 → 로컬
-  try {
-    final lastSync = prefs.lastSyncTime;
-
     final remoteExercise =
-        await sheetsService.readExerciseRecordsDelta(since: lastSync);
-    final remoteDiet = await sheetsService.readDietRecordsDelta(since: lastSync);
-    final remoteWeight = await sheetsService.readWeightRecordsDelta(since: lastSync);
-
+        await supabaseService.readExerciseRecordsDelta(since: lastSync);
     await exerciseRepo.mergeRemoteRecords(remoteExercise);
+    pulled += remoteExercise.length;
+  } catch (e) {
+    errors.add('운동 기록 Pull 오류: $e');
+  }
+
+  try {
+    final remoteDiet =
+        await supabaseService.readDietRecordsDelta(since: lastSync);
     await dietRepo.mergeRemoteRecords(remoteDiet);
-    await weightRepo.mergeRemoteRecords(remoteWeight);
-
-    pulled = remoteExercise.length + remoteDiet.length + remoteWeight.length;
+    pulled += remoteDiet.length;
   } catch (e) {
-    errors.add('Pull 오류: $e');
+    errors.add('식단 기록 Pull 오류: $e');
   }
 
-  // 2-3. 템플릿 Pull: 시트 → 로컬
   try {
-    final lastSync = prefs.lastSyncTime;
-    final remoteTemplates =
-        await sheetsService.readTemplatesDelta(since: lastSync);
-    await templateRepo.mergeRemoteTemplates(remoteTemplates);
-    pulled += remoteTemplates.length;
-  } catch (e) {
-    errors.add('템플릿 Pull 오류: $e');
-  }
-
-  // 2-4. 음식 템플릿 Pull: 시트 → 로컬
-  try {
-    final lastSync = prefs.lastSyncTime;
-    final remoteFoodTemplates =
-        await sheetsService.readFoodTemplatesDelta(since: lastSync);
-    await foodTemplateRepo.mergeRemoteTemplates(remoteFoodTemplates);
-    pulled += remoteFoodTemplates.length;
-  } catch (e) {
-    errors.add('음식 템플릿 Pull 오류: $e');
-  }
-
-  // 2-5. 체중 기록 Pull: 시트 → 로컬 (v5 신규)
-  try {
-    final lastSync = prefs.lastSyncTime;
     final remoteWeight =
-        await sheetsService.readWeightRecordsDelta(since: lastSync);
+        await supabaseService.readWeightRecordsDelta(since: lastSync);
     await weightRepo.mergeRemoteRecords(remoteWeight);
     pulled += remoteWeight.length;
   } catch (e) {
     errors.add('체중 기록 Pull 오류: $e');
+  }
+
+  try {
+    final remoteTemplates =
+        await supabaseService.readTemplatesDelta(since: lastSync);
+    await templateRepo.mergeRemoteTemplates(remoteTemplates);
+    pulled += remoteTemplates.length;
+  } catch (e) {
+    errors.add('운동 템플릿 Pull 오류: $e');
+  }
+
+  try {
+    final remoteFoodTemplates =
+        await supabaseService.readFoodTemplatesDelta(since: lastSync);
+    await foodTemplateRepo.mergeRemoteTemplates(remoteFoodTemplates);
+    pulled += remoteFoodTemplates.length;
+  } catch (e) {
+    errors.add('음식 템플릿 Pull 오류: $e');
   }
 
   // 3. Hard Delete: sync_status == deleted
@@ -494,32 +443,13 @@ Future<SyncResult> _syncAll(
     await exerciseRepo.hardDeleteSyncedDeleted();
     await dietRepo.hardDeleteSyncedDeleted();
     await weightRepo.hardDeleteSyncedDeleted();
+    await templateRepo.hardDeleteSyncedDeleted();
+    await foodTemplateRepo.hardDeleteSyncedDeleted();
   } catch (e) {
     errors.add('Hard Delete 오류: $e');
   }
 
-  // 3-3. 템플릿 Hard Delete
-  try {
-    await templateRepo.hardDeleteSyncedDeleted();
-  } catch (e) {
-    errors.add('템플릿 Hard Delete 오류: $e');
-  }
-
-  // 3-4. 음식 템플릿 Hard Delete
-  try {
-    await foodTemplateRepo.hardDeleteSyncedDeleted();
-  } catch (e) {
-    errors.add('음식 템플릿 Hard Delete 오류: $e');
-  }
-
-  // 3-5. 체중 기록 Hard Delete (v5 신규)
-  try {
-    await weightRepo.hardDeleteSyncedDeleted();
-  } catch (e) {
-    errors.add('체중 기록 Hard Delete 오류: $e');
-  }
-
-  // 4. last_sync_timestamp 업데이트 (완벽하게 성공했을 때만 갱신)
+  // 4. last_sync_timestamp 업데이트 (오류 없을 때만)
   if (errors.isEmpty) {
     try {
       await prefs.updateLastSyncTimestamp();

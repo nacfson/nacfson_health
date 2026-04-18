@@ -19,7 +19,9 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
   late final TextEditingController _carbsCtrl;
   late final TextEditingController _proteinCtrl;
   late final TextEditingController _fatCtrl;
+  late final TextEditingController _searchCtrl;
   final _formKey = GlobalKey<FormState>();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
     _carbsCtrl = TextEditingController();
     _proteinCtrl = TextEditingController();
     _fatCtrl = TextEditingController();
+    _searchCtrl = TextEditingController();
   }
 
   @override
@@ -38,6 +41,7 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
     _carbsCtrl.dispose();
     _proteinCtrl.dispose();
     _fatCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -129,7 +133,10 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final templates = ref.watch(foodTemplatesProvider);
+    final allTemplates = ref.watch(foodTemplatesProvider);
+    final templates = allTemplates
+        .where((t) => t.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
 
     return Card(
       child: Padding(
@@ -142,6 +149,24 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
                 Icon(Icons.restaurant, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text('음식 템플릿', style: theme.textTheme.titleMedium),
+                const Spacer(),
+                if (allTemplates.isNotEmpty)
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _searchCtrl,
+                      decoration: InputDecoration(
+                        hintText: '검색...',
+                        prefixIcon: const Icon(Icons.search, size: 18),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      onChanged: (v) => setState(() => _searchQuery = v),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 4),

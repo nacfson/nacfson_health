@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/widgets/bottom_nav_shell.dart';
+import '../../features/auth/presentation/screens/auth_callback_screen.dart';
 import '../../features/exercise/presentation/screens/exercise_screen.dart';
 import '../../features/diet/presentation/screens/diet_screen.dart';
 import '../../features/summary/presentation/screens/summary_screen.dart';
@@ -14,6 +15,12 @@ final appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/exercise',
   routes: [
+    GoRoute(
+      path: '/login-callback',
+      pageBuilder: (context, state) => const NoTransitionPage(
+        child: AuthCallbackScreen(),
+      ),
+    ),
     ShellRoute(
       navigatorKey: shellNavigatorKey,
       builder: (context, state, child) => BottomNavShell(child: child),

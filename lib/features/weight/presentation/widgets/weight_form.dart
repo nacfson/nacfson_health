@@ -16,12 +16,17 @@ class WeightForm extends ConsumerStatefulWidget {
 class _WeightFormState extends ConsumerState<WeightForm> {
   final _weightController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  late DateTime _selectedDate;
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialRecord != null) {
-      _weightController.text = widget.initialRecord!.weight.toString();
+    final r = widget.initialRecord;
+    _selectedDate = r != null
+        ? DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day)
+        : DateTime.now();
+    if (r != null) {
+      _weightController.text = r.weight.toString();
     }
   }
 
@@ -31,8 +36,54 @@ class _WeightFormState extends ConsumerState<WeightForm> {
     super.dispose();
   }
 
+  DateTime get _originalDate {
+    final r = widget.initialRecord;
+    if (r != null) {
+      return DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day);
+    }
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _selectedDate = DateTime(picked.year, picked.month, picked.day);
+      });
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedDate != _originalDate) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('날짜 확인'),
+          content: Text(
+            '${_selectedDate.year}년 ${_selectedDate.month}월 ${_selectedDate.day}일로 기록하시겠습니까?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
 
     try {
       final weightValue = double.parse(_weightController.text);
@@ -41,12 +92,13 @@ class _WeightFormState extends ConsumerState<WeightForm> {
       if (widget.initialRecord != null) {
         final updated = widget.initialRecord!.copyWith(
           weight: weightValue,
+          timestamp: _selectedDate,
           updatedAt: now,
         );
         await ref.read(weightRecordsProvider.notifier).updateRecord(updated);
       } else {
         final newRecord = WeightRecord(
-          timestamp: now,
+          timestamp: _selectedDate,
           updatedAt: now,
           weight: weightValue,
         );
@@ -69,12 +121,40 @@ class _WeightFormState extends ConsumerState<WeightForm> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDateChanged = _selectedDate != _originalDate;
     return RecordFormSheet(
       title: widget.initialRecord != null ? '체중 수정' : '체중 기록',
       child: Form(
         key: _formKey,
         child: Column(
           children: [
+            GestureDetector(
+              onTap: _pickDate,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDateChanged
+                        ? Colors.amber.shade700
+                        : theme.colorScheme.outline,
+                    width: isDateChanged ? 2.0 : 1.0,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${_selectedDate.year}년 ${_selectedDate.month}월 ${_selectedDate.day}일',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    Icon(Icons.calendar_today, color: theme.colorScheme.primary),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _weightController,
               autofocus: true,
@@ -99,11 +179,13 @@ class _WeightFormState extends ConsumerState<WeightForm> {
                 onPressed: _submit,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                 ),
                 child: Text(
-                  widget.initialRecord != null ? '수정 완료' : '기록 완료',
+                  isDateChanged
+                      ? '${_selectedDate.month}월 ${_selectedDate.day}일로 기록'
+                      : (widget.initialRecord != null ? '수정 완료' : '기록 완료'),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),

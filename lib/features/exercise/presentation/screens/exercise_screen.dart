@@ -55,7 +55,7 @@ class ExerciseScreen extends ConsumerWidget {
                 icon: Icons.fitness_center,
                 title: '오늘의 운동 기록이 없어요',
                 subtitle: '+ 버튼으로 첫 운동을 기록해보세요',
-                buttonLabel: '운동 추가하기',
+                buttonLabel: '운동 추가',
                 onAddPressed: () => _openAddSheet(context),
               ),
             )

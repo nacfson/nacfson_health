@@ -54,7 +54,7 @@ class DietScreen extends ConsumerWidget {
                 icon: Icons.restaurant,
                 title: '오늘의 식단 기록이 없어요',
                 subtitle: '+ 버튼으로 첫 식사를 기록해보세요',
-                buttonLabel: '식사 추가하기',
+                buttonLabel: '식사 추가',
                 onAddPressed: () => _openAddSheet(context),
               ),
             )

@@ -45,6 +45,7 @@
 - [x] `DietForm` — 음식 템플릿 드롭다운 + 자동 채움 (칼로리/탄단지 전체)
 - [x] `ExerciseForm` — 운동 템플릿 드롭다운 + 종목명 자동 채움
 - [x] `WeightScreen` — 체중 탭 (입력/차트 시각화)
+- [x] `WeightForm` — 날짜 선택 기능 (`showDatePicker`, 과거 날짜 소급 입력 지원)
 
 ---
 

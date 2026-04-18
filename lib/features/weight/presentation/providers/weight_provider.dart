@@ -25,7 +25,17 @@ class WeightNotifier extends StateNotifier<List<WeightRecord>> {
   }
 
   Future<void> addRecord(WeightRecord record) async {
-    await _repository.add(record);
+    final existing = await _repository.getByDate(record.timestamp);
+    if (existing != null) {
+      final updated = existing.copyWith(
+        weight: record.weight,
+        updatedAt: DateTime.now(),
+        syncStatus: SyncStatus.modified,
+      );
+      await _repository.update(updated);
+    } else {
+      await _repository.add(record);
+    }
     await refresh();
   }
 

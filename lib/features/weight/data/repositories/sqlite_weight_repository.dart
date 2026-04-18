@@ -50,6 +50,25 @@ class SqliteWeightRepository implements WeightRepository {
   }
 
   @override
+  Future<WeightRecord?> getByDate(DateTime date) async {
+    final db = await _dbHelper.database;
+    final start = DateTime(date.year, date.month, date.day);
+    final end = start.add(const Duration(days: 1));
+    final result = await db.query(
+      'weight_records',
+      where: 'timestamp >= ? AND timestamp < ? AND sync_status != ?',
+      whereArgs: [
+        start.millisecondsSinceEpoch,
+        end.millisecondsSinceEpoch,
+        SyncStatus.deleted.value,
+      ],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    return _fromMap(result.first);
+  }
+
+  @override
   Future<void> add(WeightRecord record) async {
     final db = await _dbHelper.database;
     final now = DateTime.now();

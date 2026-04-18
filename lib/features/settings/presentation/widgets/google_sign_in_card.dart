@@ -16,100 +16,40 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
   bool _isLoading = false;
 
   Future<void> _handleSignIn() async {
-    debugPrint('[GoogleSignInCard] ========== _handleSignIn() 시작 ==========');
-    setState(() {
-      _isLoading = true;
-      debugPrint('[GoogleSignInCard] 로딩 상태 ON: $_isLoading');
-    });
+    setState(() => _isLoading = true);
 
     try {
-      debugPrint('[GoogleSignInCard] authService 읽기 시작');
       final authService = ref.read(googleAuthServiceProvider);
-      debugPrint('[GoogleSignInCard] authService 획득: $authService');
-
-      debugPrint('[GoogleSignInCard] authService.signIn() 호출 중...');
-      final account = await authService.signIn();
-      debugPrint('[GoogleSignInCard] authService.signIn() 응답: $account');
-
-      debugPrint('[GoogleSignInCard] mounted 체크: $mounted');
-      if (!mounted) {
-        debugPrint('[GoogleSignInCard] 위젯이 해제됨 - 조기 반환');
-        return;
-      }
-
-      if (account != null) {
-        debugPrint('[GoogleSignInCard] 로그인 성공 - provider 갱신 시작');
-        // 로그인 성공 — provider 갱신
-        debugPrint('[GoogleSignInCard] isSignedInProvider 갱신 중...');
-        ref.invalidate(isSignedInProvider);
-        debugPrint('[GoogleSignInCard] currentAccountProvider 갱신 중...');
-        ref.invalidate(currentAccountProvider);
-        debugPrint('[GoogleSignInCard] provider 갱신 완료');
-      } else {
-        debugPrint('[GoogleSignInCard] 로그인 취소됨 - account == null');
-      }
-      // account == null 이면 사용자가 취소한 것 — 오류 없이 종료
+      await authService.signIn();
+      // 세션 도착은 Supabase auth stream이 자동으로 처리
     } on GoogleSignInException catch (e) {
-      debugPrint('[GoogleSignInCard] GoogleSignInException 발생: ${e.message}');
       ErrorOverlay.show(
         title: '로그인 실패',
         message: e.message,
       );
     } catch (e) {
-      debugPrint('[GoogleSignInCard] 예상 외 예외 발생: $e');
       ErrorOverlay.show(
         title: '로그인 실패',
         message: '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.',
       );
     } finally {
-      debugPrint('[GoogleSignInCard] finally 블록 - mounted 체크: $mounted');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          debugPrint('[GoogleSignInCard] 로딩 상태 OFF: $_isLoading');
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleSignOut() async {
-    debugPrint('[GoogleSignInCard] ========== _handleSignOut() 시작 ==========');
-    setState(() {
-      _isLoading = true;
-      debugPrint('[GoogleSignInCard] 로딩 상태 ON: $_isLoading');
-    });
+    setState(() => _isLoading = true);
 
     try {
-      debugPrint('[GoogleSignInCard] authService 읽기');
       final authService = ref.read(googleAuthServiceProvider);
-      debugPrint('[GoogleSignInCard] authService.signOut() 호출 중...');
       await authService.signOut();
-      debugPrint('[GoogleSignInCard] authService.signOut() 완료');
-
-      debugPrint('[GoogleSignInCard] mounted 체크: $mounted');
-      if (!mounted) {
-        debugPrint('[GoogleSignInCard] 위젯이 해제됨 - 조기 반환');
-        return;
-      }
-
-      debugPrint('[GoogleSignInCard] provider 갱신 시작');
-      ref.invalidate(isSignedInProvider);
-      ref.invalidate(currentAccountProvider);
-      debugPrint('[GoogleSignInCard] provider 갱신 완료');
     } catch (e) {
-      debugPrint('[GoogleSignInCard] 로그아웃 중 예외 발생: $e');
       ErrorOverlay.show(
         title: '로그아웃 실패',
         message: '로그아웃 중 오류가 발생했습니다. 다시 시도해 주세요.',
       );
     } finally {
-      debugPrint('[GoogleSignInCard] finally 블록 - mounted 체크: $mounted');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          debugPrint('[GoogleSignInCard] 로딩 상태 OFF: $_isLoading');
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -159,7 +99,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
               ),
             ] else ...[
               Text(
-                'Google 계정에 연결하면 데이터를 백업할 수 있습니다.',
+                'Google 계정에 연결하면 데이터를 Supabase에 백업할 수 있습니다.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
