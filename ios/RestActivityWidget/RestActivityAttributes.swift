@@ -2,23 +2,22 @@
 import ActivityKit
 import Foundation
 
-/// Live Activity payload for the rest timer.
+/// `live_activities` Flutter 플러그인 v2.4.3 은 고정된 ActivityAttributes 타입
+/// (`LiveActivitiesAppAttributes`) 으로만 Activity 를 request 한다.
+/// Widget extension 은 이 타입을 **동일한 이름·레이아웃** 으로 재선언해야
+/// ActivityKit 이 매칭되는 `ActivityConfiguration` 을 찾을 수 있다.
 ///
-/// `exerciseName` is fixed at activity creation. `endAt` / `isPaused`
-/// are pushed via `Activity.update(...)` from the Flutter side via
-/// the `live_activities` plugin.
+/// 사용자 데이터(endAtMs, isPaused, exerciseName 등)는 ContentState 가 아니라
+/// App Group `UserDefaults(suiteName:)` 에 `"\(activity.id)_\(key)"` 로 저장되고,
+/// 위젯은 그걸 직접 읽어 표시한다.
 @available(iOS 16.1, *)
-struct RestActivityAttributes: ActivityAttributes {
-    public typealias RestTimerStatus = ContentState
+public struct LiveActivitiesAppAttributes: ActivityAttributes, Identifiable {
+    public typealias LiveDeliveryData = ContentState
 
     public struct ContentState: Codable, Hashable {
-        /// 휴식 종료 예정 시각 (Unix epoch ms). SwiftUI `Text(timerInterval:)`로 자동 카운트다운.
-        var endAtMs: Double
-        var isPaused: Bool
-        var totalSeconds: Int
+        public var appGroupId: String
     }
 
-    /// 운동 종목명 (선택). Lock Screen / Expanded 뷰의 라벨로 사용.
-    var exerciseName: String?
+    public var id = UUID()
 }
 #endif

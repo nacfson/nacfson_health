@@ -572,8 +572,12 @@ log stream --predicate 'eventMessage contains "[LiveActivity]"'
 | `init FAILED: ...` | MethodChannel 미연결 / App Group 엔타이틀먼트 누락 / iOS < 16.1 | Xcode > Signing & Capabilities 에서 Runner + Widget Extension 양쪽 App Group 확인, Podfile `platform :ios, '16.1'` 확인 |
 | `disabled by user (Settings > ... > Live Activities)` | 사용자가 iOS 설정에서 꺼둠 또는 집중 모드 차단 | iOS 설정 > 앱 이름 > Live Activities 토글 ON, 집중 모드 해제 |
 | `areActivitiesEnabled FAILED: ...` | ActivityKit 런타임 비지원 환경 | 실기기 iOS 16.1+ 여부 확인 |
-| `createActivity FAILED: ...` | 권한 거부 / 동일 시각 다수 activity 제한 / payload 직렬화 실패 | Error 내 PlatformException code 확인. `code=unsupportedTarget` 이면 시뮬레이터/macOS 문제 |
+| `createActivity FAILED: ... ActivityInput error 0` | Widget extension 의 `ActivityAttributes` 타입 이름이 플러그인이 요청하는 `LiveActivitiesAppAttributes` 와 불일치 (ActivityKit 이 매칭되는 `ActivityConfiguration` 을 못 찾음) | `ios/RestActivityWidget/RestActivityAttributes.swift` 가 `LiveActivitiesAppAttributes` 를 정확한 이름·레이아웃으로 선언했는지, `RestActivityWidget.swift` 가 `ActivityConfiguration(for: LiveActivitiesAppAttributes.self)` 로 등록했는지 확인. 두 파일 모두 Widget Extension Target 에 멤버십 포함 여부도 재확인. |
+| `createActivity FAILED: ...` (기타) | 권한 거부 / 동일 시각 다수 activity 제한 / payload 직렬화 실패 | Error 내 PlatformException code 확인. `code=unsupportedTarget` 이면 시뮬레이터/macOS 문제 |
 | `updateActivity/endActivity ... FAILED` | Activity 이미 종료됨 / ID 불일치 | 대부분 무해. 새 Activity 시작 시 자동 복구 |
+
+**플러그인 데이터 플로우 (v2.4.3 기준)**:
+`live_activities` 플러그인의 ContentState 는 `appGroupId: String` 하나뿐이며, Dart 가 `createActivity(id, data)` 로 넘긴 나머지 데이터는 App Group `UserDefaults(suiteName:)` 에 `"\(activity.id.uuidString)_\(key)"` 형태로 저장된다. Widget SwiftUI 는 이 UserDefaults 를 직접 읽어 표시한다 (`ios/RestActivityWidget/RestActivityWidget.swift` 의 `readRestPrefs(_:)` 참고). 커스텀 ContentState 필드는 **동작하지 않으므로** 추가하지 말 것.
 
 ---
 
