@@ -46,3 +46,7 @@ app.*.map.json
 
 # 환경 변수 (Supabase 키 등 민감 정보)
 .env
+
+# Claude Code worktree internal state
+.claude/projects/
+**/worktrees/
