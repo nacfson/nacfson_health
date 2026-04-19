@@ -554,6 +554,26 @@ rg "Color\(0xFF[0-9A-Fa-f]{6}\)" lib/ --glob '!**/app_theme.dart'
 - App Group이 두 타겟에 다르게 설정되면 widget이 데이터를 못 받습니다.
 - iOS 16.0 이하 시뮬레이터/기기에서는 createActivity가 silently fail (try/catch 처리됨).
 - Widget Extension이 추가되지 않은 상태로 빌드해도 Dart는 정상 (createActivity가 PlatformException으로 처리됨).
+- **Simulator / macOS에서는 제한적으로만 동작** — Dynamic Island는 실기기 iOS 16.1+ 전용. 반드시 실기기로 검증.
+- 생성자에서 `_liveActivities.init(...)` 를 await 없이 fire-and-forget 하면 첫 `createActivity` 가 MethodChannel 핸드쉐이크보다 먼저 도달해 silently fail 할 수 있음. `RestNotificationServiceIOS._initFuture` 패턴으로 모든 퍼블릭 메서드가 `await _initFuture;` 하도록 유지.
+
+**Live Activity 진단 로그 (Xcode Console)**:
+
+`RestNotificationServiceIOS` 는 모든 단계에 `[LiveActivity]` 접두사로 로그를 남긴다. Live Activity가 뜨지 않을 때 Xcode 콘솔에서 필터하여 원인 분기:
+
+```bash
+# Xcode > Window > Devices and Simulators > View Device Logs, 또는 터미널에서:
+log stream --predicate 'eventMessage contains "[LiveActivity]"'
+```
+
+| 로그 메시지 | 원인 | 조치 |
+|-------------|------|------|
+| `init OK, cleaned N stale` | 정상. N개 잔존 activity 정리 완료 | — |
+| `init FAILED: ...` | MethodChannel 미연결 / App Group 엔타이틀먼트 누락 / iOS < 16.1 | Xcode > Signing & Capabilities 에서 Runner + Widget Extension 양쪽 App Group 확인, Podfile `platform :ios, '16.1'` 확인 |
+| `disabled by user (Settings > ... > Live Activities)` | 사용자가 iOS 설정에서 꺼둠 또는 집중 모드 차단 | iOS 설정 > 앱 이름 > Live Activities 토글 ON, 집중 모드 해제 |
+| `areActivitiesEnabled FAILED: ...` | ActivityKit 런타임 비지원 환경 | 실기기 iOS 16.1+ 여부 확인 |
+| `createActivity FAILED: ...` | 권한 거부 / 동일 시각 다수 activity 제한 / payload 직렬화 실패 | Error 내 PlatformException code 확인. `code=unsupportedTarget` 이면 시뮬레이터/macOS 문제 |
+| `updateActivity/endActivity ... FAILED` | Activity 이미 종료됨 / ID 불일치 | 대부분 무해. 새 Activity 시작 시 자동 복구 |
 
 ---
 
