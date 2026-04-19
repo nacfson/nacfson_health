@@ -77,7 +77,7 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_app_group_directory: 55b5362007d1c0cb45dc1dd1e94f67d615f45a6b
   flutter_local_notifications: ad39620c743ea4c15127860f4b5641649a988100
-  home_widget: f169fc41fd807b4d46ab6615dc44d62adbf9f64f
+  home_widget: 54b4f6b36ed8d64cfee594a476225c35c3e45091
   live_activities: 4dfa736d0736e1c77866a2f9c056a76513cc9e7b
   native_liquid_glass: 3fae675deda2eca3051ab63d9e3987a2ceb0a8fc
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
@@ -86,6 +86,6 @@ SPEC CHECKSUMS:
   SVGKit: 1ad7513f8c74d9652f94ed64ddecda1a23864dea
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
 
-PODFILE CHECKSUM: 079ea602d364ac85bd0c7cf605352c750c37ebac
+PODFILE CHECKSUM: c2e680ad86003742dc0f610e2537e9fbe49a7582
 
 COCOAPODS: 1.16.2

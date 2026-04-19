@@ -41,7 +41,7 @@ dependencies:
 
   # UI 및 위젯
   fl_chart: ^0.70.2
-  home_widget: ^0.7.0
+  home_widget: ^0.9.1
 
   # iOS 26 Liquid Glass (iOS 전용 PlatformView, iOS ≤ 25 / Android 는 fallback)
   native_liquid_glass: ^0.2.6
