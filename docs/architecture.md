@@ -23,6 +23,9 @@
 | **요약** | 운동·식단·체중 데이터 병합 → 하루 목표 대비 통합 표시 | `DailySummary` |
 | **운동 템플릿** | 운동 종목 프리셋 관리, SQLite + Sheets 동기화 (생성·삭제만) | `ExerciseTemplate` |
 | **음식 템플릿** | 음식 프리셋 관리 (이름·칼로리·탄단지), SQLite + Sheets 동기화 (생성·삭제만) | `FoodTemplate` |
+| **사용자 프로필** | 키/성별/연령대/목표/일일 목표 칼로리 (v7, 로컬 전용) | `UserProfile` |
+| **온보딩** | 첫 실행 키/체중 입력 → SharedPreferences 플래그 + WeightRecord 생성 | (Notifier만) |
+| **AI 인사이트** | Gemini 기반 일일 건강 조언 (캐시·일일 호출 상한 3회) | (Provider 합성) |
 
 ---
 
@@ -59,11 +62,77 @@
 
 전체 테이블 스키마 및 버전 이력은 `docs/db-schema.md` 참조.
 
-**현재 DB 버전**: v6 (테이블 5개: exercise_records · diet_records · exercise_templates · food_templates · weight_records)
+**현재 DB 버전**: v7 (테이블 6개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles)
 
 ---
 
 > 상세 스키마(컬럼 정의, SyncStatus 정책, 마이그레이션 SQL)는 `docs/db-schema.md` 참조.
+
+## AI 인사이트 데이터 흐름 (v7)
+
+`lib/core/ai/health_insight_provider.dart` → `lib/core/ai/gemini_service.dart`.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Inputs (Riverpod watch)                              │
+│  • selectedDateProvider                               │
+│  • dailySummaryProvider (운동·식단 합성)              │
+│  • heightMProvider (SharedPreferences `user_height_m`)│
+│  • latestWeightProvider + weightChartDataProvider     │
+└─────────────────────┬────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────────────────┐
+│  insightCacheProvider (세션 메모리 캐시)              │
+│  • 키: YYYYMMDD                                       │
+│  • Hit  → 즉시 반환                                   │
+│  • Miss → 다음 단계                                   │
+└─────────────────────┬────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────────────────┐
+│  insightCallCountProvider (SharedPreferences)        │
+│  키: insight_call_count_v1, 상한 kInsightDailyLimit=3 │
+│  • 초과 → throw StateError('DAILY_LIMIT_REACHED')     │
+│  • 통과 → 호출 직전 카운트++ (실패해도 소모)           │
+└─────────────────────┬────────────────────────────────┘
+                      │
+                      ▼
+┌──────────────────────────────────────────────────────┐
+│  GeminiService (gemini-2.5-flash-lite)               │
+│  • .env GEMINI_API_KEY                               │
+│  • 한국어 150자 이내 조언                             │
+└──────────────────────────────────────────────────────┘
+```
+
+**비용 방어 원칙**: 호출 직전 카운트 증가(increment-before) — 네트워크 실패/예외에도 카운트 소모. 사용자는 다음날 또는 캐시된 응답으로 우회.  
+**캐시 무효화**: 카드의 새로고침 아이콘이 `insightCacheProvider`에서 해당 키 삭제 후 `ref.invalidate(healthInsightProvider)`.
+
+---
+
+## 라우팅 흐름 (v7)
+
+`lib/core/router/app_router.dart` — Riverpod 상태와 GoRouter redirect를 연결하는 패턴.
+
+```
+onboardingDoneProvider (StateNotifier<bool>)
+                │ ref.listen
+                ▼
+_RouterNotifier (ChangeNotifier)
+                │ notifyListeners()
+                ▼
+GoRouter.refreshListenable
+                │
+                ▼
+_RouterNotifier.redirect(context, state)
+  • !done && path != '/onboarding' → '/onboarding'
+  • done && path == '/onboarding' → '/exercise'
+  • else → null (현재 경로 유지)
+```
+
+**핵심 함정**: `appRouterProvider` 내부에서 notifier를 가져올 때 `ref.read`만 사용. `ref.watch`로 가져오면 라우터 객체 자체가 재생성되며 네비 스택이 초기화됨. 자세한 사례는 `docs/build-debug.md` #3.
+
+---
 
 ### 요약 엔티티 (`DailySummary`) — DB 테이블 아님, 메모리 계산
 

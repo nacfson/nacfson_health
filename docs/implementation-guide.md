@@ -81,6 +81,46 @@
 - `SharedPreferences` 초기화 후 `ProviderScope.overrides`로 `syncPreferencesProvider`, `googleAuthServiceProvider` 주입 필수 (기본값 UnimplementedError).
 - 앱 시작 시 `GoogleAuthService.restoreSession()` 실행.
 - `AppLifecycleState.resumed` 상태 시 `_triggerSync()` 자동 호출.
+- **비동기 _load() 금지**: `OnboardingNotifier`, `HeightNotifier`, `InsightCallCountNotifier`처럼 SharedPreferences 의존 Notifier는 main.dart에서 미리 로드한 값을 `overrideWith((ref) => Notifier(initial))` 로 주입할 것. UI 첫 빌드에서 플리커가 발생하지 않게 하기 위함 (참조: `lib/main.dart`, `docs/build-debug.md` #2).
+
+---
+
+## 신규 도메인 외 자주 쓰는 패턴 (v6/v7 추가)
+
+### 1. `FutureProvider.autoDispose` + 일일 호출 상한 + 세션 캐시
+
+외부 API(Gemini 등) 호출을 캐싱·제한하는 표준 형태. 출처: [`lib/core/ai/health_insight_provider.dart`](../lib/core/ai/health_insight_provider.dart).
+
+- **세션 캐시 Provider**: `StateProvider<Map<String, T>>`. 캐시 키는 `YYYYMMDD` 문자열 (헬퍼: `insightCacheKey(DateTime)`).
+- **카운트 Notifier**: `StateNotifier<Map<String, int>>` + SharedPreferences. 키 예: `insight_call_count_v1` (스키마 변경 시 `_v2` 로 bump).
+- **호출 직전 증가**(increment-before): 네트워크 실패 시에도 카운트 소모 → 비용 방어 우선.
+- **상한 초과 시**: `throw StateError('DAILY_LIMIT_REACHED')` — UI는 `AsyncValue.error` 분기에서 안내.
+- **상수 위치**: 같은 파일 상단에 `const kInsightDailyLimit = 3` 형태로 노출.
+
+### 2. 온보딩 1회성 플래그 패턴
+
+출처: [`lib/shared/providers/user_profile_provider.dart`](../lib/shared/providers/user_profile_provider.dart).
+
+- 키: `onboarding_done` (bool), `user_height_m` (double, **meter 단위**).
+- Notifier 생성자는 `initial` 파라미터를 받아 main.dart에서 주입.
+- `complete()` / `setHeight()` 같은 액션은 항상 state 갱신 + SharedPreferences write를 함께 수행.
+
+### 3. GoRouter `refreshListenable` 패턴
+
+출처: [`lib/core/router/app_router.dart`](../lib/core/router/app_router.dart).
+
+- Riverpod 상태(예: `onboardingDoneProvider`)와 GoRouter redirect를 연결할 땐 ChangeNotifier 어댑터(`_RouterNotifier`) + `refreshListenable: notifier` 조합.
+- GoRouter는 한 번만 생성해야 하므로 `appRouterProvider` 내부에서 `ref.read`로 notifier를 가져옴 (`ref.watch` 금지 — 라우터 객체가 통째로 재생성되어 네비 스택이 초기화됨).
+- 자세한 함정 사례는 `docs/build-debug.md` #3 참조.
+
+### 4. SharedPreferences 직접 호출 금지 — `SyncPreferences` 일원화
+
+출처: [`lib/core/sync/sync_preferences.dart`](../lib/core/sync/sync_preferences.dart).
+
+- 새로운 영구 키 추가 시 항상 `SyncPreferences`에 getter/setter를 만들고 그 래퍼만 호출.
+  - 예: 테마 모드는 `themeModeRaw` / `setThemeModeRaw` 사용 (`ThemeModeNotifier`).
+- **예외**: 부트스트랩 단계의 main.dart는 `SharedPreferences.getInstance()` 직접 호출 가능 (Notifier 초기값 로드 목적).
+  - 이 경우에도 키 문자열은 Notifier 정의 파일의 `_kXxxKey` 상수와 일치시켜야 함 (drift 방지).
 
 ---
 
@@ -89,5 +129,6 @@
 | 문서 | 참조 내용 |
 |------|----------|
 | `docs/db-schema.md` | 전체 테이블 스키마, 버전 이력, Sheets 대응 |
-| `docs/architecture.md` | 동기화 프로토콜 4단계, 데이터 흐름 |
+| `docs/architecture.md` | 동기화 프로토콜 4단계, 데이터 흐름, AI 인사이트 흐름 |
 | `docs/features.md` | 완료/백로그 체크리스트 |
+| `docs/build-debug.md` | StateNotifier 비동기 초기화 함정, GoRouter refreshListenable 함정 |

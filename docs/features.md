@@ -26,6 +26,19 @@
 - [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)
 - [x] Google 로그인/로그아웃 (`GoogleSignInCard`)
 - [x] 스프레드시트 상태 + 수동 동기화 (`SpreadsheetStatusCard`)
+- [x] 테마 전환 — 시스템/라이트/다크 (`ThemeModeCard` + `themeModeProvider`, shared_preferences 영구 저장)
+- [x] 기본 휴식 시간 설정 (`RestTimerSettingsCard` — 60/90/120/180초, `defaultRestSecondsProvider`)
+
+### 휴식 타이머 (v7.1)
+- [x] **인앱 sticky 미니바** (`RestTimerBar` — BottomNavShell 오버레이, 모든 탭에서 가시성 유지)
+- [x] 운동 세트 신규 저장 시 자동 시작 (`ExerciseForm._submit` → `restTimerProvider.start`)
+- [x] ±15초 빠른 조정 / 일시정지·재개 / 수동 종료
+- [x] 백그라운드 복귀 정확성 (`endAt` 기반 계산, Timer.periodic은 UI 갱신 전용)
+- [x] 5초 전 햅틱 1회 + 0초 도달 시 강한 햅틱 (`HapticFeedback`)
+- [x] iOS Live Activity (Dynamic Island + Lock Screen) — `RestNotificationServiceIOS` + `live_activities` 패키지 + `RestActivityWidget.swift` (App Group `group.com.nacfson.nacfsonHealth` 통일, Xcode 수동 단계는 `docs/build-debug.md` §14)
+- [x] Android persistent notification (chronometer + `[+15초]`·`[정지]` 액션) — `RestNotificationServiceAndroid` + `flutter_local_notifications` + `permission_handler`
+- [ ] iOS Live Activity App Intents 액션 (현재는 인앱/Android만 액션 처리) — 백로그
+- [ ] Android Foreground Service (앱 강제 종료 시에도 알림 유지) — 백로그
 
 ### Google Sheets 동기화
 - [x] Google 계정 로그인 · 세션 복원 (`GoogleAuthService`)
@@ -44,8 +57,38 @@
 - [x] 탭 전환 시 모든 오버레이 자동 닫기 (`popAll`)
 - [x] `DietForm` — 음식 템플릿 드롭다운 + 자동 채움 (칼로리/탄단지 전체)
 - [x] `ExerciseForm` — 운동 템플릿 드롭다운 + 종목명 자동 채움
+- [x] `TemplatePickerSheet` 도입 — 운동·식단 이름 필드 suffixIcon 명시적 트리거 BottomSheet, 기본 상태 템플릿 노출 제거(넛지 최소화), 검색 + 운동 부위 필터 + 빈 상태 설정 화면 이동
 - [x] `WeightScreen` — 체중 탭 (입력/차트 시각화)
 - [x] `WeightForm` — 날짜 선택 기능 (`showDatePicker`, 과거 날짜 소급 입력 지원)
+- [x] `DateNavigationBar` — 운동/식단/요약 탭 날짜 탐색 (좌우 이동 + DatePicker)
+- [x] `VolumeTrendChart` — 운동 볼륨 주간/월간 추세 꺾은선 차트 (fl_chart)
+- [x] `CalorieTrendChart` — 식단 칼로리 주간/월간 추세 막대 차트 + 목표선 (fl_chart)
+- [x] 과거 날짜 데이터 열람 (selectedDateProvider 기반 전역 날짜 상태)
+- [x] 설정 화면 하단 스크롤 버그 수정 (`SizedBox(height: 96)` — glassmorphic nav bar 오버레이 대응)
+- [x] 요약 탭 네비게이션 버그 수정 (FAB 표시 중 요약 탭 버튼 숨김 조건 제거)
+- [x] Google 로그인 직후 자동 동기화 (`AuthCallbackScreen` → `performSync()`)
+- [x] 로그인 콜백 흐름 안정화 — `ConsumerStatefulWidget` + `ref.listenManual` 한 번만 구독, `/settings`로 복귀, 동기화는 `unawaited` + try/catch로 분리 (`docs/build-debug.md` §11)
+- [x] `ChipTheme.labelStyle` 색상 명시 — 라이트 테마 템플릿 칩 흰색 텍스트 버그 수정 (`chipFg` 토큰 추가)
+- [x] Bottom Sheet 상태 race 제거 — `sheet_state_provider`의 `Future.microtask` 제거로 FAB 복귀 지연 해소 (`docs/build-debug.md` §10)
+- [x] `EmptyState` 중복 "운동 추가"/"식사 추가" 버튼 제거 — 하단 FAB로 통일, 탭 하단 여백 96→120
+- [x] FAB 상태 관리 — 바텀시트 열림 시 자동 숨김 (`activeSheetProvider` 연결, `openSheet()` 헬퍼 일괄 적용)
+- [x] `RecordFormSheet` DraggableScrollableSheet 전환 — 드래그로 시트 높이 조절 (45%~95%), 내부 폼 스크롤과 자연 연동
+- [x] 다크모드 잔여 흰색 UI 전수 정비 — glassmorphic nav bar, TriRing/AI 인사이트 카드, BMI 바, 날짜 네비게이션 바, 온보딩, Autocomplete 드롭다운, 차트 목표선
+- [x] 다크모드 2차 전수 감사 — 운동 세트 칩(`_StatItem` kg/횟수/RPE), 매크로 게이지 단/지, 섹션 헤더(운동/식단), 칼로리 추세 차트 막대, 체중 차트 그리드 라인, 설정 경고 카드(Google 미로그인), SnackBar 오류 배경, FAB 아이콘 → 모두 `ColorScheme` 기반 동적 색상으로 전환 (brightness-aware 헬퍼 추가: `AppTheme.catDiet/catSleep/lunchTint/snackTint/warnBg/warnFg`)
+
+### 온보딩 & 사용자 프로필
+- [x] 첫 실행 온보딩 화면 (`OnboardingScreen` — 키/체중 입력, SharedPreferences 플래그)
+- [x] `HeightNotifier` — SharedPreferences 기반 키(m) 영구 저장 (`user_height_m`)
+- [x] `OnboardingNotifier` — 온보딩 완료 플래그 (`onboarding_done`)
+- [x] GoRouter 온보딩 리다이렉트 (`RouterNotifier` + `refreshListenable` 패턴)
+- [x] 온보딩 체중 입력 → `WeightRecord` 오늘 날짜로 자동 저장
+
+### AI 건강 인사이트
+- [x] `GeminiService` — `gemini-2.5-flash-lite` 기반 한국어 건강 조언 생성 (`.env` API 키)
+- [x] `healthInsightProvider` — `FutureProvider.autoDispose`, 체중·식단·운동 종합 분석
+- [x] `_AiInsightCard` — 요약 화면 AI 인사이트 카드 (로딩/에러/데이터 상태, 새로고침)
+- [x] `InsightCallCountNotifier` — 날짜별 호출 횟수 SharedPreferences 영속 (하루 3회 상한)
+- [x] BMI 동적 계산 (`_BmiBar` → ConsumerWidget, `heightMProvider` 연동)
 
 ---
 
@@ -63,7 +106,7 @@
 7. GoogleAuthService    createSpreadsheet 시트 목록에 추가
 8. sync_state.dart  SyncStateNotifier 주입 + _syncAll 단계 추가
 9. UI 위젯          설정 카드 or 폼 드롭다운
-10. docs 업데이트    db-schema.md + features.md + architecture.md
+10. docs 업데이트    db-schema.md + features.md + architecture.md + domains.md + ui-architecture.md
 ```
 
 > 템플릿 계열 (`exercise_templates`, `food_templates`)은 `modified(2)` 없이 생성·삭제만,  
@@ -76,8 +119,12 @@
 
 > 우선순위 없음 — 추가할 때 항목 작성
 
-- [ ] 주간/월간 운동 볼륨 추세선 차트
-- [ ] 날짜별 식단 칼로리 히스토리 차트
+- [x] 주간/월간 운동 볼륨 추세선 차트
+- [x] 날짜별 식단 칼로리 히스토리 차트
 - [ ] 운동 기록 캘린더 뷰 (부위별 Dot 표시)
 - [ ] 오프라인 모드 명시적 안내 (동기화 실패 시 배너)
-- [ ] 다크 모드 지원
+- [x] 다크 모드 지원 (전수 정비 완료)
+- [ ] 스트릭 시스템 (연속 기록 동기부여)
+- [ ] 설정 화면에서 키 수정 기능 (온보딩 이후 변경)
+- [ ] AI 인사이트 캐싱 (같은 날 데이터 변경 없으면 재호출 생략)
+

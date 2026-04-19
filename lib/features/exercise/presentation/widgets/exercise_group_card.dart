@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
 import './exercise_record_card.dart';
 
@@ -25,10 +26,10 @@ class ExerciseGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final typeColor = getExerciseTypeColor(exerciseType);
+    final typeColor = getExerciseTypeColor(exerciseType, theme.brightness);
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -38,13 +39,13 @@ class ExerciseGroupCard extends StatelessWidget {
             child: Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: typeColor,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(exerciseTypeIcon(exerciseType), size: 18),
+                  child: Icon(exerciseTypeIcon(exerciseType), size: 20, color: AppTheme.colorNavy),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -176,15 +177,21 @@ class _StatItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(4),
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: cs.outlineVariant),
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelSmall,
+        style: TextStyle(
+          fontFamily: 'Pretendard',
+          fontSize: 11,
+          color: cs.onSurfaceVariant,
+        ),
       ),
     );
   }

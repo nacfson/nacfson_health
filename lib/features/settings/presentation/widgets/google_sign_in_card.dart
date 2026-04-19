@@ -68,7 +68,9 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
               children: [
                 Icon(
                   isSignedIn ? Icons.check_circle : Icons.cloud_off,
-                  color: isSignedIn ? Colors.green : Colors.grey,
+                  color: isSignedIn
+                      ? Colors.green
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 8),
                 Text(

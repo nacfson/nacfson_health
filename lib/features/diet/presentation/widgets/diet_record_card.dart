@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/diet_record.dart';
 
 class DietRecordCard extends StatelessWidget {
@@ -17,7 +18,7 @@ class DietRecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final mealColor = _mealTypeColor(record.mealType);
+    final mealColor = _mealTypeColor(record.mealType, theme.brightness);
     final timeStr = _formatTime(record.timestamp);
 
     return Dismissible(
@@ -77,9 +78,11 @@ class DietRecordCard extends StatelessWidget {
                 // 칼로리
                 Text(
                   '${record.totalCalories} kcal',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.primary,
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
+                    color: AppTheme.catDiet(context),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -106,13 +109,14 @@ class DietRecordCard extends StatelessWidget {
   }
 }
 
-Color _mealTypeColor(String mealType) {
+Color _mealTypeColor(String mealType, [Brightness brightness = Brightness.light]) {
+  final isDark = brightness == Brightness.dark;
   return switch (mealType) {
-    '아침' => const Color(0xFFFFF8E1),
-    '점심' => const Color(0xFFE8F5E9),
-    '저녁' => const Color(0xFFEDE7F6),
-    '간식' => const Color(0xFFFCE4EC),
-    _ => const Color(0xFFEEEEEE),
+    '아침' => isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint,
+    '점심' => isDark ? AppTheme.colorLunchTintDark : AppTheme.colorLunchTint,
+    '저녁' => isDark ? AppTheme.colorCoralTintDark : AppTheme.colorCoralTint,
+    '간식' => isDark ? AppTheme.colorSnackTintDark : AppTheme.colorSnackTint,
+    _ => isDark ? AppTheme.colorSurfaceAltDark : AppTheme.colorBg,
   };
 }
 
@@ -221,8 +225,12 @@ class _MacroGaugeRow extends StatelessWidget {
           label: '탄',
           value: total > 0 ? (record.carbs * 4) / total : 0,
           amount: '${record.carbs.toStringAsFixed(0)}g',
-          color: Colors.orange[400]!,
-          backgroundColor: Colors.orange[100]!,
+          color: theme.brightness == Brightness.dark
+              ? AppTheme.colorCatDietDark
+              : AppTheme.colorCatDiet,
+          backgroundColor: theme.brightness == Brightness.dark
+              ? AppTheme.colorSnackTintDark
+              : AppTheme.colorSnackTint,
           theme: theme,
         ),
         const SizedBox(height: 4),
@@ -230,8 +238,12 @@ class _MacroGaugeRow extends StatelessWidget {
           label: '단',
           value: total > 0 ? (record.protein * 4) / total : 0,
           amount: '${record.protein.toStringAsFixed(0)}g',
-          color: Colors.blue[400]!,
-          backgroundColor: Colors.blue[100]!,
+          color: theme.brightness == Brightness.dark
+              ? AppTheme.colorMintDark
+              : AppTheme.colorMint,
+          backgroundColor: theme.brightness == Brightness.dark
+              ? AppTheme.colorMintTintDark
+              : AppTheme.colorMintTint,
           theme: theme,
         ),
         const SizedBox(height: 4),
@@ -239,8 +251,12 @@ class _MacroGaugeRow extends StatelessWidget {
           label: '지',
           value: total > 0 ? (record.fat * 9) / total : 0,
           amount: '${record.fat.toStringAsFixed(0)}g',
-          color: Colors.yellow[700]!,
-          backgroundColor: Colors.yellow[100]!,
+          color: theme.brightness == Brightness.dark
+              ? AppTheme.colorCoralDark
+              : AppTheme.colorCoral,
+          backgroundColor: theme.brightness == Brightness.dark
+              ? AppTheme.colorCoralTintDark
+              : AppTheme.colorCoralTint,
           theme: theme,
         ),
       ],

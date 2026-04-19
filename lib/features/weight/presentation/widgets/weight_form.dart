@@ -17,6 +17,7 @@ class _WeightFormState extends ConsumerState<WeightForm> {
   final _weightController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   late DateTime _selectedDate;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -60,6 +61,7 @@ class _WeightFormState extends ConsumerState<WeightForm> {
   }
 
   Future<void> _submit() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedDate != _originalDate) {
@@ -85,6 +87,7 @@ class _WeightFormState extends ConsumerState<WeightForm> {
       if (confirmed != true) return;
     }
 
+    setState(() => _isLoading = true);
     try {
       final weightValue = double.parse(_weightController.text);
       final now = DateTime.now();
@@ -105,17 +108,28 @@ class _WeightFormState extends ConsumerState<WeightForm> {
         await ref.read(weightRecordsProvider.notifier).addRecord(newRecord);
       }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장되었습니다'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('저장 실패: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 3),
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -176,18 +190,24 @@ class _WeightFormState extends ConsumerState<WeightForm> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _submit,
+                onPressed: _isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   backgroundColor: theme.colorScheme.primary,
                   foregroundColor: theme.colorScheme.onPrimary,
                 ),
-                child: Text(
-                  isDateChanged
-                      ? '${_selectedDate.month}월 ${_selectedDate.day}일로 기록'
-                      : (widget.initialRecord != null ? '수정 완료' : '기록 완료'),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        isDateChanged
+                            ? '${_selectedDate.month}월 ${_selectedDate.day}일로 기록'
+                            : (widget.initialRecord != null ? '수정 완료' : '기록 완료'),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
               ),
             ),
             const SizedBox(height: 16),

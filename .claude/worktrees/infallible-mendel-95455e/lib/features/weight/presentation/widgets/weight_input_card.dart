@@ -1,0 +1,65 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/weight_provider.dart';
+import 'weight_form.dart';
+
+class WeightInputCard extends ConsumerWidget {
+  const WeightInputCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final todayWeight = ref.watch(todayWeightProvider);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: InkWell(
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => WeightForm(initialRecord: todayWeight),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.scale, color: colorScheme.primary, size: 24),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '오늘의 체중',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    todayWeight != null
+                        ? '${todayWeight.weight} kg'
+                        : '기록 없음',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: todayWeight != null ? colorScheme.primary : colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Icon(
+                todayWeight != null ? Icons.edit : Icons.add_circle,
+                color: colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

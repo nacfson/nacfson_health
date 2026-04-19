@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../../data/repositories/exercise_repository.dart';
 import '../../data/repositories/sqlite_exercise_repository.dart';
@@ -184,4 +185,99 @@ final todayTotalVolumeProvider = Provider<double>((ref) {
   return ref
       .watch(todayExerciseRecordsProvider)
       .fold(0.0, (sum, r) => sum + r.volume);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 선택 날짜 기반 Provider (Observer 패턴 — selectedDateProvider 변경 시 자동 갱신)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 선택 날짜의 운동 기록 목록 - 최신순
+final selectedDateExerciseRecordsProvider = Provider<List<ExerciseRecord>>((ref) {
+  final all = ref.watch(exerciseRecordsProvider);
+  final date = ref.watch(selectedDateProvider);
+  return all
+      .where((r) =>
+          r.timestamp.year == date.year &&
+          r.timestamp.month == date.month &&
+          r.timestamp.day == date.day)
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+});
+
+/// 선택 날짜 운동 기록 — exerciseType별 및 exerciseName별 이중 그룹핑
+final selectedDateExerciseGroupedProvider =
+    Provider<Map<String, Map<String, List<ExerciseRecord>>>>((ref) {
+  final records = ref.watch(selectedDateExerciseRecordsProvider);
+  const typeOrder = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
+  final Map<String, Map<String, List<ExerciseRecord>>> grouped = {};
+
+  for (final type in typeOrder) {
+    final typeRecords = records.where((r) => r.exerciseType == type).toList();
+    if (typeRecords.isNotEmpty) {
+      final Map<String, List<ExerciseRecord>> nameGrouped = {};
+      for (final r in typeRecords) {
+        nameGrouped.putIfAbsent(r.exerciseName, () => []).add(r);
+      }
+      for (final name in nameGrouped.keys) {
+        nameGrouped[name]!.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      }
+      grouped[type] = nameGrouped;
+    }
+  }
+  return grouped;
+});
+
+/// 선택 날짜의 총 볼륨 합계 (kg)
+final selectedDateTotalVolumeProvider = Provider<double>((ref) {
+  return ref
+      .watch(selectedDateExerciseRecordsProvider)
+      .fold(0.0, (sum, r) => sum + r.volume);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 볼륨 추세 차트 데이터 (Strategy 패턴 — ChartViewType으로 기간 전략 전환)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 차트 뷰 타입 (체중 차트와 동일 패턴 재사용)
+enum ExerciseChartViewType { weekly, monthly }
+
+final exerciseChartViewTypeProvider =
+    StateProvider<ExerciseChartViewType>((ref) => ExerciseChartViewType.weekly);
+
+/// 볼륨 추세 데이터: 일별 (날짜, 총볼륨) 리스트
+final volumeTrendDataProvider =
+    Provider<List<({DateTime date, double volume})>>((ref) {
+  final all = ref.watch(exerciseRecordsProvider);
+  final viewType = ref.watch(exerciseChartViewTypeProvider);
+  final now = DateTime.now();
+
+  // Strategy 패턴: 뷰 타입에 따라 시작 날짜 결정
+  final int daysBack = switch (viewType) {
+    ExerciseChartViewType.weekly => 6,
+    ExerciseChartViewType.monthly => 29,
+  };
+  final startDate = DateTime(now.year, now.month, now.day)
+      .subtract(Duration(days: daysBack));
+
+  // 날짜 범위 내 기록만 필터링
+  final filtered = all.where((r) =>
+      r.timestamp.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
+      r.syncStatus != SyncStatus.deleted);
+
+  // 일별 볼륨 집계 (메모리 효율: Map으로 한 번만 순회)
+  final Map<String, double> dailyVolume = {};
+  for (final r in filtered) {
+    final key = '${r.timestamp.year}-${r.timestamp.month}-${r.timestamp.day}';
+    dailyVolume[key] = (dailyVolume[key] ?? 0) + r.volume;
+  }
+
+  // 전체 기간의 날짜를 생성하여 빈 날짜도 포함 (차트 연속성 보장)
+  final List<({DateTime date, double volume})> result = [];
+  for (int i = 0; i <= daysBack; i++) {
+    final date = startDate.add(Duration(days: i));
+    final key = '${date.year}-${date.month}-${date.day}';
+    result.add((date: date, volume: dailyVolume[key] ?? 0));
+  }
+
+  return result;
 });

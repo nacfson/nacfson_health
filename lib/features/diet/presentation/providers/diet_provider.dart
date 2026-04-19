@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
 import '../../domain/entities/diet_record.dart';
 import '../../data/repositories/diet_repository.dart';
 import '../../data/repositories/sqlite_diet_repository.dart';
@@ -86,4 +87,90 @@ final todayDietSummaryProvider =
     protein: records.fold(0.0, (s, r) => s + r.protein),
     fat: records.fold(0.0, (s, r) => s + r.fat),
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 선택 날짜 기반 Provider (Observer 패턴 — selectedDateProvider 변경 시 자동 갱신)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 선택 날짜의 식단 기록 목록 - 최신순
+final selectedDateDietRecordsProvider = Provider<List<DietRecord>>((ref) {
+  final all = ref.watch(dietRecordsProvider);
+  final date = ref.watch(selectedDateProvider);
+  return all
+      .where((r) =>
+          r.timestamp.year == date.year &&
+          r.timestamp.month == date.month &&
+          r.timestamp.day == date.day)
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+});
+
+/// 선택 날짜 식단 기록 — mealType별 그룹핑 (시간대 순서 고정)
+final selectedDateDietGroupedProvider =
+    Provider<Map<String, List<DietRecord>>>((ref) {
+  final records = ref.watch(selectedDateDietRecordsProvider);
+  const mealOrder = ['아침', '점심', '저녁', '간식'];
+  final Map<String, List<DietRecord>> grouped = {};
+  for (final meal in mealOrder) {
+    final list = records.where((r) => r.mealType == meal).toList();
+    if (list.isNotEmpty) grouped[meal] = list;
+  }
+  return grouped;
+});
+
+/// 선택 날짜의 칼로리 / 매크로 합계
+final selectedDateDietSummaryProvider =
+    Provider<({int kcal, double carbs, double protein, double fat})>((ref) {
+  final records = ref.watch(selectedDateDietRecordsProvider);
+  return (
+    kcal: records.fold(0, (s, r) => s + r.totalCalories),
+    carbs: records.fold(0.0, (s, r) => s + r.carbs),
+    protein: records.fold(0.0, (s, r) => s + r.protein),
+    fat: records.fold(0.0, (s, r) => s + r.fat),
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 칼로리 추세 차트 데이터 (Strategy 패턴 — ChartViewType으로 기간 전략 전환)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DietChartViewType { weekly, monthly }
+
+final dietChartViewTypeProvider =
+    StateProvider<DietChartViewType>((ref) => DietChartViewType.weekly);
+
+/// 칼로리 추세 데이터: 일별 (날짜, 칼로리) 리스트
+final calorieTrendDataProvider =
+    Provider<List<({DateTime date, int calories})>>((ref) {
+  final all = ref.watch(dietRecordsProvider);
+  final viewType = ref.watch(dietChartViewTypeProvider);
+  final now = DateTime.now();
+
+  final int daysBack = switch (viewType) {
+    DietChartViewType.weekly => 6,
+    DietChartViewType.monthly => 29,
+  };
+  final startDate = DateTime(now.year, now.month, now.day)
+      .subtract(Duration(days: daysBack));
+
+  final filtered = all.where((r) =>
+      r.timestamp.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
+      r.syncStatus != SyncStatus.deleted);
+
+  // 일별 칼로리 집계
+  final Map<String, int> dailyCalories = {};
+  for (final r in filtered) {
+    final key = '${r.timestamp.year}-${r.timestamp.month}-${r.timestamp.day}';
+    dailyCalories[key] = (dailyCalories[key] ?? 0) + r.totalCalories;
+  }
+
+  final List<({DateTime date, int calories})> result = [];
+  for (int i = 0; i <= daysBack; i++) {
+    final date = startDate.add(Duration(days: i));
+    final key = '${date.year}-${date.month}-${date.day}';
+    result.add((date: date, calories: dailyCalories[key] ?? 0));
+  }
+
+  return result;
 });

@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   cupertino_icons: ^1.0.8
 
@@ -41,6 +43,17 @@ dependencies:
   fl_chart: ^0.70.2
   home_widget: ^0.7.0
 
+  # iOS 26 Liquid Glass (iOS 전용 PlatformView, iOS ≤ 25 / Android 는 fallback)
+  native_liquid_glass: ^0.2.6
+
+  # AI
+  google_generative_ai: ^0.4.7
+
+  # 휴식 타이머 — 네이티브 위젯/알림
+  live_activities: ^2.4.3           # iOS Dynamic Island + Lock Screen Live Activity
+  flutter_local_notifications: ^17.2.4  # Android persistent notification (chronometer + actions)
+  permission_handler: ^11.3.1       # Android 13+ POST_NOTIFICATIONS 권한 요청
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -48,8 +61,29 @@ dev_dependencies:
   mocktail: ^1.0.4
   sqflite_common_ffi: ^2.3.4+1
   sqflite_common_ffi_web: ^1.1.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  macos:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/app_icon.png"
 
 flutter:
   uses-material-design: true
   assets:
     - .env
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.ttf
+          weight: 700

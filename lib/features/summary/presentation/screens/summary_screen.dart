@@ -2,7 +2,13 @@ import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/ai/health_insight_provider.dart';
+import '../../../../core/theme/app_theme.dart';
 
+import '../../../../shared/providers/selected_date_provider.dart';
+import '../../../../shared/widgets/date_navigation_bar.dart';
+import '../../../exercise/presentation/widgets/volume_trend_chart.dart';
+import '../../../diet/presentation/widgets/calorie_trend_chart.dart';
 import '../../domain/entities/daily_summary.dart';
 import '../providers/summary_provider.dart';
 
@@ -12,12 +18,17 @@ class SummaryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dailySummaryProvider);
+    final isToday = ref.watch(isSelectedDateTodayProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('오늘의 요약')),
+      extendBody: true,
+      appBar: AppBar(title: Text(isToday ? '오늘의 요약' : '요약')),
       body: CustomScrollView(
         slivers: [
+          // 날짜 네비게이션 바
+          const SliverToBoxAdapter(child: DateNavigationBar()),
           SliverToBoxAdapter(child: _DateHeader(date: summary.date)),
+          const SliverToBoxAdapter(child: _AiInsightCard()),
           if (summary.dietNutrition != null) ...[
             SliverToBoxAdapter(
               child: _CalorieDonutCard(nutrition: summary.dietNutrition!),
@@ -32,7 +43,21 @@ class SummaryScreen extends ConsumerWidget {
               child: _WorkoutSummaryCard(
                   performance: summary.workoutPerformance!),
             ),
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          // ── 추세 차트 섹션 ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Text(
+                '추세 분석',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: CalorieTrendChart()),
+          const SliverToBoxAdapter(child: VolumeTrendChart()),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
     );
@@ -77,11 +102,10 @@ class _CalorieDonutCard extends StatelessWidget {
   const _CalorieDonutCard({required this.nutrition});
 
   Color _chartColor(BuildContext context, CalorieResult result) {
-    final cs = Theme.of(context).colorScheme;
     return switch (result) {
-      CalorieResult.achieved => Colors.green,
-      CalorieResult.exceeded => Colors.orange,
-      CalorieResult.under => cs.primary,
+      CalorieResult.achieved => AppTheme.colorMint,
+      CalorieResult.exceeded => AppTheme.colorCoral,
+      CalorieResult.under    => AppTheme.colorCatDiet,
     };
   }
 
@@ -92,9 +116,9 @@ class _CalorieDonutCard extends StatelessWidget {
       };
 
   Color _badgeColor(CalorieResult result) => switch (result) {
-        CalorieResult.achieved => Colors.green,
-        CalorieResult.exceeded => Colors.orange,
-        CalorieResult.under => Colors.blueGrey,
+        CalorieResult.achieved => AppTheme.colorMint,
+        CalorieResult.exceeded => AppTheme.colorCoral,
+        CalorieResult.under    => AppTheme.colorCatDiet,
       };
 
   @override
@@ -108,7 +132,7 @@ class _CalorieDonutCard extends StatelessWidget {
     final activeColor = _chartColor(context, nutrition.calorieResult);
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -116,8 +140,8 @@ class _CalorieDonutCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.local_fire_department,
-                    color: colorScheme.primary, size: 20),
+                const Icon(Icons.local_fire_department,
+                    color: AppTheme.colorCatDiet, size: 20),
                 const SizedBox(width: 8),
                 Text('칼로리', style: theme.textTheme.titleMedium),
                 const Spacer(),
@@ -216,13 +240,12 @@ class _MacroProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final carbs = nutrition.macroStatus['carbs']!;
     final protein = nutrition.macroStatus['protein']!;
     final fat = nutrition.macroStatus['fat']!;
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 4),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -230,8 +253,8 @@ class _MacroProgressCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.pie_chart_outline,
-                    color: colorScheme.primary, size: 20),
+                const Icon(Icons.pie_chart_outline,
+                    color: AppTheme.colorMint, size: 20),
                 const SizedBox(width: 8),
                 Text('매크로 영양소', style: theme.textTheme.titleMedium),
               ],
@@ -240,19 +263,19 @@ class _MacroProgressCard extends StatelessWidget {
             _MacroRow(
               label: '탄수화물',
               info: carbs,
-              color: Colors.orange[400]!,
+              color: AppTheme.colorCatDiet,
             ),
             const SizedBox(height: 12),
             _MacroRow(
               label: '단백질',
               info: protein,
-              color: Colors.blue[400]!,
+              color: AppTheme.colorMint,
             ),
             const SizedBox(height: 12),
             _MacroRow(
               label: '지방',
               info: fat,
-              color: Colors.yellow[700]!,
+              color: AppTheme.colorCoral,
             ),
           ],
         ),
@@ -275,7 +298,7 @@ class _MacroRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isExceeded = info.consumed > info.target;
-    final barColor = isExceeded ? Colors.red : color;
+    final barColor = isExceeded ? theme.colorScheme.error : color;
     final progress = info.target > 0
         ? min(1.0, info.consumed / info.target)
         : 0.0;
@@ -301,7 +324,7 @@ class _MacroRow extends StatelessWidget {
             ),
             if (isExceeded) ...[
               const SizedBox(width: 4),
-              Icon(Icons.arrow_upward, size: 12, color: Colors.red),
+              Icon(Icons.arrow_upward, size: 12, color: theme.colorScheme.error),
             ],
           ],
         ),
@@ -335,7 +358,7 @@ class _WorkoutSummaryCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 4),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -343,8 +366,8 @@ class _WorkoutSummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.fitness_center,
-                    color: colorScheme.primary, size: 20),
+                const Icon(Icons.fitness_center,
+                    color: AppTheme.colorMint, size: 20),
                 const SizedBox(width: 8),
                 Text('운동', style: theme.textTheme.titleMedium),
                 const Spacer(),
@@ -353,7 +376,9 @@ class _WorkoutSummaryCard extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: performance.isWorkoutDay
-                        ? Colors.green.withValues(alpha: 0.15)
+                        ? (Theme.of(context).brightness == Brightness.dark
+                            ? AppTheme.colorMintTintDark
+                            : AppTheme.colorMintTint)
                         : colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -361,7 +386,9 @@ class _WorkoutSummaryCard extends StatelessWidget {
                     performance.isWorkoutDay ? '운동함' : '휴식일',
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: performance.isWorkoutDay
-                          ? Colors.green
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? AppTheme.colorMintDark
+                              : AppTheme.colorMintDeep)
                           : colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
                     ),
@@ -398,7 +425,7 @@ class _WorkoutSummaryCard extends StatelessWidget {
                       icon: Icons.bar_chart,
                       label: '총 볼륨',
                       value: '${performance.totalVolume.toStringAsFixed(0)} kg',
-                      color: colorScheme.primary,
+                      color: AppTheme.colorMint,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -407,7 +434,7 @@ class _WorkoutSummaryCard extends StatelessWidget {
                       icon: Icons.speed,
                       label: '평균 RPE',
                       value: performance.averageRpe.toStringAsFixed(1),
-                      color: colorScheme.tertiary,
+                      color: AppTheme.colorCoral,
                     ),
                   ),
                 ],
@@ -479,13 +506,13 @@ class _EmptyDietCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Icon(Icons.restaurant_outlined,
-                size: 40, color: colorScheme.outline),
+                size: 40, color: colorScheme.onSurfaceVariant),
             const SizedBox(height: 8),
             Text(
               '오늘의 식단 기록이 없습니다',
@@ -501,6 +528,170 @@ class _EmptyDietCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── AI 건강 인사이트 카드 ──────────────────────────────────────────────────────
+
+class _AiInsightCard extends ConsumerWidget {
+  const _AiInsightCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mintTint = isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint;
+    final insightAsync = ref.watch(healthInsightProvider);
+    final selectedDate = ref.watch(selectedDateProvider);
+    final dateKey = insightCacheKey(selectedDate);
+    final counts = ref.watch(insightCallCountProvider);
+    final used = counts[dateKey] ?? 0;
+    final canRefresh = used < kInsightDailyLimit;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: mintTint,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppTheme.colorMint,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI 건강 인사이트',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    Text(
+                      'Powered by Gemini · 오늘 $used/$kInsightDailyLimit',
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 10,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              insightAsync.isLoading
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.colorMint,
+                      ),
+                    )
+                  : GestureDetector(
+                      onTap: () {
+                        if (!canRefresh) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                '오늘 AI 인사이트는 $kInsightDailyLimit회까지 이용할 수 있습니다. 내일 다시 확인해주세요.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+                        // 현재 날짜 캐시 삭제 후 재호출
+                        ref
+                            .read(insightCacheProvider.notifier)
+                            .update((s) => Map.from(s)..remove(dateKey));
+                        ref.invalidate(healthInsightProvider);
+                      },
+                      child: Icon(
+                        Icons.refresh_rounded,
+                        color: canRefresh
+                            ? cs.onSurfaceVariant
+                            : cs.outlineVariant,
+                        size: 18,
+                      ),
+                    ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // 본문
+          insightAsync.when(
+            loading: () => Text(
+              'AI가 오늘의 건강 데이터를 분석하고 있습니다...',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+            error: (e, _) {
+              final msg = e.toString();
+              final String text;
+              if (msg.contains('DAILY_LIMIT_REACHED')) {
+                text =
+                    '오늘 AI 인사이트는 $kInsightDailyLimit회까지 이용할 수 있습니다. 내일 다시 확인해주세요.';
+              } else if (msg.contains('API')) {
+                text = 'Gemini API 키를 .env 파일에 설정해주세요.';
+              } else {
+                text = '인사이트를 불러오지 못했습니다. 새로고침해보세요.';
+              }
+              return Row(
+                children: [
+                  Icon(Icons.error_outline, size: 16, color: cs.error),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 13,
+                        color: cs.error,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+            data: (text) => Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 14,
+                color: cs.onSurface,
+                height: 1.6,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/app_theme.dart';
 
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final String buttonLabel;
-  final VoidCallback onAddPressed;
+  final String? buttonLabel;
+  final VoidCallback? onAddPressed;
 
   const EmptyState({
     super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.buttonLabel,
-    required this.onAddPressed,
+    this.buttonLabel,
+    this.onAddPressed,
   });
 
   @override
@@ -44,21 +45,29 @@ class EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
-            FilledButton.tonal(
-              onPressed: onAddPressed,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add, size: 18),
-                  const SizedBox(width: 6),
-                  Text(buttonLabel),
-                ],
+            // 버튼이 있을 때만 표시 (과거 날짜에서는 숨김)
+            if (buttonLabel != null && onAddPressed != null) ...[
+              const SizedBox(height: 24),
+              FilledButton.tonal(
+                onPressed: onAddPressed,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.colorMintTint,
+                  foregroundColor: AppTheme.colorMintDeep,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.add, size: 18),
+                    const SizedBox(width: 6),
+                    Text(buttonLabel!),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
   }
 }
+

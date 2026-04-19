@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../features/settings/domain/entities/food_template.dart';
 import '../../../../features/settings/presentation/providers/food_template_provider.dart';
+import '../../../../shared/widgets/template_picker_sheet.dart';
 import '../../domain/entities/diet_record.dart';
 import '../providers/diet_provider.dart';
 
@@ -26,7 +28,8 @@ class _DietFormState extends ConsumerState<DietForm> {
 
   final _mealTypes = ['아침', '점심', '저녁', '간식'];
   int _satisfaction = 3;
-  DateTime _timestamp = DateTime.now();
+  late DateTime _timestamp;
+  bool _isLoading = false;
 
   bool get _isEditMode => widget.initialRecord != null;
 
@@ -34,6 +37,8 @@ class _DietFormState extends ConsumerState<DietForm> {
   void initState() {
     super.initState();
     final r = widget.initialRecord;
+    // 신규 추가 시 항상 현재 시각으로 초기화 (재오픈해도 오늘 날짜)
+    _timestamp = r?.timestamp ?? DateTime.now();
     if (r != null) {
       _mealTypeController.text = r.mealType;
       _foodNameController.text = r.foodName;
@@ -49,7 +54,6 @@ class _DietFormState extends ConsumerState<DietForm> {
           : r.fat.toString();
       _memoController.text = r.memo ?? '';
       _satisfaction = r.satisfaction;
-      _timestamp = r.timestamp;
     }
   }
 
@@ -111,12 +115,24 @@ class _DietFormState extends ConsumerState<DietForm> {
     );
     if (confirmed == true && mounted) {
       ref.read(dietRecordsProvider.notifier).deleteRecord(widget.initialRecord!.uuid);
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('삭제되었습니다'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
     }
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
+  Future<void> _submit() async {
+    if (_isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    try {
       final foodName = _foodNameController.text.trim();
       final now = DateTime.now();
       if (_isEditMode) {
@@ -149,14 +165,49 @@ class _DietFormState extends ConsumerState<DietForm> {
         );
         ref.read(dietRecordsProvider.notifier).addRecord(record);
       }
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장되었습니다'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openTemplatePicker() async {
+    final templates = ref.read(foodTemplatesProvider);
+    final picked = await showTemplatePickerSheet<FoodTemplate>(
+      context: context,
+      title: '음식 템플릿 선택',
+      templates: templates,
+      labelOf: (t) => t.name,
+      subtitleOf: (t) {
+        String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
+        return '${t.calories}kcal · 탄 ${fmt(t.carbs)}g 단 ${fmt(t.protein)}g 지 ${fmt(t.fat)}g';
+      },
+      emptyHint: '등록된 음식 템플릿이 없습니다.\n설정에서 자주 먹는 음식을 템플릿으로 추가해 보세요.',
+      onEmptyAction: () => context.push('/settings'),
+    );
+    if (picked != null && mounted) {
+      String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
+      setState(() {
+        _foodNameController.text = picked.name;
+        _caloriesController.text = picked.calories.toString();
+        _carbsController.text = fmt(picked.carbs);
+        _proteinController.text = fmt(picked.protein);
+        _fatController.text = fmt(picked.fat);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final foodTemplates = ref.watch(foodTemplatesProvider);
-
     return Form(
       key: _formKey,
       child: Column(
@@ -174,78 +225,18 @@ class _DietFormState extends ConsumerState<DietForm> {
             validator: (v) => v == null ? '필수' : null,
           ),
           const SizedBox(height: 12),
-          Autocomplete<FoodTemplate>(
-            displayStringForOption: (option) => option.name,
-            initialValue: TextEditingValue(text: _foodNameController.text),
-            optionsBuilder: (textEditingValue) {
-              if (textEditingValue.text.isEmpty) {
-                return const Iterable<FoodTemplate>.empty();
-              }
-              return foodTemplates.where((t) => t.name.contains(textEditingValue.text));
-            },
-            onSelected: (selection) {
-              setState(() {
-                _foodNameController.text = selection.name;
-                _caloriesController.text = selection.calories.toString();
-                _carbsController.text = selection.carbs % 1 == 0
-                    ? selection.carbs.toInt().toString()
-                    : selection.carbs.toString();
-                _proteinController.text = selection.protein % 1 == 0
-                    ? selection.protein.toInt().toString()
-                    : selection.protein.toString();
-                _fatController.text = selection.fat % 1 == 0
-                    ? selection.fat.toInt().toString()
-                    : selection.fat.toString();
-              });
-            },
-            fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-              // 초기화 시 기존 값을 반영하거나, Autocomplete 내부 컨트롤러와 외부 컨트롤러 동기화
-              if (controller.text.isEmpty && _foodNameController.text.isNotEmpty) {
-                controller.text = _foodNameController.text;
-              }
-              controller.addListener(() {
-                _foodNameController.text = controller.text;
-              });
-
-              return TextFormField(
-                controller: controller,
-                focusNode: focusNode,
-                decoration: const InputDecoration(
-                  labelText: '음식 이름',
-                  hintText: '이름을 입력하여 검색',
-                  suffixIcon: Icon(Icons.search),
-                ),
-                onFieldSubmitted: (value) => onFieldSubmitted(),
-                validator: (v) => v?.isEmpty ?? true ? '필수' : null,
-              );
-            },
-            optionsViewBuilder: (context, onSelected, options) {
-              return Align(
-                alignment: Alignment.topLeft,
-                child: Material(
-                  elevation: 4.0,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: 200,
-                      maxWidth: MediaQuery.of(context).size.width - 48, // Padding 고려
-                    ),
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: options.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final option = options.elementAt(index);
-                        return ListTile(
-                          title: Text(option.name),
-                          subtitle: Text('${option.calories}kcal | 탄 ${option.carbs}g 단 ${option.protein}g 지 ${option.fat}g'),
-                          onTap: () => onSelected(option),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              );
-            },
+          TextFormField(
+            controller: _foodNameController,
+            decoration: InputDecoration(
+              labelText: '음식 이름',
+              hintText: '직접 입력하거나 템플릿에서 선택',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.bookmark_border),
+                tooltip: '템플릿에서 선택',
+                onPressed: _openTemplatePicker,
+              ),
+            ),
+            validator: (v) => v?.isEmpty ?? true ? '필수' : null,
           ),
           const SizedBox(height: 12),
           TextFormField(
@@ -267,6 +258,13 @@ class _DietFormState extends ConsumerState<DietForm> {
                   decoration: const InputDecoration(labelText: '탄수화물(g)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return null;
+                    final n = double.tryParse(v);
+                    if (n == null) return '숫자 입력';
+                    if (n < 0) return '0 이상';
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -276,6 +274,13 @@ class _DietFormState extends ConsumerState<DietForm> {
                   decoration: const InputDecoration(labelText: '단백질(g)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return null;
+                    final n = double.tryParse(v);
+                    if (n == null) return '숫자 입력';
+                    if (n < 0) return '0 이상';
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -285,6 +290,13 @@ class _DietFormState extends ConsumerState<DietForm> {
                   decoration: const InputDecoration(labelText: '지방(g)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return null;
+                    final n = double.tryParse(v);
+                    if (n == null) return '숫자 입력';
+                    if (n < 0) return '0 이상';
+                    return null;
+                  },
                 ),
               ),
             ],
@@ -320,8 +332,14 @@ class _DietFormState extends ConsumerState<DietForm> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _submit,
-              child: Text(_isEditMode ? '수정' : '추가'),
+              onPressed: _isLoading ? null : _submit,
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_isEditMode ? '수정' : '추가'),
             ),
           ),
           if (_isEditMode) ...[

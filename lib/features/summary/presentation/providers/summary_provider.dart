@@ -3,26 +3,27 @@ import '../../domain/entities/daily_summary.dart';
 import '../../../exercise/presentation/providers/exercise_provider.dart';
 import '../../../diet/presentation/providers/diet_provider.dart';
 import '../../../../core/sync/sync_state.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
 
 final dailySummaryProvider = Provider<DailySummary>((ref) {
   final exercises = ref.watch(exerciseRecordsProvider);
   final diets = ref.watch(dietRecordsProvider);
   final targets = ref.watch(nutritionTargetsProvider);
-  final now = DateTime.now();
+  final date = ref.watch(selectedDateProvider); // Observer 패턴: 날짜 변경 시 자동 갱신
 
-  final todayExercises = exercises.where((e) =>
-    e.timestamp.year == now.year &&
-    e.timestamp.month == now.month &&
-    e.timestamp.day == now.day
+  final dateExercises = exercises.where((e) =>
+    e.timestamp.year == date.year &&
+    e.timestamp.month == date.month &&
+    e.timestamp.day == date.day
   ).toList();
 
-  final todayDiets = diets.where((d) =>
-    d.timestamp.year == now.year &&
-    d.timestamp.month == now.month &&
-    d.timestamp.day == now.day
+  final dateDiets = diets.where((d) =>
+    d.timestamp.year == date.year &&
+    d.timestamp.month == date.month &&
+    d.timestamp.day == date.day
   ).toList();
 
-  final totalCalories = todayDiets.fold(0, (sum, d) => sum + d.totalCalories);
+  final totalCalories = dateDiets.fold(0, (sum, d) => sum + d.totalCalories);
   final targetCalories = targets.calories;
 
   CalorieResult result;
@@ -34,9 +35,9 @@ final dailySummaryProvider = Provider<DailySummary>((ref) {
     result = CalorieResult.under;
   }
 
-  final totalCarbs = todayDiets.fold(0.0, (sum, d) => sum + d.carbs);
-  final totalProtein = todayDiets.fold(0.0, (sum, d) => sum + d.protein);
-  final totalFat = todayDiets.fold(0.0, (sum, d) => sum + d.fat);
+  final totalCarbs = dateDiets.fold(0.0, (sum, d) => sum + d.carbs);
+  final totalProtein = dateDiets.fold(0.0, (sum, d) => sum + d.protein);
+  final totalFat = dateDiets.fold(0.0, (sum, d) => sum + d.fat);
 
   final dietNutrition = DietNutrition(
     consumedCalories: totalCalories,
@@ -61,26 +62,27 @@ final dailySummaryProvider = Provider<DailySummary>((ref) {
     calorieResult: result,
   );
 
-  final totalVolume = todayExercises.fold(0.0, (sum, e) => sum + e.volume);
-  final avgRpe = todayExercises.isEmpty
+  final totalVolume = dateExercises.fold(0.0, (sum, e) => sum + e.volume);
+  final avgRpe = dateExercises.isEmpty
       ? 0.0
-      : todayExercises.fold(0.0, (sum, e) => sum + e.rpe) / todayExercises.length;
+      : dateExercises.fold(0.0, (sum, e) => sum + e.rpe) / dateExercises.length;
 
-  final targetedMuscles = todayExercises
+  final targetedMuscles = dateExercises
       .map((e) => e.exerciseType)
       .toSet()
       .toList();
 
   final workoutPerformance = WorkoutPerformance(
-    isWorkoutDay: todayExercises.isNotEmpty,
+    isWorkoutDay: dateExercises.isNotEmpty,
     targetedMuscles: targetedMuscles,
     totalVolume: totalVolume,
     averageRpe: avgRpe,
   );
 
   return DailySummary(
-    date: now,
+    date: date,
     dietNutrition: dietNutrition,
     workoutPerformance: workoutPerformance,
   );
 });
+

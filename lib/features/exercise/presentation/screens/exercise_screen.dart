@@ -1,34 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/sheet_state_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
+import '../../../../shared/widgets/bottom_nav_shell.dart';
+import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/widgets/record_form_sheet.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../providers/exercise_provider.dart';
 import '../widgets/exercise_form.dart';
 import '../widgets/exercise_group_card.dart';
-import '../widgets/exercise_record_card.dart';
 
-class ExerciseScreen extends ConsumerWidget {
+class ExerciseScreen extends ConsumerStatefulWidget {
   const ExerciseScreen({super.key});
 
+  @override
+  ConsumerState<ExerciseScreen> createState() => _ExerciseScreenState();
+}
+
+class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(fabActionProvider.notifier).state = () => _openAddSheet(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    // ref.read in dispose can throw "used after dispose" during navigation transition
+    try {
+      ref.read(fabActionProvider.notifier).state = null;
+    } catch (_) {}
+    super.dispose();
+  }
+
   void _openAddSheet(BuildContext context) {
-    showModalBottomSheet(
+    openSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => RecordFormSheet(
+      ref: ref,
+      type: SheetType.exercise,
+      title: '운동 기록 추가',
+      child: const RecordFormSheet(
         title: '운동 기록 추가',
-        child: const ExerciseForm(),
+        child: ExerciseForm(),
       ),
     );
   }
 
   void _openEditSheet(BuildContext context, ExerciseRecord record) {
-    showModalBottomSheet(
+    openSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => RecordFormSheet(
+      ref: ref,
+      type: SheetType.exercise,
+      title: '운동 기록 수정',
+      child: RecordFormSheet(
         title: '운동 기록 수정',
         child: ExerciseForm(initialRecord: record),
       ),
@@ -36,27 +64,33 @@ class ExerciseScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final grouped = ref.watch(todayExerciseGroupedProvider);
-    final totalVolume = ref.watch(todayTotalVolumeProvider);
-    final isEmpty = grouped.isEmpty;
+  Widget build(BuildContext context) {
+    final grouped     = ref.watch(selectedDateExerciseGroupedProvider);
+    final totalVolume = ref.watch(selectedDateTotalVolumeProvider);
+    final selectedDate = ref.watch(selectedDateProvider);
+    final isToday     = ref.watch(isSelectedDateTodayProvider);
+    final isEmpty     = grouped.isEmpty;
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(title: const Text('운동 기록')),
       body: CustomScrollView(
         slivers: [
+          const SliverToBoxAdapter(child: DateNavigationBar()),
           SliverToBoxAdapter(
-            child: _TodayExerciseBanner(totalVolume: totalVolume),
+            child: _ExerciseSummaryCard(
+              date: selectedDate,
+              totalVolume: totalVolume,
+              isToday: isToday,
+            ),
           ),
           if (isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.fitness_center,
-                title: '오늘의 운동 기록이 없어요',
-                subtitle: '+ 버튼으로 첫 운동을 기록해보세요',
-                buttonLabel: '운동 추가',
-                onAddPressed: () => _openAddSheet(context),
+                title: isToday ? '오늘의 운동 기록이 없어요' : '이 날짜의 운동 기록이 없어요',
+                subtitle: isToday ? '+ 버튼으로 첫 운동을 기록해보세요' : '다른 날짜를 선택해보세요',
               ),
             )
           else
@@ -64,8 +98,7 @@ class ExerciseScreen extends ConsumerWidget {
               SliverToBoxAdapter(
                 child: _SectionHeader(
                   exerciseType: typeEntry.key,
-                  count: typeEntry.value.values
-                      .fold(0, (sum, list) => sum + list.length),
+                  count: typeEntry.value.values.fold(0, (sum, list) => sum + list.length),
                 ),
               ),
               SliverList(
@@ -86,36 +119,46 @@ class ExerciseScreen extends ConsumerWidget {
                 ),
               ),
             ],
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openAddSheet(context),
-        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class _TodayExerciseBanner extends StatelessWidget {
+// ── 운동 요약 카드 ────────────────────────────────────────────────────────────
+
+class _ExerciseSummaryCard extends StatelessWidget {
+  final DateTime date;
   final double totalVolume;
-  const _TodayExerciseBanner({required this.totalVolume});
+  final bool isToday;
+  const _ExerciseSummaryCard({
+    required this.date,
+    required this.totalVolume,
+    required this.isToday,
+  });
+
+  String _formatVolume(double v) =>
+      v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : v.toStringAsFixed(0);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final now = DateTime.now();
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-    final dateStr =
-        '${now.month}월 ${now.day}일 (${weekdays[now.weekday - 1]})';
+    final dateStr = '${date.month}월 ${date.day}일 (${weekdays[date.weekday - 1]})';
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.colorNavy,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.colorNavy.withOpacity(0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -124,36 +167,48 @@ class _TodayExerciseBanner extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '오늘',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
+                isToday ? '오늘' : dateStr,
+                style: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.colorMint,
+                  letterSpacing: -0.3,
                 ),
               ),
-              Text(
-                dateStr,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onPrimaryContainer,
+              if (isToday)
+                Text(
+                  dateStr,
+                  style: const TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
             ],
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
+              const Text(
                 '총 볼륨',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppTheme.colorTextDim,
                 ),
               ),
               Text(
-                totalVolume == 0
-                    ? '—'
-                    : '${_formatVolume(totalVolume)} kg',
-                style: theme.textTheme.titleLarge?.copyWith(
+                totalVolume == 0 ? '—' : '${_formatVolume(totalVolume)} kg',
+                style: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: colorScheme.primary,
+                  color: AppTheme.colorMint,
+                  letterSpacing: -0.8,
                 ),
               ),
             ],
@@ -162,14 +217,9 @@ class _TodayExerciseBanner extends StatelessWidget {
       ),
     );
   }
-
-  String _formatVolume(double v) {
-    if (v >= 1000) {
-      return '${(v / 1000).toStringAsFixed(1)}k';
-    }
-    return v.toStringAsFixed(0);
-  }
 }
+
+// ── 섹션 헤더 ─────────────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final String exerciseType;
@@ -178,24 +228,37 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          Icon(exerciseTypeIcon(exerciseType), size: 16, color: colorScheme.primary),
-          const SizedBox(width: 6),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.colorMintDark : AppTheme.colorMint,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             exerciseType,
-            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
           ),
           const Spacer(),
           Text(
             '$count개',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colorScheme.outline,
+            style: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],

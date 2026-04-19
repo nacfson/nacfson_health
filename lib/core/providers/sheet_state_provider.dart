@@ -30,13 +30,9 @@ void openSheet({
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      ref.read(activeSheetProvider.notifier).state = type;
-      return child;
-    },
+    builder: (ctx) => child,
   ).then((_) {
-    Future.microtask(() {
-      ref.read(activeSheetProvider.notifier).state = null;
-    });
+    // 시트가 닫히면 즉시 FAB 복귀시킴 (microtask 지연 제거)
+    ref.read(activeSheetProvider.notifier).state = null;
   });
 }

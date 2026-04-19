@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v5  
+> **현재 버전**: v7  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -8,13 +8,15 @@
 
 ## 버전 이력
 
-| 버전 | 추가 테이블 | 비고 |
-|------|-----------|------|
+| 버전 | 변경 내용 | 비고 |
+|------|----------|------|
 | v1 | `exercise_records` | 초기 출시 |
 | v2 | `diet_records` | 식단 기록 추가 |
 | v3 | `exercise_templates` | 운동 종목 프리셋 |
 | v4 | `food_templates` | 음식 프리셋 (2026-04) |
-| v5 | `weight_records` | 체중 기록 (2026-04) |
+| v5 | `weight_records` 신규 + `exercise_templates.exercise_type` 컬럼 추가 | 체중 기록 + 운동 부위 분류 (2026-04) |
+| v6 | `exercise_type=''` 인 잔여 템플릿 삭제 | v5 마이그레이션 기본값 정리 (2026-04) |
+| v7 | `user_profiles` 신규 | 온보딩/AI 인사이트 사용자 정보 (2026-04) |
 
 ---
 
@@ -79,12 +81,14 @@
 | `id` | INTEGER PK | 로컬 자동증가 (시트 연동 금지) |
 | `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
 | `name` | TEXT UNIQUE | 종목명 |
+| `exercise_type` | TEXT | 부위 (가슴/등/팔/하체/어깨/코어) — v5 추가, default `''` |
 | `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
 | `sync_status` | INTEGER | TemplateSyncStatus 값 |
 
 **TemplateSyncStatus**: `synced(0)` / `created(1)` / `deleted(3)` — `modified(2)` **미사용**  
 **지원 연산**: Create · Delete (수정 없음)  
-**Pull 병합 전략**: insert-or-skip (uuid 기준, LWW 불필요)
+**Pull 병합 전략**: insert-or-skip (uuid 기준, LWW 불필요)  
+**v6 정리**: `exercise_type=''`인 행은 마이그레이션 시 일괄 삭제됨
 
 ---
 
@@ -125,15 +129,37 @@
 
 ---
 
+### 6. `user_profiles` _(v7 신규)_
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | INTEGER PK | 로컬 자동증가 (시트 연동 금지) |
+| `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
+| `gender` | TEXT | 성별 (male/female/etc) |
+| `age_group` | TEXT | 연령대 (예: 20s, 30s) |
+| `height` | REAL | 키 (m) |
+| `goal` | TEXT | 목표 (lose/maintain/gain) |
+| `target_calories` | INTEGER | 일일 목표 칼로리 (kcal) |
+| `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
+| `sync_status` | INTEGER | SyncStatus 값 |
+
+**SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
+**지원 연산**: Create · Read · Update (Delete 비공개 — 1인 1프로필)  
+**연관 모듈**: `lib/features/onboarding/`, `lib/core/ai/health_insight_provider.dart` (BMI 계산용 height 참조)  
+**참고**: 키(height) 영구 저장은 SharedPreferences `user_height_m`(meter)와 이중화 — 빠른 접근/오프라인 우선
+
+---
+
 ## Google Sheets 대응 시트
 
 | DB 테이블 | Sheets 탭 | 헤더 범위 |
 |----------|-----------|---------|
 | `exercise_records` | `exercise_records` | A1:I1 |
 | `diet_records` | `diet_records` | A1:K1 |
-| `exercise_templates` | `exercise_templates` | A1:C1 |
+| `exercise_templates` | `exercise_templates` | A1:D1 (uuid/name/exerciseType/updatedAt) |
 | `food_templates` | `food_templates` | A1:G1 |
 | `weight_records` | `weight_records` | A1:D1 (uuid/timestamp/updatedAt/weight) |
+| `user_profiles` | _시트 동기화 미적용_ | 로컬 전용 (v7 시점) |
 
 > **동기화 메타데이터** (spreadsheetId, lastSyncTime, 영양 목표값 등)는 `SharedPreferences`에 저장 — DB 외부.
 

@@ -17,7 +17,7 @@ class ExerciseRecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final typeColor = getExerciseTypeColor(record.exerciseType);
+    final typeColor = getExerciseTypeColor(record.exerciseType, theme.brightness);
     final timeStr = _formatTime(record.timestamp);
 
     return Dismissible(
@@ -105,16 +105,14 @@ class ExerciseRecordCard extends StatelessWidget {
   }
 }
 
-Color getExerciseTypeColor(String type) {
+Color getExerciseTypeColor(String type, [Brightness brightness = Brightness.light]) {
+  final isDark = brightness == Brightness.dark;
   return switch (type) {
-    '가슴' => const Color(0xFFFFE0B2),
-    '등' => const Color(0xFFE3F2FD),
-    '하체' => const Color(0xFFF3E5F5),
-    '어깨' => const Color(0xFFE8F5E9),
-    '팔' => const Color(0xFFFCE4EC),
-    '코어' => const Color(0xFFFFF9C4),
-    '유산소' => const Color(0xFFE0F7FA),
-    _ => const Color(0xFFEEEEEE),
+    '가슴' || '등' || '어깨' => isDark ? const Color(0xFF143129) : const Color(0xFFE7F8F4),
+    '하체' || '둔근'         => isDark ? const Color(0xFF3A1D1A) : const Color(0xFFFFECE8),
+    '팔' || '코어'           => isDark ? const Color(0xFF1E2540) : const Color(0xFFF0F4FF),
+    '유산소'                 => isDark ? const Color(0xFF1B2A3F) : const Color(0xFFEEF5FF),
+    _                       => isDark ? const Color(0xFF22303C) : const Color(0xFFF4F5F7),
   };
 }
 

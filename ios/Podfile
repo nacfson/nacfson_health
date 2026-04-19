@@ -1,5 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '13.0'
+# iOS 16.1+ 필수 — ActivityKit (Live Activity) 사용
+platform :ios, '16.1'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,5 +39,23 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if current.nil? || Gem::Version.new(current) < Gem::Version.new('16.1')
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.1'
+      end
+    end
+
+    # flutter_app_group_directory 1.1.0 / live_activities 2.4.3 podspec 의 s.source_files
+    # 와일드카드가 PrivacyInfo.xcprivacy 를 Compile Sources 로 포함시켜 빌드 실패 (no rule to process file of type 'text.xml')
+    # resource_bundles 선언이 주석 처리돼 있어 Xcode 가 컴파일하려다 깨짐 → Compile Sources 에서 제거.
+    if ['live_activities', 'flutter_app_group_directory'].include?(target.name)
+      target.source_build_phase.files.dup.each do |bf|
+        ref = bf.file_ref
+        if ref && ref.path && ref.path.end_with?('PrivacyInfo.xcprivacy')
+          target.source_build_phase.remove_build_file(bf)
+        end
+      end
+    end
   end
 end

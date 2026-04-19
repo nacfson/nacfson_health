@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../providers/weight_provider.dart';
 
 class WeightChartCard extends ConsumerWidget {
@@ -17,7 +18,7 @@ class WeightChartCard extends ConsumerWidget {
     final colorScheme = theme.colorScheme;
 
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -105,7 +106,14 @@ class WeightChartCard extends ConsumerWidget {
     double maxY = data.map((e) => (e.weight as num).toDouble()).reduce(max) + 1.0;
 
     return LineChartData(
-      gridData: const FlGridData(show: false),
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (v) => FlLine(
+          color: colorScheme.outlineVariant,
+          strokeWidth: 1,
+        ),
+      ),
       titlesData: FlTitlesData(
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -144,13 +152,22 @@ class WeightChartCard extends ConsumerWidget {
         LineChartBarData(
           spots: spots,
           isCurved: true,
-          color: colorScheme.primary,
-          barWidth: 3,
+          color: AppTheme.colorMint,
+          barWidth: 2.5,
           isStrokeCapRound: true,
-          dotData: const FlDotData(show: true),
+          dotData: FlDotData(
+            show: true,
+            getDotPainter: (spot, percent, barData, index) =>
+                FlDotCirclePainter(
+              radius: 3,
+              color: AppTheme.colorMint,
+              strokeWidth: 0,
+              strokeColor: Colors.transparent,
+            ),
+          ),
           belowBarData: BarAreaData(
             show: true,
-            color: colorScheme.primary.withValues(alpha: 0.1),
+            color: AppTheme.colorMint.withOpacity(0.08),
           ),
         ),
       ],

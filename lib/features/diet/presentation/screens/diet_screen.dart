@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/sheet_state_provider.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
+import '../../../../shared/widgets/bottom_nav_shell.dart';
+import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/widgets/record_form_sheet.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../domain/entities/diet_record.dart';
@@ -7,27 +12,50 @@ import '../providers/diet_provider.dart';
 import '../widgets/diet_form.dart';
 import '../widgets/diet_record_card.dart';
 
-class DietScreen extends ConsumerWidget {
+class DietScreen extends ConsumerStatefulWidget {
   const DietScreen({super.key});
 
+  @override
+  ConsumerState<DietScreen> createState() => _DietScreenState();
+}
+
+class _DietScreenState extends ConsumerState<DietScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(fabActionProvider.notifier).state = () => _openAddSheet(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    try {
+      ref.read(fabActionProvider.notifier).state = null;
+    } catch (_) {}
+    super.dispose();
+  }
+
   void _openAddSheet(BuildContext context) {
-    showModalBottomSheet(
+    openSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => RecordFormSheet(
+      ref: ref,
+      type: SheetType.diet,
+      title: '식단 기록 추가',
+      child: const RecordFormSheet(
         title: '식단 기록 추가',
-        child: const DietForm(),
+        child: DietForm(),
       ),
     );
   }
 
   void _openEditSheet(BuildContext context, DietRecord record) {
-    showModalBottomSheet(
+    openSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => RecordFormSheet(
+      ref: ref,
+      type: SheetType.diet,
+      title: '식단 기록 수정',
+      child: RecordFormSheet(
         title: '식단 기록 수정',
         child: DietForm(initialRecord: record),
       ),
@@ -35,36 +63,39 @@ class DietScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final grouped = ref.watch(todayDietGroupedProvider);
-    final summary = ref.watch(todayDietSummaryProvider);
-    final isEmpty = grouped.isEmpty;
+  Widget build(BuildContext context) {
+    final grouped      = ref.watch(selectedDateDietGroupedProvider);
+    final summary      = ref.watch(selectedDateDietSummaryProvider);
+    final selectedDate = ref.watch(selectedDateProvider);
+    final isToday      = ref.watch(isSelectedDateTodayProvider);
+    final isEmpty      = grouped.isEmpty;
 
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(title: const Text('식단 기록')),
       body: CustomScrollView(
         slivers: [
+          const SliverToBoxAdapter(child: DateNavigationBar()),
           SliverToBoxAdapter(
-            child: _TodayDietBanner(summary: summary),
+            child: _DietSummaryCard(
+              date: selectedDate,
+              summary: summary,
+              isToday: isToday,
+            ),
           ),
           if (isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.restaurant,
-                title: '오늘의 식단 기록이 없어요',
-                subtitle: '+ 버튼으로 첫 식사를 기록해보세요',
-                buttonLabel: '식사 추가',
-                onAddPressed: () => _openAddSheet(context),
+                title: isToday ? '오늘의 식단 기록이 없어요' : '이 날짜의 식단 기록이 없어요',
+                subtitle: isToday ? '+ 버튼으로 첫 식사를 기록해보세요' : '다른 날짜를 선택해보세요',
               ),
             )
           else
             for (final entry in grouped.entries) ...[
               SliverToBoxAdapter(
-                child: _SectionHeader(
-                  mealType: entry.key,
-                  count: entry.value.length,
-                ),
+                child: _SectionHeader(mealType: entry.key, count: entry.value.length),
               ),
               SliverList(
                 delegate: SliverChildBuilderDelegate(
@@ -82,43 +113,45 @@ class DietScreen extends ConsumerWidget {
                 ),
               ),
             ],
-          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openAddSheet(context),
-        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class _TodayDietBanner extends StatelessWidget {
+// ── 식단 요약 카드 ────────────────────────────────────────────────────────────
+
+class _DietSummaryCard extends StatelessWidget {
+  final DateTime date;
   final ({int kcal, double carbs, double protein, double fat}) summary;
-  const _TodayDietBanner({required this.summary});
+  final bool isToday;
+  const _DietSummaryCard({
+    required this.date,
+    required this.summary,
+    required this.isToday,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final now = DateTime.now();
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
-    final dateStr =
-        '${now.month}월 ${now.day}일 (${weekdays[now.weekday - 1]})';
+    final dateStr = '${date.month}월 ${date.day}일 (${weekdays[date.weekday - 1]})';
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [colorScheme.primaryContainer, colorScheme.secondaryContainer],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.colorNavy,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.colorNavy.withOpacity(0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -127,34 +160,47 @@ class _TodayDietBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '오늘',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
+                    isToday ? '오늘' : dateStr,
+                    style: const TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.colorCatDiet,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  Text(
-                    dateStr,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onPrimaryContainer,
+                  if (isToday)
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
                     ),
-                  ),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
+                  const Text(
                     '총 칼로리',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
+                    style: TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 11,
+                      color: AppTheme.colorTextDim,
                     ),
                   ),
                   Text(
                     summary.kcal == 0 ? '—' : '${summary.kcal} kcal',
-                    style: theme.textTheme.titleLarge?.copyWith(
+                    style: const TextStyle(
+                      fontFamily: 'Pretendard',
+                      fontSize: 26,
                       fontWeight: FontWeight.w700,
-                      color: colorScheme.primary,
+                      color: AppTheme.colorCatDiet,
+                      letterSpacing: -0.8,
                     ),
                   ),
                 ],
@@ -162,27 +208,8 @@ class _TodayDietBanner extends StatelessWidget {
             ],
           ),
           if (summary.kcal > 0) ...[
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _MacroChip(
-                  label: '탄',
-                  value: '${summary.carbs.toStringAsFixed(0)}g',
-                  color: Colors.orange[400]!,
-                ),
-                _MacroChip(
-                  label: '단',
-                  value: '${summary.protein.toStringAsFixed(0)}g',
-                  color: Colors.blue[400]!,
-                ),
-                _MacroChip(
-                  label: '지',
-                  value: '${summary.fat.toStringAsFixed(0)}g',
-                  color: Colors.yellow[700]!,
-                ),
-              ],
-            ),
+            const SizedBox(height: 16),
+            _MacroBarsRow(summary: summary),
           ],
         ],
       ),
@@ -190,33 +217,88 @@ class _TodayDietBanner extends StatelessWidget {
   }
 }
 
-class _MacroChip extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const _MacroChip({required this.label, required this.value, required this.color});
+class _MacroBarsRow extends StatelessWidget {
+  final ({int kcal, double carbs, double protein, double fat}) summary;
+  const _MacroBarsRow({required this.summary});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(8),
-      ),
+    final total = summary.kcal.toDouble();
+    return Row(
+      children: [
+        _MacroBar(
+          label: '탄',
+          value: total > 0 ? (summary.carbs * 4) / total : 0,
+          amount: '${summary.carbs.toStringAsFixed(0)}g',
+          color: AppTheme.colorCatDiet,
+        ),
+        const SizedBox(width: 8),
+        _MacroBar(
+          label: '단',
+          value: total > 0 ? (summary.protein * 4) / total : 0,
+          amount: '${summary.protein.toStringAsFixed(0)}g',
+          color: AppTheme.colorMint,
+        ),
+        const SizedBox(width: 8),
+        _MacroBar(
+          label: '지',
+          value: total > 0 ? (summary.fat * 9) / total : 0,
+          amount: '${summary.fat.toStringAsFixed(0)}g',
+          color: AppTheme.colorCoral,
+        ),
+      ],
+    );
+  }
+}
+
+class _MacroBar extends StatelessWidget {
+  final String label;
+  final double value;
+  final String amount;
+  final Color color;
+  const _MacroBar({
+    required this.label,
+    required this.value,
+    required this.amount,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 11,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                amount,
+                style: const TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 11,
+                  color: AppTheme.colorTextDim,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: value.clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: Colors.white.withOpacity(0.15),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
         ],
@@ -225,31 +307,55 @@ class _MacroChip extends StatelessWidget {
   }
 }
 
+// ── 섹션 헤더 ─────────────────────────────────────────────────────────────────
+
 class _SectionHeader extends StatelessWidget {
   final String mealType;
   final int count;
   const _SectionHeader({required this.mealType, required this.count});
 
+  Color _sectionColor(String type, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return switch (type) {
+      '아침' => isDark ? AppTheme.colorCatDietDark : AppTheme.colorCatDiet,
+      '점심' => isDark ? AppTheme.colorMintDark : AppTheme.colorMint,
+      '저녁' => isDark ? AppTheme.colorCatSleepDark : AppTheme.colorCatSleep,
+      _     => isDark ? AppTheme.colorCoralDark : AppTheme.colorCoral,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          Icon(mealTypeIcon(mealType), size: 16, color: colorScheme.primary),
-          const SizedBox(width: 6),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _sectionColor(mealType, context),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             mealType,
-            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
+            ),
           ),
           const Spacer(),
           Text(
             '$count개',
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colorScheme.outline,
+            style: TextStyle(
+              fontFamily: 'Pretendard',
+              fontSize: 12,
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],

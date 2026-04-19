@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -100,6 +100,20 @@ class DatabaseHelper {
         weight REAL NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE user_profiles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        gender TEXT NOT NULL,
+        age_group TEXT NOT NULL,
+        height REAL NOT NULL,
+        goal TEXT NOT NULL,
+        target_calories INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -154,6 +168,22 @@ class DatabaseHelper {
       // v6: exercise_type이 빈 문자열인 템플릿 삭제 (v5 마이그레이션 당시 기본값)
       await db.execute('''
         DELETE FROM exercise_templates WHERE exercise_type = ''
+      ''');
+    }
+    if (oldVersion < 7) {
+      // v7: user_profiles 테이블 생성
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          gender TEXT NOT NULL,
+          age_group TEXT NOT NULL,
+          height REAL NOT NULL,
+          goal TEXT NOT NULL,
+          target_calories INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1
+        )
       ''');
     }
   }

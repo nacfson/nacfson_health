@@ -7,6 +7,7 @@ class SyncPreferences {
   static const _keyTargetCarbs = 'target_carbs';
   static const _keyTargetProtein = 'target_protein';
   static const _keyTargetFat = 'target_fat';
+  static const _keyThemeMode = 'theme_mode';
 
   final SharedPreferences _prefs;
 
@@ -55,6 +56,14 @@ class SyncPreferences {
   Future<void> setTargetFat(double v) async =>
       _prefs.setDouble(_keyTargetFat, v);
 
+  // ── 테마 모드 ────────────────────────────────────────────────────────────────
+
+  /// "system" | "light" | "dark" (기본: "system")
+  String get themeModeRaw => _prefs.getString(_keyThemeMode) ?? 'system';
+
+  Future<void> setThemeModeRaw(String mode) async =>
+      _prefs.setString(_keyThemeMode, mode);
+
   // ── 운동 템플릿 ───────────────────────────────────────────────────────────────
 
   static const _keyExerciseTemplates = 'exercise_templates';
@@ -68,4 +77,13 @@ class SyncPreferences {
   /// SharedPreferences → SQLite 마이그레이션 완료 후 레거시 키를 제거합니다.
   Future<void> clearExerciseTemplates() async =>
       _prefs.remove(_keyExerciseTemplates);
+
+  // ── 휴식 타이머 ──────────────────────────────────────────────────────────────
+
+  static const _keyDefaultRestSeconds = 'default_rest_seconds';
+
+  int get defaultRestSeconds => _prefs.getInt(_keyDefaultRestSeconds) ?? 90;
+
+  Future<void> setDefaultRestSeconds(int seconds) async =>
+      _prefs.setInt(_keyDefaultRestSeconds, seconds);
 }

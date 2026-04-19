@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../features/settings/domain/entities/exercise_template.dart';
 import '../../../../features/settings/presentation/providers/exercise_template_provider.dart';
+import '../../../../shared/widgets/template_picker_sheet.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../providers/exercise_provider.dart';
+import '../providers/rest_timer_provider.dart';
 
 class ExerciseForm extends ConsumerStatefulWidget {
   final ExerciseRecord? initialRecord;
@@ -23,7 +27,7 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
 
   final _exerciseTypes = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
   String _selectedType = '가슴';
-  bool _isTemplatesExpanded = false;
+  bool _isLoading = false;
 
   bool get _isEditMode => widget.initialRecord != null;
 
@@ -80,12 +84,24 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
       ref
           .read(exerciseRecordsProvider.notifier)
           .deleteRecord(widget.initialRecord!.uuid);
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('삭제되었습니다'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
     }
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
+  Future<void> _submit() async {
+    if (_isLoading) return;
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    try {
       final now = DateTime.now();
       if (_isEditMode) {
         final updated = widget.initialRecord!.copyWith(
@@ -100,29 +116,64 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
         );
         ref.read(exerciseRecordsProvider.notifier).updateRecord(updated);
       } else {
+        final exerciseName = _exerciseNameController.text.trim();
         final record = ExerciseRecord(
           timestamp: now,
           updatedAt: now,
           exerciseType: _selectedType,
-          exerciseName: _exerciseNameController.text.trim(),
+          exerciseName: exerciseName,
           currentSet: int.parse(_currentSetController.text),
           weight: double.parse(_weightController.text),
           reps: int.parse(_repsController.text),
           rpe: double.parse(_rpeController.text),
         );
         ref.read(exerciseRecordsProvider.notifier).addRecord(record);
+
+        // 신규 세트 저장 시 휴식 타이머 자동 시작
+        final defaultSec = ref.read(defaultRestSecondsProvider);
+        ref
+            .read(restTimerProvider.notifier)
+            .start(defaultSec, exerciseName: exerciseName);
       }
-      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('저장되었습니다'),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openTemplatePicker() async {
+    final templates = ref.read(exerciseTemplatesProvider);
+    final picked = await showTemplatePickerSheet<ExerciseTemplate>(
+      context: context,
+      title: '운동 템플릿 선택',
+      templates: templates,
+      labelOf: (t) => t.name,
+      groupKeyOf: (t) => t.exerciseType,
+      initialGroupKey: _selectedType,
+      emptyHint: '등록된 운동 템플릿이 없습니다.\n설정에서 자주 하는 운동을 템플릿으로 추가해 보세요.',
+      onEmptyAction: () => context.push('/settings'),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _exerciseNameController.text = picked.name;
+        if (picked.exerciseType.isNotEmpty) {
+          _selectedType = picked.exerciseType;
+        }
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final templates = ref.watch(exerciseTemplatesProvider);
-    final filteredTemplates = templates
-        .where((t) => t.exerciseType == _selectedType)
-        .toList();
-
     return Form(
       key: _formKey,
       child: Column(
@@ -156,7 +207,7 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
                   labelStyle: TextStyle(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.black54,
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
                     fontWeight: isSelected
                         ? FontWeight.bold
                         : FontWeight.normal,
@@ -164,7 +215,7 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
                   side: BorderSide(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
-                        : Colors.black.withOpacity(0.1),
+                        : Theme.of(context).colorScheme.outlineVariant,
                   ),
                 );
               },
@@ -172,79 +223,21 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
           ),
           const SizedBox(height: 16),
 
-          // 2. 운동 이름 입력 필드
+          // 2. 운동 이름 입력 필드 (우측 suffixIcon으로 템플릿 피커 호출)
           TextFormField(
             controller: _exerciseNameController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '어떤 운동을 하셨나요?',
               hintText: '예: 벤치 프레스',
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.bookmark_border),
+                tooltip: '템플릿에서 선택',
+                onPressed: _openTemplatePicker,
+              ),
             ),
             validator: (v) => v?.isEmpty ?? true ? '운동 이름을 입력해주세요' : null,
           ),
-
-          // 3. 템플릿 아코디언 토글
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () =>
-                  setState(() => _isTemplatesExpanded = !_isTemplatesExpanded),
-              icon: Icon(
-                _isTemplatesExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-                size: 18,
-              ),
-              label: Text(
-                _isTemplatesExpanded ? '닫기' : '템플릿에서 선택',
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ),
-
-          // 4. 아코디언 영역 (Templates List)
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: SizedBox(
-              width: double.infinity,
-              height: _isTemplatesExpanded ? null : 0,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: filteredTemplates.isEmpty
-                    ? const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          '등록된 템플릿이 없습니다.',
-                          style: TextStyle(color: Colors.black38, fontSize: 13),
-                        ),
-                      )
-                    : Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: filteredTemplates.map((t) {
-                          return ActionChip(
-                            label: Text(t.name),
-                            onPressed: () {
-                              setState(() {
-                                _exerciseNameController.text = t.name;
-                                _isTemplatesExpanded = false;
-                              });
-                            },
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: 0,
-                            ),
-                            labelStyle: const TextStyle(fontSize: 12),
-                            backgroundColor: Colors.white,
-                            side: BorderSide(
-                              color: Colors.black.withOpacity(0.1),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-            ),
-          ),
+          const SizedBox(height: 8),
 
           // 5. 세트, 중량, 반복, RPE 입력 (2x2 Grid)
           Row(
@@ -254,8 +247,11 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
                   controller: _currentSetController,
                   decoration: const InputDecoration(labelText: '세트'),
                   keyboardType: TextInputType.number,
-                  validator: (v) =>
-                      (int.tryParse(v ?? '') ?? 0) < 1 ? '필수' : null,
+                  validator: (v) {
+                    final n = int.tryParse(v ?? '');
+                    if (n == null || n < 1) return '1 이상';
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -266,8 +262,12 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  validator: (v) =>
-                      double.tryParse(v ?? '') == null ? '필수' : null,
+                  validator: (v) {
+                    final n = double.tryParse(v ?? '');
+                    if (n == null) return '숫자를 입력하세요';
+                    if (n <= 0) return '0보다 커야 합니다';
+                    return null;
+                  },
                 ),
               ),
             ],
@@ -307,8 +307,14 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: _submit,
-              child: Text(_isEditMode ? '기록 수정하기' : '기록 완료'),
+              onPressed: _isLoading ? null : _submit,
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(_isEditMode ? '기록 수정하기' : '기록 완료'),
             ),
           ),
           if (_isEditMode) ...[
@@ -329,3 +335,4 @@ class _ExerciseFormState extends ConsumerState<ExerciseForm> {
     );
   }
 }
+

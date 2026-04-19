@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -6,8 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/ai/health_insight_provider.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
+import 'features/exercise/data/rest_notification_service.dart';
+import 'features/exercise/data/rest_notification_service_android.dart';
+import 'features/exercise/data/rest_notification_service_ios.dart';
+import 'shared/providers/user_profile_provider.dart';
 import 'features/settings/data/repositories/sqlite_exercise_template_repository.dart';
 import 'features/settings/domain/entities/exercise_template.dart';
 
@@ -23,6 +30,13 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final syncPrefs = SyncPreferences(prefs);
+
+  // 사용자 프로필 미리 로드 (router가 즉시 올바른 초기값을 사용하도록)
+  final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+  final heightM = prefs.getDouble('user_height_m') ?? 1.70;
+
+  // Gemini 호출 카운트 미리 로드 (하루 상한 체크용)
+  final insightCounts = await InsightCallCountNotifier.load();
 
   // SharedPreferences 템플릿 → SQLite 1회 마이그레이션 (Web 환경 제외)
   if (!kIsWeb) {
@@ -40,14 +54,36 @@ void main() async {
     }
   }
 
+  final restService = _createRestNotificationService();
+
   runApp(
     ProviderScope(
       overrides: [
         syncPreferencesProvider.overrideWithValue(syncPrefs),
+        // 미리 로드한 값으로 초기화 → 비동기 _load() 제거, 플리커 없음
+        onboardingDoneProvider.overrideWith((ref) => OnboardingNotifier(onboardingDone)),
+        heightMProvider.overrideWith((ref) => HeightNotifier(heightM)),
+        insightCallCountProvider.overrideWith(
+          (ref) => InsightCallCountNotifier(insightCounts),
+        ),
+        restNotificationServiceProvider.overrideWithValue(restService),
       ],
       child: const NacfsonHealthAppWithSync(),
     ),
   );
+}
+
+/// 플랫폼별 RestNotificationService 인스턴스를 생성합니다.
+/// Web/macOS/Linux/Windows 등 지원 범위 밖에서는 Noop 구현으로 안전 fallback.
+RestNotificationService _createRestNotificationService() {
+  if (kIsWeb) return NoopRestNotificationService();
+  try {
+    if (Platform.isIOS) return RestNotificationServiceIOS();
+    if (Platform.isAndroid) return RestNotificationServiceAndroid();
+  } catch (_) {
+    // Platform 접근 실패 시 안전 fallback.
+  }
+  return NoopRestNotificationService();
 }
 
 class NacfsonHealthAppWithSync extends ConsumerStatefulWidget {
