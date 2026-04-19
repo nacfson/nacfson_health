@@ -1,0 +1,49 @@
+{
+  "" : {
+    "diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetExtension-primary.dia",
+    "emit-module-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetExtension-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetExtension-primary-emit-module.dia",
+    "pch" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetExtension-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetExtension-primary.swiftdeps"
+  },
+  "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/RestActivityWidget/RestActivityAttributes.swift" : {
+    "const-values" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.swiftconstvalues",
+    "dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.d",
+    "diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.dia",
+    "index-unit-output-path" : "/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.o",
+    "llvm-bc" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.bc",
+    "object" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.o",
+    "swift-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes.swiftdeps",
+    "swiftmodule" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityAttributes~partial.swiftmodule"
+  },
+  "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/RestActivityWidget/RestActivityWidget.swift" : {
+    "const-values" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.swiftconstvalues",
+    "dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.d",
+    "diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.dia",
+    "index-unit-output-path" : "/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.o",
+    "llvm-bc" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.bc",
+    "object" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.o",
+    "swift-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget.swiftdeps",
+    "swiftmodule" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidget~partial.swiftmodule"
+  },
+  "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/RestActivityWidget/RestActivityWidgetBundle.swift" : {
+    "const-values" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.swiftconstvalues",
+    "dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.d",
+    "diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.dia",
+    "index-unit-output-path" : "/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.o",
+    "llvm-bc" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.bc",
+    "object" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.o",
+    "swift-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle.swiftdeps",
+    "swiftmodule" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/RestActivityWidgetBundle~partial.swiftmodule"
+  },
+  "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.dia",
+    "index-unit-output-path" : "/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols.swiftdeps",
+    "swiftmodule" : "/Users/hyungjuyu/Projects/Flutter/nacfson_health/ios/build/Runner.build/Debug-iphonesimulator/RestActivityWidgetExtension.build/Objects-normal/arm64/GeneratedAssetSymbols~partial.swiftmodule"
+  }
+}

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:native_liquid_glass/native_liquid_glass.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../providers/rest_timer_provider.dart';
@@ -23,6 +24,7 @@ class RestTimerBar extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accent = isDark ? AppTheme.colorMintDark : AppTheme.colorMintDeep;
     final tint = isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint;
+    final useNativeGlass = NativeLiquidGlassUtils.supportsLiquidGlass;
 
     final remaining = state.remainingSeconds.clamp(0, 9999);
     final minutes = (remaining ~/ 60).toString().padLeft(2, '0');
@@ -31,68 +33,99 @@ class RestTimerBar extends ConsumerWidget {
         ? 0.0
         : (remaining / state.totalSeconds).clamp(0.0, 1.0);
 
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ProgressIcon(
+          progress: progress,
+          accent: accent,
+          tint: tint,
+          isPaused: state.isPaused,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$minutes:$seconds',
+          style: TextStyle(
+            fontFamily: 'Pretendard',
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: cs.onSurface,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            letterSpacing: -0.2,
+          ),
+        ),
+        const SizedBox(width: 8),
+        _CircleButton(
+          icon: state.isPaused
+              ? Icons.play_arrow_rounded
+              : Icons.pause_rounded,
+          tooltip: state.isPaused ? '재개' : '일시정지',
+          emphasized: true,
+          onTap: () =>
+              ref.read(restTimerProvider.notifier).togglePause(),
+        ),
+        const SizedBox(width: 4),
+        _CircleButton(
+          icon: Icons.close,
+          tooltip: '종료',
+          onTap: () => ref.read(restTimerProvider.notifier).stop(),
+        ),
+      ],
+    );
+
+    const contentPadding = EdgeInsets.symmetric(horizontal: 6);
+
+    if (useNativeGlass) {
+      // iOS 26+ : 네이티브 UIGlassEffect. BackdropFilter 미사용
+      // (Impeller + BackdropFilter 조합에서 상단에 빨간 잔상 남는 버그 회피).
+      return Material(
+        type: MaterialType.transparency,
+        child: SizedBox(
+          height: 40,
+          child: LiquidGlassContainer(
+            config: LiquidGlassConfig(
+              effect: LiquidGlassEffect.clear,
+              shape: LiquidGlassEffectShape.capsule,
+              backgroundColor: cs.surface.withValues(alpha: 0.4),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: tint, width: 1.2),
+              ),
+              padding: contentPadding,
+              child: Center(child: row),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Fallback : iOS ≤ 25 / Android / Web — 기존 BackdropFilter 경로.
     return Material(
       type: MaterialType.transparency,
       child: ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: tint, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.25),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ProgressIcon(
-                progress: progress,
-                accent: accent,
-                tint: tint,
-                isPaused: state.isPaused,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '$minutes:$seconds',
-                style: TextStyle(
-                  fontFamily: 'Pretendard',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  letterSpacing: -0.2,
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: cs.surface.withValues(alpha: 0.92),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: tint, width: 1.2),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _CircleButton(
-                icon: state.isPaused
-                    ? Icons.play_arrow_rounded
-                    : Icons.pause_rounded,
-                tooltip: state.isPaused ? '재개' : '일시정지',
-                emphasized: true,
-                onTap: () =>
-                    ref.read(restTimerProvider.notifier).togglePause(),
-              ),
-              const SizedBox(width: 4),
-              _CircleButton(
-                icon: Icons.close,
-                tooltip: '종료',
-                onTap: () => ref.read(restTimerProvider.notifier).stop(),
-              ),
-            ],
+              ],
+            ),
+            padding: contentPadding,
+            child: row,
           ),
         ),
-      ),
       ),
     );
   }
