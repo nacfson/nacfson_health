@@ -57,5 +57,23 @@ post_install do |installer|
         end
       end
     end
+
+    # 업스트림이 미유지보수이거나 수정이 어려운 서드파티 타겟의 경고 억제.
+    # - home_widget 0.9.1: Sendable capture, 미사용 immutable, String?→Any coercion 등
+    #   (0.7.0 → 0.9.1 업그레이드로도 경고는 그대로 — CHANGELOG에 수정 없음)
+    # - live_activities 2.4.3: Swift 6 Sendable / @Sendable capture / exhaustive switch 경고
+    # - native_liquid_glass 0.2.6: iOS 15+ deprecated UIButton insets, weak ref 즉시 해제 등
+    # - SVGKit 3.0.0 (native_liquid_glass 의존): DDASLLogger deprecated, C prototype, umbrella header
+    #
+    # 주의: GCC_WARN_* 빌드 설정은 CocoaPods / podspec 이 명령줄 -W 플래그를 주입하면 무력화되므로,
+    # WARNING_CFLAGS 로 -Wno-* 를 직접 주입해야 안정적으로 억제된다. Swift 타겟이 C 모듈
+    # (SVGKit modulemap 등) 을 임포트할 때 발생하는 Clang 경고는 OTHER_SWIFT_FLAGS -Xcc 로 전달.
+    if %w[home_widget live_activities native_liquid_glass SVGKit].include?(target.name)
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+        config.build_settings['WARNING_CFLAGS'] = '$(inherited) -Wno-deprecated-declarations -Wno-strict-prototypes -Wno-incomplete-umbrella'
+        config.build_settings['OTHER_SWIFT_FLAGS'] = '$(inherited) -Xcc -Wno-incomplete-umbrella -Xcc -Wno-deprecated-declarations'
+      end
+    end
   end
 end
