@@ -3,46 +3,58 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
+/// App Group 은 Runner / Widget Extension / entitlements 에 등록된 값과 일치해야 한다.
+private let appGroupId = "group.com.nacfson.nacfsonHealth"
+
+/// 플러그인이 App Group UserDefaults 에 `"\(activity.id)_\(key)"` 로 저장한 사용자 데이터.
+/// 플러그인 소스 `LiveActivitiesPlugin.swift:261` 참고.
+@available(iOS 16.1, *)
+private func readRestPrefs(
+    _ context: ActivityViewContext<LiveActivitiesAppAttributes>
+) -> (endDate: Date, isPaused: Bool, name: String) {
+    let defaults = UserDefaults(suiteName: appGroupId)
+    let prefix = context.attributes.id.uuidString
+    let endAtMs = defaults?.double(forKey: "\(prefix)_endAtMs") ?? 0
+    let isPaused = defaults?.bool(forKey: "\(prefix)_isPaused") ?? false
+    let name = defaults?.string(forKey: "\(prefix)_exerciseName") ?? ""
+    let endDate = Date(timeIntervalSince1970: endAtMs / 1000.0)
+    return (endDate, isPaused, name)
+}
+
 @available(iOS 16.1, *)
 struct RestActivityWidget: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: RestActivityAttributes.self) { context in
-            // Lock Screen / Banner
+        ActivityConfiguration(for: LiveActivitiesAppAttributes.self) { context in
             RestLockScreenView(context: context)
                 .padding()
                 .activityBackgroundTint(Color(.systemBackground))
         } dynamicIsland: { context in
-            DynamicIsland {
+            let prefs = readRestPrefs(context)
+            return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Image(systemName: "timer")
                         .foregroundColor(.mint)
                         .imageScale(.large)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    timerText(context: context)
+                    timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
                         .font(.system(size: 22, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundColor(.primary)
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    if let name = context.attributes.exerciseName, !name.isEmpty {
-                        Text(name)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("휴식 중")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
+                    Text(prefs.name.isEmpty ? "휴식 중" : prefs.name)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    progressBar(context: context)
+                    progressBar(endDate: prefs.endDate, isPaused: prefs.isPaused)
                 }
             } compactLeading: {
                 Image(systemName: "timer")
                     .foregroundColor(.mint)
             } compactTrailing: {
-                timerText(context: context)
+                timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
                     .monospacedDigit()
                     .foregroundColor(.primary)
             } minimal: {
@@ -53,9 +65,8 @@ struct RestActivityWidget: Widget {
     }
 
     @ViewBuilder
-    private func timerText(context: ActivityViewContext<RestActivityAttributes>) -> some View {
-        let endDate = Date(timeIntervalSince1970: context.state.endAtMs / 1000.0)
-        if context.state.isPaused {
+    private func timerText(endDate: Date, isPaused: Bool) -> some View {
+        if isPaused {
             Text("일시정지")
                 .font(.caption)
         } else {
@@ -64,11 +75,8 @@ struct RestActivityWidget: Widget {
     }
 
     @ViewBuilder
-    private func progressBar(
-        context: ActivityViewContext<RestActivityAttributes>
-    ) -> some View {
-        let endDate = Date(timeIntervalSince1970: context.state.endAtMs / 1000.0)
-        if context.state.isPaused {
+    private func progressBar(endDate: Date, isPaused: Bool) -> some View {
+        if isPaused {
             ProgressView(value: 0.0)
                 .tint(.mint)
         } else {
@@ -85,30 +93,30 @@ struct RestActivityWidget: Widget {
 
 @available(iOS 16.1, *)
 struct RestLockScreenView: View {
-    let context: ActivityViewContext<RestActivityAttributes>
+    let context: ActivityViewContext<LiveActivitiesAppAttributes>
 
     var body: some View {
-        let endDate = Date(timeIntervalSince1970: context.state.endAtMs / 1000.0)
+        let prefs = readRestPrefs(context)
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "timer")
                     .foregroundColor(.mint)
-                Text(context.attributes.exerciseName ?? "휴식 중")
+                Text(prefs.name.isEmpty ? "휴식 중" : prefs.name)
                     .font(.headline)
                 Spacer()
-                if context.state.isPaused {
+                if prefs.isPaused {
                     Text("일시정지")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 } else {
-                    Text(timerInterval: Date()...endDate, countsDown: true)
+                    Text(timerInterval: Date()...prefs.endDate, countsDown: true)
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }
             }
-            if !context.state.isPaused {
+            if !prefs.isPaused {
                 ProgressView(
-                    timerInterval: Date()...endDate,
+                    timerInterval: Date()...prefs.endDate,
                     countsDown: true,
                     label: { EmptyView() },
                     currentValueLabel: { EmptyView() }
