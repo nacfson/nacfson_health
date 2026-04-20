@@ -42,11 +42,16 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
     super.dispose();
   }
 
-  void _recalculateFromGoal() {
+  Future<void> _recalculateFromGoal() async {
     final prefs = ref.read(syncPreferencesProvider);
     final heightM = ref.read(heightMProvider);
-    final latestWeight = ref.read(latestWeightProvider);
 
+    // WeightNotifier가 비동기 refresh로 초기화되므로 latestWeightProvider는
+    // 화면 진입 직후 일시적으로 null일 수 있음. 저장소를 직접 조회해 오탐 방지.
+    final repo = ref.read(weightRepositoryProvider);
+    final latestWeight = await repo.getLatest();
+
+    if (!mounted) return;
     if (latestWeight == null) {
       ErrorOverlay.show(
         title: '체중 기록 없음',
@@ -109,10 +114,9 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
 
     if (picked == null) return;
     await prefs.setFitnessGoalRaw(picked.prefsKey);
-    if (mounted) {
-      setState(() {}); // 현재 목표 라벨 갱신
-      _recalculateFromGoal();
-    }
+    if (!mounted) return;
+    setState(() {}); // 현재 목표 라벨 갱신
+    await _recalculateFromGoal();
   }
 
   Future<void> _save() async {

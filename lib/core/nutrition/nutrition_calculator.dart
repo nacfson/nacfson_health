@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
-import '../sync/sync_state.dart' show NutritionTargets;
+import 'nutrition_targets.dart';
+
+export 'nutrition_targets.dart' show NutritionTargets;
 
 /// 피트니스 목표
 enum FitnessGoal { diet, leanMass, bulkUp }
