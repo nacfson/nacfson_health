@@ -93,11 +93,14 @@
 - [x] 다크모드 2차 전수 감사 — 운동 세트 칩(`_StatItem` kg/횟수/RPE), 매크로 게이지 단/지, 섹션 헤더(운동/식단), 칼로리 추세 차트 막대, 체중 차트 그리드 라인, 설정 경고 카드(Google 미로그인), SnackBar 오류 배경, FAB 아이콘 → 모두 `ColorScheme` 기반 동적 색상으로 전환 (brightness-aware 헬퍼 추가: `AppTheme.catDiet/catSleep/lunchTint/snackTint/warnBg/warnFg`)
 
 ### 온보딩 & 사용자 프로필
-- [x] 첫 실행 온보딩 화면 (`OnboardingScreen` — 키/체중 입력, SharedPreferences 플래그)
+- [x] 첫 실행 온보딩 화면 (`OnboardingScreen` — 키/체중/성별/나이대/목표 입력, SharedPreferences 플래그)
 - [x] `HeightNotifier` — SharedPreferences 기반 키(m) 영구 저장 (`user_height_m`)
 - [x] `OnboardingNotifier` — 온보딩 완료 플래그 (`onboarding_done`)
 - [x] GoRouter 온보딩 리다이렉트 (`RouterNotifier` + `refreshListenable` 패턴)
 - [x] 온보딩 체중 입력 → `WeightRecord` 오늘 날짜로 자동 저장
+- [x] 온보딩 목표(다이어트/린매스업/벌크업) + 성별/나이대 입력 → Mifflin-St Jeor 기반 영양 목표 자동 계산 (`lib/core/nutrition/nutrition_calculator.dart`)
+- [x] `SyncPreferences` 사용자 프로필 저장 — `user_gender` / `user_age_group` / `fitness_goal`
+- [x] 설정 화면 '영양 목표' 카드 — 목표 선택 bottom sheet + '목표 기반 재계산' 버튼
 
 ### AI 건강 인사이트
 - [x] `GeminiService` — `gemini-2.5-flash-lite` 기반 한국어 건강 조언 생성 (`.env` API 키)

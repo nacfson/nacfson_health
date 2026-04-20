@@ -182,6 +182,31 @@
 
 ---
 
+## 패치: 온보딩 목표 기반 영양 목표 자동 계산
+
+### 개요
+온보딩 화면에서 키·체중과 함께 **성별·나이대·피트니스 목표**(다이어트/린매스업/벌크업)를 수집하도록 확장하고, Mifflin-St Jeor BMR × 활동계수 1.55 기반 TDEE에 목표별 보정(-500 / +200 / +400 kcal)과 매크로 분배(단백질 1.8 g/kg · 지방 22.5% · 탄수 나머지)를 적용하여 `nutritionTargetsProvider`의 초기값을 seed한다. 기존 1800/250/150/60 하드코딩 기본값 대비 사용자 체형에 맞춘 값이 즉시 적용된다.
+
+### 신규
+- `lib/core/nutrition/nutrition_calculator.dart` — `FitnessGoal` / `UserGender` / `AgeGroup` enum + extension(label/prefsKey/fromPrefsKey) + `calculateTargets(...)` 순수 함수
+- `test/core/nutrition/nutrition_calculator_test.dart` — BMR/TDEE/매크로 합산/하한/enum 왕복 검증
+
+### 변경
+- `lib/features/onboarding/presentation/screens/onboarding_screen.dart` — 성별 `SegmentedButton`, 나이대 `ChoiceChip`(20대/30대/40대/50대 이상), 목표 `SegmentedButton`(다이어트/린매스업/벌크업), 실시간 `_NutritionPreview` 카드 추가. `_submit()`에서 `SyncPreferences`에 성별/나이대/목표 저장 후 `calculateTargets(...)` 결과를 `nutritionTargetsProvider.update(...)`로 seed
+- `lib/core/sync/sync_preferences.dart` — `user_gender` · `user_age_group` · `fitness_goal` 키 추가 (String) + getter/setter 쌍
+- `lib/features/settings/presentation/widgets/diet_target_card.dart` — `_GoalRecalculateRow` 추가: 현재 목표 라벨(탭하여 bottom sheet로 변경), '목표 기반 재계산' 버튼(최신 체중 + 저장된 프로필 기반 재계산 후 컨트롤러 채움, 저장은 사용자가 직접 '저장' 탭)
+
+### 공식
+- BMR (Mifflin-St Jeor): 남 `10w + 6.25h − 5a + 5`, 여 `10w + 6.25h − 5a − 161` (a=나이대 중앙값)
+- TDEE = BMR × 1.55
+- 목표 kcal: 다이어트 `TDEE − 500` (하한 `max(1200, weightKg × 22)`), 린매스업 `TDEE + 200`, 벌크업 `TDEE + 400`
+- 단백질 = weightKg × 1.8 g, 지방 = kcal × 0.225 / 9, 탄수 = 나머지 (음수 clamp, 10 kcal / 1 g 단위 반올림)
+
+### 미적용 (의도적 제외)
+- `user_profiles` DB 테이블 쓰기 — 현재 앱이 해당 테이블을 읽지 않으므로 DB Repository 추가 없이 SharedPreferences만 사용. 추후 Google Sheets 동기화 추가 시 연결 예정.
+
+---
+
 ## 브레이킹 체인지 ⚠️
 
 - **첫 실행 강제 온보딩**: 기존 사용자(SharedPreferences 미보유)는 한 번 키/체중 입력 화면을 거친다.

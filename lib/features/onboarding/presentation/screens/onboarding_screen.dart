@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/nutrition/nutrition_calculator.dart';
+import '../../../../core/sync/sync_state.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../features/weight/domain/entities/weight_record.dart';
 import '../../../../features/weight/presentation/providers/weight_provider.dart';
@@ -21,14 +23,44 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _weightFocus = FocusNode();
+  UserGender _gender = UserGender.male;
+  AgeGroup _ageGroup = AgeGroup.thirties;
+  FitnessGoal _goal = FitnessGoal.leanMass;
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _heightCtrl.addListener(_refreshPreview);
+    _weightCtrl.addListener(_refreshPreview);
+  }
+
+  @override
   void dispose() {
+    _heightCtrl.removeListener(_refreshPreview);
+    _weightCtrl.removeListener(_refreshPreview);
     _heightCtrl.dispose();
     _weightCtrl.dispose();
     _weightFocus.dispose();
     super.dispose();
+  }
+
+  void _refreshPreview() {
+    if (mounted) setState(() {});
+  }
+
+  NutritionTargets? _previewTargets() {
+    final h = double.tryParse(_heightCtrl.text.trim());
+    final w = double.tryParse(_weightCtrl.text.trim());
+    if (h == null || h < 100 || h > 250) return null;
+    if (w == null || w < 20 || w > 300) return null;
+    return calculateTargets(NutritionCalculationInput(
+      heightCm: h,
+      weightKg: w,
+      gender: _gender,
+      ageGroup: _ageGroup,
+      goal: _goal,
+    ));
   }
 
   Future<void> _submit() async {
@@ -50,6 +82,27 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             updatedAt: now,
             weight: weightKg,
           ),
+        );
+
+    // 사용자 프로필 (성별/나이대/목표) 저장
+    final prefs = ref.read(syncPreferencesProvider);
+    await prefs.setUserGenderRaw(_gender.prefsKey);
+    await prefs.setUserAgeGroupRaw(_ageGroup.prefsKey);
+    await prefs.setFitnessGoalRaw(_goal.prefsKey);
+
+    // 목표 기반 영양 목표 계산 및 저장
+    final targets = calculateTargets(NutritionCalculationInput(
+      heightCm: heightCm,
+      weightKg: weightKg,
+      gender: _gender,
+      ageGroup: _ageGroup,
+      goal: _goal,
+    ));
+    await ref.read(nutritionTargetsProvider.notifier).update(
+          calories: targets.calories,
+          carbs: targets.carbs,
+          protein: targets.protein,
+          fat: targets.fat,
         );
 
     // 온보딩 완료 플래그
@@ -103,7 +156,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '정확한 BMI와 건강 분석을 위해\n기본 정보를 입력해주세요.',
+                  '맞춤 영양 목표 계산을 위해\n기본 정보를 입력해주세요.',
                   style: TextStyle(
                     fontFamily: 'Pretendard',
                     fontSize: 15,
@@ -148,7 +201,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
                   textInputAction: TextInputAction.done,
-                  onFieldSubmitted: (_) => _submit(),
                   decoration: _inputDeco(hint: '예) 70.5'),
                   validator: (v) {
                     if (v == null || v.isEmpty) return '체중을 입력해주세요';
@@ -157,7 +209,61 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 20),
+
+                // ── 성별 ──
+                _FieldLabel(label: '성별'),
+                const SizedBox(height: 8),
+                SegmentedButton<UserGender>(
+                  segments: UserGender.values
+                      .map((g) => ButtonSegment<UserGender>(
+                            value: g,
+                            label: Text(g.label),
+                          ))
+                      .toList(),
+                  selected: {_gender},
+                  onSelectionChanged: (s) =>
+                      setState(() => _gender = s.first),
+                ),
+                const SizedBox(height: 20),
+
+                // ── 나이대 ──
+                _FieldLabel(label: '나이대'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: AgeGroup.values.map((a) {
+                    return ChoiceChip(
+                      label: Text(a.label),
+                      selected: _ageGroup == a,
+                      onSelected: (_) => setState(() => _ageGroup = a),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+
+                // ── 목표 ──
+                _FieldLabel(label: '목표'),
+                const SizedBox(height: 8),
+                SegmentedButton<FitnessGoal>(
+                  segments: FitnessGoal.values
+                      .map((g) => ButtonSegment<FitnessGoal>(
+                            value: g,
+                            label: Text(g.label),
+                          ))
+                      .toList(),
+                  selected: {_goal},
+                  onSelectionChanged: (s) =>
+                      setState(() => _goal = s.first),
+                ),
+                const SizedBox(height: 24),
+
+                // ── 영양 목표 프리뷰 ──
+                _NutritionPreview(
+                  targets: _previewTargets(),
+                  tint: mintTint,
+                ),
+                const SizedBox(height: 32),
 
                 // ── 시작 버튼 ──
                 SizedBox(
@@ -259,6 +365,82 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 14,
         fontWeight: FontWeight.w600,
         color: Theme.of(context).colorScheme.onSurface,
+      ),
+    );
+  }
+}
+
+class _NutritionPreview extends StatelessWidget {
+  final NutritionTargets? targets;
+  final Color tint;
+
+  const _NutritionPreview({required this.targets, required this.tint});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = targets;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome,
+                  size: 16, color: AppTheme.colorMint),
+              const SizedBox(width: 6),
+              Text(
+                '예상 영양 목표',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (t == null)
+            Text(
+              '키/체중을 입력하면 자동으로 계산돼요',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+              ),
+            )
+          else ...[
+            Text(
+              '${t.calories} kcal',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '탄 ${t.carbs.toStringAsFixed(0)}g'
+              ' · 단 ${t.protein.toStringAsFixed(0)}g'
+              ' · 지 ${t.fat.toStringAsFixed(0)}g',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 13,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

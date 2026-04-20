@@ -15,9 +15,12 @@ import '../../features/settings/presentation/providers/exercise_template_provide
 import '../../features/settings/presentation/providers/food_template_provider.dart';
 import '../../features/weight/data/repositories/weight_repository.dart';
 import '../../features/weight/presentation/providers/weight_provider.dart';
+import '../nutrition/nutrition_targets.dart';
 import 'google_auth_service.dart';
 import 'supabase_service.dart';
 import 'sync_preferences.dart';
+
+export '../nutrition/nutrition_targets.dart' show NutritionTargets;
 
 // ============================================================================
 // Sync State Enum
@@ -235,33 +238,8 @@ class SyncResult {
 // ============================================================================
 // NutritionTargets — 영양 목표값 상태 관리
 // ============================================================================
-
-class NutritionTargets {
-  final int calories;
-  final double carbs;
-  final double protein;
-  final double fat;
-
-  const NutritionTargets({
-    required this.calories,
-    required this.carbs,
-    required this.protein,
-    required this.fat,
-  });
-
-  NutritionTargets copyWith({
-    int? calories,
-    double? carbs,
-    double? protein,
-    double? fat,
-  }) =>
-      NutritionTargets(
-        calories: calories ?? this.calories,
-        carbs: carbs ?? this.carbs,
-        protein: protein ?? this.protein,
-        fat: fat ?? this.fat,
-      );
-}
+// `NutritionTargets` DTO는 `core/nutrition/nutrition_targets.dart`에 정의되어
+// 있으며 이 파일에서 re-export 합니다 (sync 레이어에 결합되지 않도록).
 
 class NutritionTargetsNotifier extends StateNotifier<NutritionTargets> {
   final SyncPreferences _prefs;

@@ -7,6 +7,9 @@ class SyncPreferences {
   static const _keyTargetCarbs = 'target_carbs';
   static const _keyTargetProtein = 'target_protein';
   static const _keyTargetFat = 'target_fat';
+  static const _keyUserGender = 'user_gender';
+  static const _keyUserAgeGroup = 'user_age_group';
+  static const _keyFitnessGoal = 'fitness_goal';
   static const _keyThemeMode = 'theme_mode';
 
   final SharedPreferences _prefs;
@@ -55,6 +58,26 @@ class SyncPreferences {
       _prefs.setDouble(_keyTargetProtein, v);
   Future<void> setTargetFat(double v) async =>
       _prefs.setDouble(_keyTargetFat, v);
+
+  // ── 사용자 프로필 (온보딩 입력) ───────────────────────────────────────────────
+
+  /// 'male' | 'female'
+  String get userGenderRaw => _prefs.getString(_keyUserGender) ?? 'male';
+
+  Future<void> setUserGenderRaw(String v) async =>
+      _prefs.setString(_keyUserGender, v);
+
+  /// '20s' | '30s' | '40s' | '50s+'
+  String get userAgeGroupRaw => _prefs.getString(_keyUserAgeGroup) ?? '30s';
+
+  Future<void> setUserAgeGroupRaw(String v) async =>
+      _prefs.setString(_keyUserAgeGroup, v);
+
+  /// 'diet' | 'lean_mass' | 'bulk_up'
+  String get fitnessGoalRaw => _prefs.getString(_keyFitnessGoal) ?? 'lean_mass';
+
+  Future<void> setFitnessGoalRaw(String v) async =>
+      _prefs.setString(_keyFitnessGoal, v);
 
   // ── 테마 모드 ────────────────────────────────────────────────────────────────
 
