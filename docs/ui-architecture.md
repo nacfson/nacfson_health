@@ -57,7 +57,7 @@
 
 | 경로 | 화면 | 설명 |
 |------|------|------|
-| `/onboarding` | `OnboardingScreen` | 첫 실행 키/체중 입력 (Shell 외부, redirect 진입점) |
+| `/onboarding` | `OnboardingScreen` | 첫 실행 키/체중/성별/나이대/목표 입력 + 영양 목표 프리뷰 (Shell 외부, redirect 진입점) |
 | `/login-callback` | `AuthCallbackScreen` | OAuth 콜백 → `/settings`로 복귀, `performSync()`는 `unawaited` 배경 실행 (Shell 외부) |
 | `/exercise` | `ExerciseScreen` | 운동 기록 탭 |
 | `/diet` | `DietScreen` | 식단 기록 탭 |
@@ -155,7 +155,7 @@ int _calculateSelectedIndex(BuildContext context) {
 | `DateNavigationBar` | `lib/shared/widgets/date_navigation_bar.dart` | 운동/식단/요약 공통 날짜 탐색 (좌우 chevron + DatePicker + Today 버튼). 미래 날짜는 forward 비활성화 (`isSelectedDateTodayProvider`) |
 | `VolumeTrendChart` | `lib/features/exercise/presentation/widgets/volume_trend_chart.dart` | 운동 볼륨 주간/월간 LineChart (mint, k-notation) |
 | `CalorieTrendChart` | `lib/features/diet/presentation/widgets/calorie_trend_chart.dart` | 식단 칼로리 주간/월간 BarChart + 빨간 점선 목표선, 105% 초과 시 코랄 |
-| `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 |
+| `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg)/성별/나이대/목표(다이어트/린매스업/벌크업) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 + `calculateTargets(...)` 결과를 `nutritionTargetsProvider`에 seed. 실시간 프리뷰(`_NutritionPreview`) 포함 |
 | `ThemeModeCard` | `lib/features/settings/presentation/widgets/theme_mode_card.dart` | SegmentedButton 3-way 테마 전환 |
 | `_AiInsightCard` | `lib/features/summary/presentation/screens/summary_screen.dart` 내 private | Gemini 인사이트 카드 (loading/error/data + 새로고침) |
 | `ExerciseGroupCard` _(v8)_ | `lib/features/exercise/presentation/widgets/exercise_group_card.dart` | 운동 카드. `editable=true`(오늘)면 `+ 세트 추가` 버튼·인라인 입력·"루틴에서 제거" 메뉴 노출. `editable=false`(과거)면 읽기 전용 |
