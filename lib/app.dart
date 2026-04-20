@@ -61,7 +61,7 @@ class _RootTimerOverlay extends ConsumerWidget {
         Positioned(
           top: media.padding.top + 6,
           right: 12,
-          child: const RestTimerBar(),
+          child: const RepaintBoundary(child: RestTimerBar()),
         ),
       ],
     );

@@ -47,7 +47,7 @@
   - 시트 없음: `bottom = 72 + padding.bottom + 12` — BottomNav 위.
 - **가시성**: `restTimerProvider.isActive == true` 일 때만 렌더. 비활성 시 오버레이 자체가 생략되어 레이아웃 영향 없음.
 - **모든 탭·모달에서 유지**: root-level 오버레이이므로 탭 전환·시트 오픈 무관.
-- **스타일**: `BackdropFilter + 반투명 surface` Glassmorphism (BottomNav와 시각적 일관성).
+- **스타일**: iOS 26+ 는 `LiquidGlassContainer` (UIGlassEffect), 그 외 플랫폼은 blur 없는 **solid pill** (`cs.surface` + 테두리 + shadow). `BackdropFilter` 는 **사용하지 않는다** — Impeller + BackdropFilter 조합이 상단에 빨간 잔상을 남기는 문제 때문. 상세: §8.3 및 `docs/build-debug.md §13-1`.
 
 ---
 
