@@ -85,6 +85,12 @@ class FoodAnalysisResult {
       return int.tryParse(v.toString()) ?? 0;
     }
 
+    String? asStringOrNull(dynamic v) {
+      if (v == null) return null;
+      final s = v.toString().trim();
+      return s.isEmpty ? null : s;
+    }
+
     final rawItems = json['items'];
     final items = <FoodAnalysisItem>[];
     if (rawItems is List) {
@@ -104,9 +110,7 @@ class FoodAnalysisResult {
       protein: asDouble(json['protein']),
       fat: asDouble(json['fat']),
       confidence: asDouble(json['confidence']).clamp(0.0, 1.0),
-      notes: (json['notes'] as String?)?.trim().isEmpty ?? true
-          ? null
-          : (json['notes'] as String).trim(),
+      notes: asStringOrNull(json['notes']),
       items: items,
     );
   }

@@ -186,6 +186,8 @@ class _DietFormState extends ConsumerState<DietForm> {
     }
   }
 
+  static final _aiTagPattern = RegExp(r'\s*\[AI 분석 \d+g\]');
+
   void _applyAnalysis(FoodAnalysisResult r, Uint8List thumbnail) {
     String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toStringAsFixed(1);
     final memoTag = '[AI 분석 ${r.estimatedGrams}g]';
@@ -197,10 +199,8 @@ class _DietFormState extends ConsumerState<DietForm> {
       _carbsController.text = fmt(r.carbs);
       _proteinController.text = fmt(r.protein);
       _fatController.text = fmt(r.fat);
-      final existingMemo = _memoController.text.trim();
-      _memoController.text = existingMemo.isEmpty
-          ? memoTag
-          : '$existingMemo $memoTag';
+      final cleanedMemo = _memoController.text.replaceAll(_aiTagPattern, '').trim();
+      _memoController.text = cleanedMemo.isEmpty ? memoTag : '$cleanedMemo $memoTag';
     });
   }
 
@@ -208,6 +208,12 @@ class _DietFormState extends ConsumerState<DietForm> {
     setState(() {
       _analyzedResult = null;
       _analyzedThumbnail = null;
+      _foodNameController.clear();
+      _caloriesController.clear();
+      _carbsController.clear();
+      _proteinController.clear();
+      _fatController.clear();
+      _memoController.text = _memoController.text.replaceAll(_aiTagPattern, '').trim();
     });
   }
 

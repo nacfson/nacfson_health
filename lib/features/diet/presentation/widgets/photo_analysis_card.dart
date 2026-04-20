@@ -66,10 +66,12 @@ class _PhotoAnalysisCardState extends ConsumerState<PhotoAnalysisCard> {
       jpegBytes = await _imageProcessor.resizeAndEncode(file);
       cacheKey = _imageProcessor.sha256Hex(jpegBytes);
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('이미지를 처리할 수 없습니다');
       setState(() => _stage = _AnalysisStage.idle);
       return;
     }
+    if (!mounted) return;
 
     setState(() => _stage = _AnalysisStage.analyzing);
     try {
@@ -203,7 +205,9 @@ class _PhotoAnalysisCardState extends ConsumerState<PhotoAnalysisCard> {
       return _AppliedBanner(
         thumbnail: widget.existingThumbnail!,
         result: widget.existingResult!,
-        onReanalyze: _stage == _AnalysisStage.idle ? _showSourcePicker : null,
+        onReanalyze: _stage == _AnalysisStage.idle && remaining > 0
+            ? _showSourcePicker
+            : null,
         onClear: widget.onClear,
       );
     }
