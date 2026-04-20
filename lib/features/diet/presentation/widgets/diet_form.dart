@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +7,9 @@ import '../../../../features/settings/domain/entities/food_template.dart';
 import '../../../../features/settings/presentation/providers/food_template_provider.dart';
 import '../../../../shared/widgets/template_picker_sheet.dart';
 import '../../domain/entities/diet_record.dart';
+import '../../domain/entities/food_analysis_result.dart';
 import '../providers/diet_provider.dart';
+import 'photo_analysis_card.dart';
 
 class DietForm extends ConsumerStatefulWidget {
   final DietRecord? initialRecord;
@@ -30,6 +34,8 @@ class _DietFormState extends ConsumerState<DietForm> {
   int _satisfaction = 3;
   late DateTime _timestamp;
   bool _isLoading = false;
+  FoodAnalysisResult? _analyzedResult;
+  Uint8List? _analyzedThumbnail;
 
   bool get _isEditMode => widget.initialRecord != null;
 
@@ -180,6 +186,31 @@ class _DietFormState extends ConsumerState<DietForm> {
     }
   }
 
+  void _applyAnalysis(FoodAnalysisResult r, Uint8List thumbnail) {
+    String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toStringAsFixed(1);
+    final memoTag = '[AI 분석 ${r.estimatedGrams}g]';
+    setState(() {
+      _analyzedResult = r;
+      _analyzedThumbnail = thumbnail;
+      _foodNameController.text = r.foodName;
+      _caloriesController.text = r.calories.toString();
+      _carbsController.text = fmt(r.carbs);
+      _proteinController.text = fmt(r.protein);
+      _fatController.text = fmt(r.fat);
+      final existingMemo = _memoController.text.trim();
+      _memoController.text = existingMemo.isEmpty
+          ? memoTag
+          : '$existingMemo $memoTag';
+    });
+  }
+
+  void _clearAnalysis() {
+    setState(() {
+      _analyzedResult = null;
+      _analyzedThumbnail = null;
+    });
+  }
+
   Future<void> _openTemplatePicker() async {
     final templates = ref.read(foodTemplatesProvider);
     final picked = await showTemplatePickerSheet<FoodTemplate>(
@@ -213,6 +244,13 @@ class _DietFormState extends ConsumerState<DietForm> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (!_isEditMode)
+            PhotoAnalysisCard(
+              onAccepted: _applyAnalysis,
+              existingResult: _analyzedResult,
+              existingThumbnail: _analyzedThumbnail,
+              onClear: _clearAnalysis,
+            ),
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(labelText: '식사 유형'),
             initialValue: _mealTypeController.text.isEmpty

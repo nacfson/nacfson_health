@@ -4,6 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>음식 사진을 촬영해 영양성분을 자동으로 분석하기 위해 카메라가 필요합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>저장된 음식 사진에서 영양성분을 분석하기 위해 사진 접근이 필요합니다.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
