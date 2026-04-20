@@ -9,7 +9,7 @@ import '../../../exercise/presentation/providers/exercise_provider.dart';
 /// 최근 13주(91일) GitHub 스타일 운동 히트맵.
 /// - 가로축: 주 (좌→우 과거→현재), 총 13열
 /// - 세로축: 요일 (월~일), 총 7행
-/// - 색상: 본세트 볼륨 분위수 기반 4단계 (0/Q1/Q2/Q3+)
+/// - 색상: 0단계 + 본세트 볼륨 분위수 기반 4단계로 총 5단계 (0/Q1/Q2/Q3/Q3+)
 /// - 셀 탭: `selectedDateProvider` 업데이트 + 운동 탭으로 이동
 class WorkoutHeatmapCard extends ConsumerWidget {
   const WorkoutHeatmapCard({super.key});

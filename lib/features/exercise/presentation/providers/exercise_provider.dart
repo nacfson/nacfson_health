@@ -551,13 +551,16 @@ class ProgressionSummary {
 // 운동 달력 히트맵 (D1) — 최근 91일 일별 본세트 볼륨 맵
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// 최근 91일 동안의 일별 본세트 볼륨. key: midnight DateTime, value: 총 볼륨(kg).
+/// 최근 13주(월요일 기준) 일별 본세트 볼륨. key: midnight DateTime, value: 총 볼륨(kg).
 /// 볼륨 0인 날짜는 맵에 포함되지 않는다 (호출자가 기본값 0으로 처리).
+/// 시작점은 `WorkoutHeatmapCard` 의 그리드 시작(mondayOfThisWeek - 7*12)과 동일하게 계산한다.
 final heatmapDataProvider = Provider<Map<DateTime, double>>((ref) {
   final all = ref.watch(exerciseRecordsProvider);
   final now = DateTime.now();
-  final start = DateTime(now.year, now.month, now.day)
-      .subtract(const Duration(days: 90));
+  final today = DateTime(now.year, now.month, now.day);
+  final mondayOfThisWeek =
+      today.subtract(Duration(days: today.weekday - 1));
+  final start = mondayOfThisWeek.subtract(const Duration(days: 7 * 12));
   final map = <DateTime, double>{};
   for (final r in all) {
     if (r.syncStatus == SyncStatus.deleted) continue;

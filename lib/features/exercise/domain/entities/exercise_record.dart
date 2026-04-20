@@ -11,7 +11,7 @@ enum SyncStatus {
       SyncStatus.values.firstWhere((e) => e.value == v);
 }
 
-/// 세트 타입 — 볼륨/PR 집계 시 `work`(기본)만 포함하고 웜업/실패는 제외한다.
+/// 세트 타입 — 볼륨/PR 집계 시 `work`(기본)와 `drop`을 포함하고 웜업/실패는 제외한다.
 /// 드롭세트는 본세트와 함께 집계에 포함(근성장 기여).
 enum SetType {
   warmup('warmup'),
