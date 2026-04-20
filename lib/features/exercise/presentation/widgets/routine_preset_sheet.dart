@@ -75,32 +75,36 @@ class _RoutinePresetSheet extends ConsumerWidget {
   Future<void> _renamePrompt(
       BuildContext context, WidgetRef ref, WorkoutRoutine r) async {
     final controller = TextEditingController(text: r.name);
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('루틴 이름 변경'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '루틴 이름'),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+    try {
+      final newName = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('루틴 이름 변경'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: '루틴 이름'),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('저장'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('저장'),
-          ),
-        ],
-      ),
-    );
-    if (newName != null && newName.isNotEmpty && newName != r.name) {
-      await ref
-          .read(workoutRoutinesProvider.notifier)
-          .renamePreset(r.uuid, newName);
+      );
+      if (newName != null && newName.isNotEmpty && newName != r.name) {
+        await ref
+            .read(workoutRoutinesProvider.notifier)
+            .renamePreset(r.uuid, newName);
+      }
+    } finally {
+      controller.dispose();
     }
   }
 

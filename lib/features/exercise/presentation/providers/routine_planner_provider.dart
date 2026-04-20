@@ -49,14 +49,16 @@ class RoutinePlannerNotifier extends StateNotifier<List<RoutineItem>> {
 
   Future<void> _load() async {
     final routine = await _repository.getByDate(_date);
+    if (!mounted) return;
     state = routine?.items ?? const [];
   }
 
   Future<void> _persist(List<RoutineItem> items) async {
-    state = List.unmodifiable(items);
+    final next = List<RoutineItem>.unmodifiable(items);
+    state = next;
     await _repository.upsert(DailyRoutine(
       date: _date,
-      items: state,
+      items: next,
       updatedAt: DateTime.now(),
     ));
   }

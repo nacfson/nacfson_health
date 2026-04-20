@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/repositories/sqlite_workout_routine_repository.dart';
 import '../../data/repositories/workout_routine_repository.dart';
@@ -9,6 +10,7 @@ import '../../domain/entities/workout_routine.dart';
 
 class _MemoryWorkoutRoutineRepository implements WorkoutRoutineRepository {
   final List<WorkoutRoutine> _items = [];
+  final Uuid _uuid = const Uuid();
 
   @override
   Future<List<WorkoutRoutine>> getAll() async {
@@ -21,7 +23,10 @@ class _MemoryWorkoutRoutineRepository implements WorkoutRoutineRepository {
   @override
   Future<void> add(WorkoutRoutine routine) async {
     final id = _items.length + 1;
-    _items.add(routine.copyWith(id: id));
+    _items.add(routine.copyWith(
+      id: id,
+      uuid: routine.uuid.isEmpty ? _uuid.v4() : routine.uuid,
+    ));
   }
 
   @override

@@ -109,8 +109,8 @@ class SupabaseService {
               'uuid': r.uuid,
               'user_id': userId,
               'name': r.name,
-              'items_json':
-                  jsonEncode(r.items.map((i) => i.toJson()).toList()),
+              // JSONB 컬럼이므로 구조화된 리스트로 전송 (JSON 문자열로 감싸지 않음)
+              'items_json': r.items.map((i) => i.toJson()).toList(),
               'created_at': r.createdAt.toUtc().toIso8601String(),
               'updated_at': r.updatedAt.toUtc().toIso8601String(),
               'is_deleted': r.syncStatus == SyncStatus.deleted,

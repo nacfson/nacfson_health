@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
 import '../../../../shared/widgets/bottom_nav_shell.dart';
@@ -44,22 +45,41 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
 
   Future<void> _openTemplatePickerForRoutine() async {
     final templates = ref.read(exerciseTemplatesProvider);
-    final picked = await showTemplatePickerSheet<ExerciseTemplate>(
-      context: context,
-      title: '오늘 루틴에 추가',
-      templates: templates,
-      labelOf: (t) => t.name,
-      groupKeyOf: (t) => t.exerciseType,
-      emptyHint: '등록된 운동 템플릿이 없습니다.\n설정에서 자주 하는 운동을 템플릿으로 추가해 보세요.',
-      onEmptyAction: () => context.push('/settings'),
-    );
-    if (picked != null && mounted) {
-      await ref.read(routinePlannerProvider.notifier).addItem(
-            RoutineItem(
-              exerciseType: picked.exerciseType,
-              exerciseName: picked.name,
-            ),
-          );
+    // 다른 시트/피커와 FAB 숨김 규칙을 통일 (activeSheetProvider 경유)
+    ref.read(activeSheetProvider.notifier).state = SheetType.exercise;
+    try {
+      final picked = await showTemplatePickerSheet<ExerciseTemplate>(
+        context: context,
+        title: '오늘 루틴에 추가',
+        templates: templates,
+        labelOf: (t) => t.name,
+        groupKeyOf: (t) => t.exerciseType,
+        emptyHint: '등록된 운동 템플릿이 없습니다.\n설정에서 자주 하는 운동을 템플릿으로 추가해 보세요.',
+        onEmptyAction: () => context.push('/settings'),
+      );
+      if (picked != null && mounted) {
+        await ref.read(routinePlannerProvider.notifier).addItem(
+              RoutineItem(
+                exerciseType: picked.exerciseType,
+                exerciseName: picked.name,
+              ),
+            );
+      }
+    } finally {
+      try {
+        ref.read(activeSheetProvider.notifier).state = null;
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _openRoutinePresetSheet() async {
+    ref.read(activeSheetProvider.notifier).state = SheetType.exercise;
+    try {
+      await showRoutinePresetSheet(context: context);
+    } finally {
+      try {
+        ref.read(activeSheetProvider.notifier).state = null;
+      } catch (_) {}
     }
   }
 
@@ -67,44 +87,48 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     final routine = ref.read(routinePlannerProvider);
     if (routine.isEmpty) return;
     final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('현재 루틴 저장'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '루틴 이름',
-            hintText: '예: 가슴 & 삼두',
+    try {
+      final name = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('현재 루틴 저장'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: '루틴 이름',
+              hintText: '예: 가슴 & 삼두',
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
           ),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('저장'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('저장'),
-          ),
-        ],
-      ),
-    );
-    if (name != null && name.isNotEmpty && mounted) {
-      await ref
-          .read(workoutRoutinesProvider.notifier)
-          .savePreset(name, routine);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('"$name" 루틴이 저장되었습니다'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      );
+      if (name != null && name.isNotEmpty && mounted) {
+        await ref
+            .read(workoutRoutinesProvider.notifier)
+            .savePreset(name, routine);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"$name" 루틴이 저장되었습니다'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -131,7 +155,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
             IconButton(
               tooltip: '저장된 루틴',
               icon: const Icon(Icons.playlist_play),
-              onPressed: () => showRoutinePresetSheet(context: context),
+              onPressed: _openRoutinePresetSheet,
             ),
         ],
       ),
@@ -165,8 +189,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               child: isToday
                   ? _TodayEmptyState(
                       onAdd: _openTemplatePickerForRoutine,
-                      onLoadRoutine: () =>
-                          showRoutinePresetSheet(context: context),
+                      onLoadRoutine: _openRoutinePresetSheet,
                     )
                   : const EmptyState(
                       icon: Icons.fitness_center,
