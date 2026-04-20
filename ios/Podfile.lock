@@ -11,6 +11,8 @@ PODS:
     - Flutter
   - home_widget (0.0.1):
     - Flutter
+  - image_picker_ios (0.0.1):
+    - Flutter
   - live_activities (0.0.1):
     - Flutter
   - native_liquid_glass (0.2.5):
@@ -35,6 +37,7 @@ DEPENDENCIES:
   - flutter_app_group_directory (from `.symlinks/plugins/flutter_app_group_directory/ios`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - home_widget (from `.symlinks/plugins/home_widget/ios`)
+  - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - live_activities (from `.symlinks/plugins/live_activities/ios`)
   - native_liquid_glass (from `.symlinks/plugins/native_liquid_glass/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
@@ -58,6 +61,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_local_notifications/ios"
   home_widget:
     :path: ".symlinks/plugins/home_widget/ios"
+  image_picker_ios:
+    :path: ".symlinks/plugins/image_picker_ios/ios"
   live_activities:
     :path: ".symlinks/plugins/live_activities/ios"
   native_liquid_glass:
@@ -78,6 +83,7 @@ SPEC CHECKSUMS:
   flutter_app_group_directory: 55b5362007d1c0cb45dc1dd1e94f67d615f45a6b
   flutter_local_notifications: ad39620c743ea4c15127860f4b5641649a988100
   home_widget: 54b4f6b36ed8d64cfee594a476225c35c3e45091
+  image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   live_activities: 4dfa736d0736e1c77866a2f9c056a76513cc9e7b
   native_liquid_glass: 3fae675deda2eca3051ab63d9e3987a2ceb0a8fc
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
