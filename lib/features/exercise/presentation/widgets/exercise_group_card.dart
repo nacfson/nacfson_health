@@ -2,31 +2,50 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
 import './exercise_record_card.dart';
+import './inline_set_input.dart';
 
-class ExerciseGroupCard extends StatelessWidget {
+/// 카드 하단의 인라인 입력 모드. `add` = 신규 세트, `edit` = 특정 세트 수정.
+enum _InputMode { none, add, edit }
+
+class ExerciseGroupCard extends StatefulWidget {
   final String exerciseName;
   final String exerciseType;
   final List<ExerciseRecord> records;
-  final Function(ExerciseRecord) onEdit;
-  final Function(String) onDelete;
+  final bool editable;
+  final VoidCallback? onRemoveFromRoutine;
+
+  /// 비편집 모드(과거 날짜)에서만 사용되는 콜백. 편집 모드일 때는 인라인 입력으로 처리.
+  final Function(ExerciseRecord)? onEdit;
+  final Function(String)? onDelete;
 
   const ExerciseGroupCard({
     super.key,
     required this.exerciseName,
     required this.exerciseType,
     required this.records,
-    required this.onEdit,
-    required this.onDelete,
+    this.editable = false,
+    this.onRemoveFromRoutine,
+    this.onEdit,
+    this.onDelete,
   });
 
-  double get totalVolume =>
-      records.fold(0.0, (sum, r) => sum + r.volume);
+  @override
+  State<ExerciseGroupCard> createState() => _ExerciseGroupCardState();
+}
+
+class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
+  _InputMode _mode = _InputMode.none;
+  String? _editingUuid;
+
+  double get _totalVolume =>
+      widget.records.fold(0.0, (sum, r) => sum + r.volume);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final typeColor = getExerciseTypeColor(exerciseType, theme.brightness);
+    final typeColor =
+        getExerciseTypeColor(widget.exerciseType, theme.brightness);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
@@ -35,7 +54,7 @@ class ExerciseGroupCard extends StatelessWidget {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
             child: Row(
               children: [
                 Container(
@@ -45,7 +64,8 @@ class ExerciseGroupCard extends StatelessWidget {
                     color: typeColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(exerciseTypeIcon(exerciseType), size: 20, color: AppTheme.colorNavy),
+                  child: Icon(exerciseTypeIcon(widget.exerciseType),
+                      size: 20, color: AppTheme.colorNavy),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -53,13 +73,13 @@ class ExerciseGroupCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        exerciseName,
+                        widget.exerciseName,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        exerciseType,
+                        widget.exerciseType,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.outline,
                         ),
@@ -68,31 +88,106 @@ class ExerciseGroupCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${totalVolume.toStringAsFixed(0)}kg',
+                  '${_totalVolume.toStringAsFixed(0)}kg',
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: colorScheme.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (widget.editable && widget.onRemoveFromRoutine != null)
+                  PopupMenuButton<String>(
+                    tooltip: '카드 메뉴',
+                    icon: Icon(Icons.more_vert,
+                        size: 20, color: colorScheme.onSurfaceVariant),
+                    onSelected: (v) {
+                      if (v == 'remove') widget.onRemoveFromRoutine!();
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'remove',
+                        child: Text('루틴에서 제거'),
+                      ),
+                    ],
+                  )
+                else
+                  const SizedBox(width: 8),
               ],
             ),
           ),
           const Divider(height: 1),
           // Sets List
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: records.length,
-            separatorBuilder: (context, index) => const Divider(height: 1, indent: 48),
-            itemBuilder: (context, index) {
-              final record = records[index];
-              return _SetRow(
-                record: record,
-                onTap: () => onEdit(record),
-                onDelete: () => onDelete(record.uuid),
-              );
-            },
-          ),
+          if (widget.records.isEmpty && widget.editable)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Text(
+                '아직 기록 없음 · + 버튼으로 첫 세트를 추가하세요',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: widget.records.length,
+              separatorBuilder: (context, index) =>
+                  const Divider(height: 1, indent: 48),
+              itemBuilder: (context, index) {
+                final record = widget.records[index];
+                final isEditingThis = _mode == _InputMode.edit &&
+                    _editingUuid == record.uuid;
+                if (isEditingThis) {
+                  return InlineSetInput(
+                    exerciseType: widget.exerciseType,
+                    exerciseName: widget.exerciseName,
+                    editing: record,
+                    onClose: () => setState(() {
+                      _mode = _InputMode.none;
+                      _editingUuid = null;
+                    }),
+                  );
+                }
+                return _SetRow(
+                  record: record,
+                  editable: widget.editable,
+                  onTap: () {
+                    if (widget.editable) {
+                      setState(() {
+                        _mode = _InputMode.edit;
+                        _editingUuid = record.uuid;
+                      });
+                    } else if (widget.onEdit != null) {
+                      widget.onEdit!(record);
+                    }
+                  },
+                  onDelete: () {
+                    if (widget.onDelete != null) widget.onDelete!(record.uuid);
+                  },
+                );
+              },
+            ),
+          if (widget.editable) ...[
+            const Divider(height: 1),
+            if (_mode == _InputMode.add)
+              InlineSetInput(
+                exerciseType: widget.exerciseType,
+                exerciseName: widget.exerciseName,
+                onClose: () => setState(() => _mode = _InputMode.none),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _mode = _InputMode.add;
+                    _editingUuid = null;
+                  }),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('세트 추가'),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -101,11 +196,13 @@ class ExerciseGroupCard extends StatelessWidget {
 
 class _SetRow extends StatelessWidget {
   final ExerciseRecord record;
+  final bool editable;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _SetRow({
     required this.record,
+    required this.editable,
     required this.onTap,
     required this.onDelete,
   });
@@ -114,6 +211,51 @@ class _SetRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    final row = InkWell(
+      onTap: editable ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 36,
+              child: Text(
+                '${record.currentSet}세트',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.outline,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Row(
+                children: [
+                  _StatItem(
+                    label: record.weight % 1 == 0
+                        ? '${record.weight.toInt()}kg'
+                        : '${record.weight}kg',
+                  ),
+                  const SizedBox(width: 8),
+                  _StatItem(label: '${record.reps}회'),
+                  const SizedBox(width: 8),
+                  _StatItem(label: 'RPE ${record.rpe.toStringAsFixed(1)}'),
+                ],
+              ),
+            ),
+            Text(
+              '${record.volume.toStringAsFixed(0)}kg',
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!editable) return row;
 
     return Dismissible(
       key: ValueKey(record.uuid),
@@ -125,48 +267,7 @@ class _SetRow extends StatelessWidget {
         child: Icon(Icons.delete_outline, color: colorScheme.onErrorContainer),
       ),
       onDismissed: (_) => onDelete(),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${record.currentSet}세트',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.outline,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  children: [
-                    _StatItem(
-                      label: record.weight % 1 == 0
-                          ? '${record.weight.toInt()}kg'
-                          : '${record.weight}kg',
-                    ),
-                    const SizedBox(width: 8),
-                    _StatItem(label: '${record.reps}회'),
-                    const SizedBox(width: 8),
-                    _StatItem(label: 'RPE ${record.rpe.toStringAsFixed(1)}'),
-                  ],
-                ),
-              ),
-              Text(
-                '${record.volume.toStringAsFixed(0)}kg',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: row,
     );
   }
 }

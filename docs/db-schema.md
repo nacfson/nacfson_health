@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v7  
+> **현재 버전**: v8  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -17,6 +17,7 @@
 | v5 | `weight_records` 신규 + `exercise_templates.exercise_type` 컬럼 추가 | 체중 기록 + 운동 부위 분류 (2026-04) |
 | v6 | `exercise_type=''` 인 잔여 템플릿 삭제 | v5 마이그레이션 기본값 정리 (2026-04) |
 | v7 | `user_profiles` 신규 | 온보딩/AI 인사이트 사용자 정보 (2026-04) |
+| v8 | `workout_routines`(루틴 프리셋) + `daily_routine`(오늘 루틴) 신규 | 루틴 플래너 + 인라인 세트 입력 (2026-04) |
 
 ---
 
@@ -150,6 +151,40 @@
 
 ---
 
+### 7. `workout_routines` _(v8 신규)_
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | INTEGER PK | 로컬 자동증가 (서버 연동 금지) |
+| `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
+| `name` | TEXT | 루틴명 (예: "가슴 & 삼두") |
+| `items_json` | TEXT | `[{"type":"가슴","name":"벤치 프레스"}, ...]` 직렬화 |
+| `created_at` | INTEGER | 생성 시각 (ms since epoch) |
+| `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
+| `sync_status` | INTEGER | `SyncStatus` 값 (0/1/2/3) |
+
+**SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
+**지원 연산**: Create · Read · Update · Delete  
+**Pull 병합 전략**: LWW (`updated_at` 기준)  
+**비고**: 자주 사용하는 운동 조합 프리셋. 오늘 루틴 구성 후 "루틴으로 저장"으로 이름 붙여 보관.
+
+---
+
+### 8. `daily_routine` _(v8 신규, 로컬 전용)_
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | INTEGER PK | 로컬 자동증가 |
+| `date` | TEXT UNIQUE | `YYYY-MM-DD` (로컬 자정 기준) |
+| `items_json` | TEXT | 해당 일자에 계획된 운동 항목 직렬화 |
+| `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
+
+**동기화 미적용** — 로컬 전용. 사용자가 오늘 어떤 운동을 할 계획인지 기억하기 위한 임시 데이터.  
+**지원 연산**: Upsert (1일 1행) · Read · Delete  
+**비고**: 카드만 얹은(세트 0인) 상태에서 앱을 닫아도 `exercise_records` 시트엔 아무것도 올라가지 않는다. 실제 세트가 입력될 때만 `exercise_records` insert.
+
+---
+
 ## Google Sheets 대응 시트
 
 | DB 테이블 | Sheets 탭 | 헤더 범위 |
@@ -160,6 +195,10 @@
 | `food_templates` | `food_templates` | A1:G1 |
 | `weight_records` | `weight_records` | A1:D1 (uuid/timestamp/updatedAt/weight) |
 | `user_profiles` | _시트 동기화 미적용_ | 로컬 전용 (v7 시점) |
+| `workout_routines` | `workout_routines` | uuid/name/items_json/created_at/updated_at/is_deleted (Supabase, v8) |
+| `daily_routine` | _시트 동기화 미적용_ | 로컬 전용 (v8) — 오늘 루틴 계획 |
+
+> Supabase 측 `workout_routines` 테이블은 별도 SQL 마이그레이션으로 사전에 생성되어야 한다 (`uuid TEXT PK`, `user_id UUID`, `name TEXT`, `items_json JSONB`, `created_at TIMESTAMPTZ`, `updated_at TIMESTAMPTZ`, `is_deleted BOOLEAN`). 테이블이 없으면 동기화 사이클 중 해당 단계만 오류로 기록되고 다른 동기화는 정상 진행된다.
 
 > **동기화 메타데이터** (spreadsheetId, lastSyncTime, 영양 목표값 등)는 `SharedPreferences`에 저장 — DB 외부.
 

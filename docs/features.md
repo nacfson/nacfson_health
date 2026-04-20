@@ -29,9 +29,23 @@
 - [x] 테마 전환 — 시스템/라이트/다크 (`ThemeModeCard` + `themeModeProvider`, shared_preferences 영구 저장)
 - [x] 기본 휴식 시간 설정 (`RestTimerSettingsCard` — 60/90/120/180초, `defaultRestSecondsProvider`)
 
+### 운동 루틴 플래너 + 인라인 세트 입력 (v8)
+- [x] DB v8 — `workout_routines` (Supabase 동기화) + `daily_routine` (로컬 전용) 테이블
+- [x] `RoutinePlannerNotifier` — 오늘 루틴(`daily_routine`) 항목 추가/제거/교체/병합
+- [x] `WorkoutRoutineNotifier` — 프리셋(저장된 루틴) CRUD + Supabase 양방향 동기화
+- [x] `todayExerciseCardsProvider` — 계획(루틴)과 기록(세트)을 union 한 카드 데이터
+- [x] `InlineSetInput` — 카드 하단 1행 입력기, 직전 세트 값 프리필 + 연속 입력
+- [x] `addSetAutoNumber` — 같은 운동의 다음 세트 번호 자동 부여
+- [x] `deleteSetAndRenumber` — 세트 삭제 후 동일 운동의 currentSet 재부여
+- [x] `RoutinePresetSheet` — AppBar 아이콘으로 호출, 탭=불러오기(교체/추가) · 메뉴=이름변경/삭제
+- [x] "루틴으로 저장" — 현재 오늘 루틴을 이름 붙여 프리셋으로 보관
+- [x] FAB 동작 변경 — 모달 폼 대신 템플릿 피커로 직접 루틴에 운동 추가
+- [x] 볼륨 공식 정정 — `weight × reps × currentSet` → `weight × reps`
+- [x] 레거시 `ExerciseForm` 바텀시트 제거 (인라인 입력으로 대체)
+
 ### 휴식 타이머 (v7.1)
 - [x] **인앱 sticky 미니바** (`RestTimerBar` — BottomNavShell 오버레이, 모든 탭에서 가시성 유지)
-- [x] 운동 세트 신규 저장 시 자동 시작 (`ExerciseForm._submit` → `restTimerProvider.start`)
+- [x] 운동 세트 신규 저장 시 자동 시작 (`InlineSetInput._submit` → `restTimerProvider.start`)
 - [x] ±15초 빠른 조정 / 일시정지·재개 / 수동 종료
 - [x] 백그라운드 복귀 정확성 (`endAt` 기반 계산, Timer.periodic은 UI 갱신 전용)
 - [x] 5초 전 햅틱 1회 + 0초 도달 시 강한 햅틱 (`HapticFeedback`)
@@ -48,6 +62,7 @@
 - [x] 운동 템플릿 양방향 동기화 (Push/Pull/HardDelete)
 - [x] 음식 템플릿 양방향 동기화 (Push/Pull/HardDelete, v4)
 - [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5) ✅ 완성
+- [x] 운동 루틴 프리셋 양방향 동기화 (Push/Pull/HardDelete, v8) — `daily_routine`은 로컬 전용
 - [x] 스프레드시트 교체 시 전체 재동기화 (`resetAllSyncStatus`)
 - [x] 앱 포그라운드 전환 시 자동 동기화 (`AppLifecycleState.resumed`)
 
