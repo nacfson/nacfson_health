@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/ai/food_vision_provider.dart';
 import 'core/ai/health_insight_provider.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
@@ -38,6 +39,7 @@ void main() async {
 
   // Gemini 호출 카운트 미리 로드 (하루 상한 체크용)
   final insightCounts = await InsightCallCountNotifier.load();
+  final foodVisionCounts = await FoodVisionCallCountNotifier.load();
 
   // SharedPreferences 템플릿 → SQLite 1회 마이그레이션 (Web 환경 제외)
   if (!kIsWeb) {
@@ -67,6 +69,9 @@ void main() async {
         heightMProvider.overrideWith((ref) => HeightNotifier(heightM)),
         insightCallCountProvider.overrideWith(
           (ref) => InsightCallCountNotifier(insightCounts),
+        ),
+        foodVisionCallCountProvider.overrideWith(
+          (ref) => FoodVisionCallCountNotifier(foodVisionCounts),
         ),
         restNotificationServiceProvider.overrideWithValue(restService),
       ],
