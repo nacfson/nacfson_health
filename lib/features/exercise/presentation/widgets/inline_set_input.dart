@@ -35,6 +35,7 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
   final FocusNode _repsFocus = FocusNode();
   final FocusNode _rpeFocus = FocusNode();
   bool _saving = false;
+  late SetType _selectedType;
 
   bool get _isEdit => widget.editing != null;
 
@@ -46,6 +47,7 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
       _weightCtl = TextEditingController(text: _fmtNum(r.weight));
       _repsCtl = TextEditingController(text: r.reps.toString());
       _rpeCtl = TextEditingController(text: _fmtNum(r.rpe));
+      _selectedType = r.setType;
     } else {
       final last = ref.read(latestSetOfTodayProvider(widget.exerciseName));
       _weightCtl =
@@ -53,6 +55,8 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
       _repsCtl =
           TextEditingController(text: last == null ? '' : last.reps.toString());
       _rpeCtl = TextEditingController(text: last == null ? '' : _fmtNum(last.rpe));
+      // 신규 입력 기본값은 항상 본세트(work).
+      _selectedType = SetType.work;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _weightFocus.requestFocus();
@@ -102,6 +106,7 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
           weight: weight,
           reps: reps,
           rpe: rpe,
+          setType: _selectedType,
         );
         await notifier.updateRecord(updated);
         if (mounted) widget.onClose();
@@ -112,6 +117,7 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
           weight: weight,
           reps: reps,
           rpe: rpe,
+          setType: _selectedType,
         );
         // 휴식 타이머 자동 시작
         final defaultSec = ref.read(defaultRestSecondsProvider);
@@ -119,6 +125,7 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
             .read(restTimerProvider.notifier)
             .start(defaultSec, exerciseName: widget.exerciseName);
         // 연속 입력: 필드 유지 + 중량 포커스 복귀
+        // 연속 입력 시 타입은 직전 선택을 유지(웜업 3개 연속 입력 패턴 지원).
         if (mounted) {
           FocusScope.of(context).requestFocus(_weightFocus);
           _weightCtl.selection = TextSelection(
@@ -143,6 +150,11 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
       ),
       child: Row(
         children: [
+          _SetTypeSelector(
+            value: _selectedType,
+            onChanged: (t) => setState(() => _selectedType = t),
+          ),
+          const SizedBox(width: 6),
           Expanded(
             child: _NumField(
               controller: _weightCtl,
@@ -194,6 +206,55 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
             onPressed: _saving ? null : widget.onClose,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 세트 타입 드롭다운 — 웜업/본세트/드롭세트/실패 4가지를 한 글자로 표시.
+class _SetTypeSelector extends StatelessWidget {
+  final SetType value;
+  final ValueChanged<SetType> onChanged;
+
+  const _SetTypeSelector({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(minWidth: 52),
+      decoration: BoxDecoration(
+        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<SetType>(
+          value: value,
+          isDense: true,
+          icon: Icon(Icons.arrow_drop_down, size: 18, color: cs.onSurfaceVariant),
+          items: const [
+            DropdownMenuItem(
+              value: SetType.warmup,
+              child: Text('웜', style: TextStyle(fontSize: 13)),
+            ),
+            DropdownMenuItem(
+              value: SetType.work,
+              child: Text('본', style: TextStyle(fontSize: 13)),
+            ),
+            DropdownMenuItem(
+              value: SetType.drop,
+              child: Text('드', style: TextStyle(fontSize: 13)),
+            ),
+            DropdownMenuItem(
+              value: SetType.failure,
+              child: Text('실', style: TextStyle(fontSize: 13)),
+            ),
+          ],
+          onChanged: (t) {
+            if (t != null) onChanged(t);
+          },
+        ),
       ),
     );
   }

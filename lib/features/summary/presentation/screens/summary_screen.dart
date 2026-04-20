@@ -11,6 +11,7 @@ import '../../../exercise/presentation/widgets/volume_trend_chart.dart';
 import '../../../diet/presentation/widgets/calorie_trend_chart.dart';
 import '../../domain/entities/daily_summary.dart';
 import '../providers/summary_provider.dart';
+import '../widgets/workout_heatmap_card.dart';
 
 class SummaryScreen extends ConsumerWidget {
   const SummaryScreen({super.key});
@@ -27,6 +28,7 @@ class SummaryScreen extends ConsumerWidget {
         slivers: [
           // 날짜 네비게이션 바
           const SliverToBoxAdapter(child: DateNavigationBar()),
+          const SliverToBoxAdapter(child: WorkoutHeatmapCard()),
           SliverToBoxAdapter(child: _DateHeader(date: summary.date)),
           const SliverToBoxAdapter(child: _AiInsightCard()),
           if (summary.dietNutrition != null) ...[

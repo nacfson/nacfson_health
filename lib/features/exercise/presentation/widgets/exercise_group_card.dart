@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
+import './exercise_progression_sheet.dart';
 import './exercise_record_card.dart';
 import './inline_set_input.dart';
 
@@ -37,8 +38,12 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
   _InputMode _mode = _InputMode.none;
   String? _editingUuid;
 
-  double get _totalVolume =>
-      widget.records.fold(0.0, (sum, r) => sum + r.volume);
+  double get _totalVolume => widget.records
+      .where((r) => r.countsTowardVolume)
+      .fold(0.0, (sum, r) => sum + r.volume);
+
+  bool get _hasExcludedSets =>
+      widget.records.any((r) => !r.countsTowardVolume);
 
   @override
   Widget build(BuildContext context) {
@@ -52,8 +57,15 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Padding(
+          // Header — 탭 시 진행 추세 시트 오픈 (PopupMenuButton은 자체 이벤트 소비)
+          InkWell(
+            onTap: () => showExerciseProgressionSheet(
+              context,
+              exerciseType: widget.exerciseType,
+              exerciseName: widget.exerciseName,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
             child: Row(
               children: [
@@ -87,12 +99,25 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
                     ],
                   ),
                 ),
-                Text(
-                  '${_totalVolume.toStringAsFixed(0)}kg',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${_totalVolume.toStringAsFixed(0)}kg',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_hasExcludedSets)
+                      Text(
+                        '본세트 기준',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.outline,
+                          fontSize: 10,
+                        ),
+                      ),
+                  ],
                 ),
                 if (widget.editable && widget.onRemoveFromRoutine != null)
                   PopupMenuButton<String>(
@@ -113,6 +138,7 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
                   const SizedBox(width: 8),
               ],
             ),
+          ),
           ),
           const Divider(height: 1),
           // Sets List
@@ -212,6 +238,7 @@ class _SetRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    final isWork = record.setType == SetType.work;
     final row = InkWell(
       onTap: editable ? onTap : null,
       child: Padding(
@@ -220,13 +247,15 @@ class _SetRow extends StatelessWidget {
           children: [
             SizedBox(
               width: 36,
-              child: Text(
-                '${record.currentSet}세트',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.outline,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: isWork
+                  ? Text(
+                      '${record.currentSet}세트',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.outline,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : _SetTypeBadge(setType: record.setType),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -248,6 +277,9 @@ class _SetRow extends StatelessWidget {
               '${record.volume.toStringAsFixed(0)}kg',
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: record.countsTowardVolume
+                    ? null
+                    : colorScheme.outline,
               ),
             ),
           ],
@@ -268,6 +300,55 @@ class _SetRow extends StatelessWidget {
       ),
       onDismissed: (_) => onDelete(),
       child: row,
+    );
+  }
+}
+
+class _SetTypeBadge extends StatelessWidget {
+  final SetType setType;
+  const _SetTypeBadge({required this.setType});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (label, bg, fg, border) = switch (setType) {
+      SetType.warmup => (
+          '웜',
+          Colors.transparent,
+          cs.onSurfaceVariant,
+          cs.outline,
+        ),
+      SetType.drop => (
+          '드',
+          AppTheme.colorCoral.withValues(alpha: 0.18),
+          AppTheme.colorCoral,
+          AppTheme.colorCoral,
+        ),
+      SetType.failure => (
+          '실',
+          AppTheme.colorCoral,
+          Colors.white,
+          AppTheme.colorCoral,
+        ),
+      SetType.work => ('본', Colors.transparent, cs.onSurface, cs.outline),
+    };
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: border),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Pretendard',
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
+      ),
     );
   }
 }

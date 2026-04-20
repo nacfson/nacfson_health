@@ -11,6 +11,26 @@ enum SyncStatus {
       SyncStatus.values.firstWhere((e) => e.value == v);
 }
 
+/// 세트 타입 — 볼륨/PR 집계 시 `work`(기본)와 `drop`을 포함하고 웜업/실패는 제외한다.
+/// 드롭세트는 본세트와 함께 집계에 포함(근성장 기여).
+enum SetType {
+  warmup('warmup'),
+  work('work'),
+  drop('drop'),
+  failure('failure');
+
+  final String value;
+  const SetType(this.value);
+
+  static SetType fromString(String? v) {
+    if (v == null) return SetType.work;
+    return SetType.values.firstWhere(
+      (e) => e.value == v,
+      orElse: () => SetType.work,
+    );
+  }
+}
+
 class ExerciseRecord {
   final int? id; // LOCAL ONLY - 시트 연동 시 사용 금지
   final String uuid; // 글로벌 PK (UUID v4), 빈 문자열이면 Repository에서 자동 생성
@@ -23,6 +43,7 @@ class ExerciseRecord {
   final double weight;
   final int reps;
   final double rpe;
+  final SetType setType;
 
   const ExerciseRecord({
     this.id,
@@ -36,9 +57,14 @@ class ExerciseRecord {
     required this.weight,
     required this.reps,
     required this.rpe,
+    this.setType = SetType.work,
   });
 
   double get volume => weight * reps;
+
+  /// 볼륨 집계 포함 여부 (웜업/실패는 제외).
+  bool get countsTowardVolume =>
+      setType == SetType.work || setType == SetType.drop;
 
   ExerciseRecord copyWith({
     int? id,
@@ -52,6 +78,7 @@ class ExerciseRecord {
     double? weight,
     int? reps,
     double? rpe,
+    SetType? setType,
   }) {
     return ExerciseRecord(
       id: id ?? this.id,
@@ -65,6 +92,7 @@ class ExerciseRecord {
       weight: weight ?? this.weight,
       reps: reps ?? this.reps,
       rpe: rpe ?? this.rpe,
+      setType: setType ?? this.setType,
     );
   }
 }

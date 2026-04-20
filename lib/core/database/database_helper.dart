@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -43,7 +43,8 @@ class DatabaseHelper {
         current_set INTEGER NOT NULL,
         weight REAL NOT NULL,
         reps INTEGER NOT NULL,
-        rpe REAL NOT NULL
+        rpe REAL NOT NULL,
+        set_type TEXT NOT NULL DEFAULT 'work'
       )
     ''');
 
@@ -228,6 +229,17 @@ class DatabaseHelper {
           updated_at INTEGER NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 9) {
+      // v9: exercise_records에 set_type 컬럼 추가 (웜업/본세트/드롭/실패)
+      try {
+        await db.execute('''
+          ALTER TABLE exercise_records
+          ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
+        ''');
+      } catch (e) {
+        // 컬럼이 이미 존재하는 경우 무시
+      }
     }
   }
 

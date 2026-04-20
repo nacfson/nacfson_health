@@ -150,6 +150,7 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
     required double weight,
     required int reps,
     required double rpe,
+    SetType setType = SetType.work,
     DateTime? when,
   }) async {
     final now = when ?? DateTime.now();
@@ -169,6 +170,7 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
       weight: weight,
       reps: reps,
       rpe: rpe,
+      setType: setType,
     );
     await _repository.add(record);
     state = await _repository.getAll();
@@ -241,10 +243,11 @@ final todayExerciseGroupedProvider =
   return grouped;
 });
 
-/// 오늘 총 볼륨 합계 (kg)
+/// 오늘 총 볼륨 합계 (kg) — 본세트/드롭세트만 집계(웜업/실패 제외).
 final todayTotalVolumeProvider = Provider<double>((ref) {
   return ref
       .watch(todayExerciseRecordsProvider)
+      .where((r) => r.countsTowardVolume)
       .fold(0.0, (sum, r) => sum + r.volume);
 });
 
@@ -288,10 +291,11 @@ final selectedDateExerciseGroupedProvider =
   return grouped;
 });
 
-/// 선택 날짜의 총 볼륨 합계 (kg)
+/// 선택 날짜의 총 볼륨 합계 (kg) — 본세트/드롭세트만 집계(웜업/실패 제외).
 final selectedDateTotalVolumeProvider = Provider<double>((ref) {
   return ref
       .watch(selectedDateExerciseRecordsProvider)
+      .where((r) => r.countsTowardVolume)
       .fold(0.0, (sum, r) => sum + r.volume);
 });
 
@@ -387,10 +391,11 @@ final volumeTrendDataProvider =
   final startDate = DateTime(now.year, now.month, now.day)
       .subtract(Duration(days: daysBack));
 
-  // 날짜 범위 내 기록만 필터링
+  // 날짜 범위 내 기록만 필터링 (웜업/실패는 볼륨 집계 제외)
   final filtered = all.where((r) =>
       r.timestamp.isAfter(startDate.subtract(const Duration(seconds: 1))) &&
-      r.syncStatus != SyncStatus.deleted);
+      r.syncStatus != SyncStatus.deleted &&
+      r.countsTowardVolume);
 
   // 일별 볼륨 집계 (메모리 효율: Map으로 한 번만 순회)
   final Map<String, double> dailyVolume = {};
@@ -408,4 +413,186 @@ final volumeTrendDataProvider =
   }
 
   return result;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 종목별 진행 차트 (A2) — 운동 1개에 대해 최고 무게 / e1RM / 세션 볼륨 시계열
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ProgressionMetric { topWeight, e1rm, sessionVolume }
+
+enum ProgressionPeriod { m1, m3, m6 }
+
+extension ProgressionPeriodDays on ProgressionPeriod {
+  int get days => switch (this) {
+        ProgressionPeriod.m1 => 30,
+        ProgressionPeriod.m3 => 90,
+        ProgressionPeriod.m6 => 180,
+      };
+
+  String get label => switch (this) {
+        ProgressionPeriod.m1 => '1개월',
+        ProgressionPeriod.m3 => '3개월',
+        ProgressionPeriod.m6 => '6개월',
+      };
+}
+
+extension ProgressionMetricLabel on ProgressionMetric {
+  String get label => switch (this) {
+        ProgressionMetric.topWeight => '최고 무게',
+        ProgressionMetric.e1rm => 'e1RM',
+        ProgressionMetric.sessionVolume => '세션 볼륨',
+      };
+
+  String get unit => switch (this) {
+        ProgressionMetric.topWeight => 'kg',
+        ProgressionMetric.e1rm => 'kg',
+        ProgressionMetric.sessionVolume => 'kg',
+      };
+}
+
+final progressionMetricProvider =
+    StateProvider<ProgressionMetric>((_) => ProgressionMetric.topWeight);
+
+final progressionPeriodProvider =
+    StateProvider<ProgressionPeriod>((_) => ProgressionPeriod.m3);
+
+/// Epley 1RM 추정치. reps ≤ 10 인 세트만 대상(고반복은 편향).
+double _epleyE1rm(double weight, int reps) {
+  if (reps < 1 || reps > 10) return 0;
+  return weight * (1 + reps / 30.0);
+}
+
+class ProgressionSessionPoint {
+  final DateTime date;
+  final double value; // 메트릭 값
+  final double topWeight;
+  final int topReps;
+  final double avgRpe;
+  final int setCount;
+
+  const ProgressionSessionPoint({
+    required this.date,
+    required this.value,
+    required this.topWeight,
+    required this.topReps,
+    required this.avgRpe,
+    required this.setCount,
+  });
+}
+
+/// 종목명 별 진행 데이터. 본세트/드롭세트만 포함(웜업/실패 제외).
+/// 빈 날짜는 포함하지 않음(세션이 있는 날짜만 점으로 반환).
+final exerciseProgressionDataProvider = Provider.family<
+    List<ProgressionSessionPoint>, String>((ref, exerciseName) {
+  final all = ref.watch(exerciseRecordsProvider);
+  final metric = ref.watch(progressionMetricProvider);
+  final period = ref.watch(progressionPeriodProvider);
+  final now = DateTime.now();
+  final cutoff = DateTime(now.year, now.month, now.day)
+      .subtract(Duration(days: period.days));
+
+  final relevant = all.where((r) =>
+      r.exerciseName == exerciseName &&
+      r.syncStatus != SyncStatus.deleted &&
+      r.countsTowardVolume &&
+      r.timestamp.isAfter(cutoff.subtract(const Duration(seconds: 1))));
+
+  // 날짜별 그룹핑 (midnight)
+  final Map<DateTime, List<ExerciseRecord>> byDay = {};
+  for (final r in relevant) {
+    final key = DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day);
+    byDay.putIfAbsent(key, () => []).add(r);
+  }
+
+  final points = <ProgressionSessionPoint>[];
+  for (final entry in byDay.entries) {
+    final sets = entry.value;
+    final topSet = sets.reduce((a, b) => a.weight >= b.weight ? a : b);
+    final maxE1rm = sets
+        .map((s) => _epleyE1rm(s.weight, s.reps))
+        .fold<double>(0, (a, b) => a > b ? a : b);
+    final sessionVolume = sets.fold<double>(0, (s, r) => s + r.volume);
+    final avgRpe = sets.map((s) => s.rpe).fold<double>(0, (a, b) => a + b) /
+        sets.length;
+    final value = switch (metric) {
+      ProgressionMetric.topWeight => topSet.weight,
+      ProgressionMetric.e1rm => maxE1rm,
+      ProgressionMetric.sessionVolume => sessionVolume,
+    };
+    points.add(ProgressionSessionPoint(
+      date: entry.key,
+      value: value,
+      topWeight: topSet.weight,
+      topReps: topSet.reps,
+      avgRpe: avgRpe,
+      setCount: sets.length,
+    ));
+  }
+  points.sort((a, b) => a.date.compareTo(b.date));
+  return points;
+});
+
+class ProgressionSummary {
+  final double maxWeight;
+  final int maxWeightReps;
+  final int sessionCount;
+  final double avgRpe;
+
+  const ProgressionSummary({
+    required this.maxWeight,
+    required this.maxWeightReps,
+    required this.sessionCount,
+    required this.avgRpe,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 운동 달력 히트맵 (D1) — 최근 91일 일별 본세트 볼륨 맵
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 최근 13주(월요일 기준) 일별 본세트 볼륨. key: midnight DateTime, value: 총 볼륨(kg).
+/// 볼륨 0인 날짜는 맵에 포함되지 않는다 (호출자가 기본값 0으로 처리).
+/// 시작점은 `WorkoutHeatmapCard` 의 그리드 시작(mondayOfThisWeek - 7*12)과 동일하게 계산한다.
+final heatmapDataProvider = Provider<Map<DateTime, double>>((ref) {
+  final all = ref.watch(exerciseRecordsProvider);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final mondayOfThisWeek =
+      today.subtract(Duration(days: today.weekday - 1));
+  final start = mondayOfThisWeek.subtract(const Duration(days: 7 * 12));
+  final map = <DateTime, double>{};
+  for (final r in all) {
+    if (r.syncStatus == SyncStatus.deleted) continue;
+    if (!r.countsTowardVolume) continue; // 웜업/실패 제외
+    if (r.timestamp.isBefore(start)) continue;
+    final key =
+        DateTime(r.timestamp.year, r.timestamp.month, r.timestamp.day);
+    map[key] = (map[key] ?? 0) + r.volume;
+  }
+  return map;
+});
+
+/// 종목별 요약 카드 데이터 (기간 내 최고 기록 / 세션 수 / 평균 RPE).
+final exerciseProgressionSummaryProvider =
+    Provider.family<ProgressionSummary, String>((ref, exerciseName) {
+  final points = ref.watch(exerciseProgressionDataProvider(exerciseName));
+  if (points.isEmpty) {
+    return const ProgressionSummary(
+      maxWeight: 0,
+      maxWeightReps: 0,
+      sessionCount: 0,
+      avgRpe: 0,
+    );
+  }
+  final topPoint = points.reduce((a, b) => a.topWeight >= b.topWeight ? a : b);
+  final avgRpe =
+      points.map((p) => p.avgRpe).fold<double>(0, (a, b) => a + b) /
+          points.length;
+  return ProgressionSummary(
+    maxWeight: topPoint.topWeight,
+    maxWeightReps: topPoint.topReps,
+    sessionCount: points.length,
+    avgRpe: avgRpe,
+  );
 });

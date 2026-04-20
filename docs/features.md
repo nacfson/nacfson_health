@@ -54,17 +54,18 @@
 - [ ] iOS Live Activity App Intents 액션 (현재는 인앱/Android만 액션 처리) — 백로그
 - [ ] Android Foreground Service (앱 강제 종료 시에도 알림 유지) — 백로그
 
-### Google Sheets 동기화
-- [x] Google 계정 로그인 · 세션 복원 (`GoogleAuthService`)
-- [x] 스프레드시트 자동 생성 + 필수 시트 보장 (`ensureAllRequiredSheets`)
-- [x] 운동 기록 Push/Pull/HardDelete
+### Supabase 동기화
+- [x] Supabase OAuth 로그인 · 세션 복원 (`GoogleAuthService` — Supabase OAuth 래퍼)
+- [x] 운동 기록 Push/Pull/HardDelete — `SupabaseService.batchPushExerciseRecords` / `readExerciseRecordsDelta`
 - [x] 식단 기록 Push/Pull/HardDelete
 - [x] 운동 템플릿 양방향 동기화 (Push/Pull/HardDelete)
 - [x] 음식 템플릿 양방향 동기화 (Push/Pull/HardDelete, v4)
 - [x] 체중 기록 양방향 동기화 (Push/Pull/HardDelete, v5) ✅ 완성
 - [x] 운동 루틴 프리셋 양방향 동기화 (Push/Pull/HardDelete, v8) — `daily_routine`은 로컬 전용
-- [x] 스프레드시트 교체 시 전체 재동기화 (`resetAllSyncStatus`)
+- [x] LWW (Last-Write-Wins) 머지 — `updated_at` 기준, Soft-delete(`is_deleted=true`)
+- [x] 전체 재동기화 (`resetAllSyncStatus`)
 - [x] 앱 포그라운드 전환 시 자동 동기화 (`AppLifecycleState.resumed`)
+- [x] **Google Sheets 동기화는 v7에서 제거됨** (자세한 경위는 `docs/changelog-v7.md`)
 
 ### UI/UX
 - [x] `ErrorOverlay` — 자동 닫힘 오류 표시 (낮은 심각도)
@@ -130,16 +131,36 @@
 
 ---
 
+### 헬스 사용자 UX 강화 (v9)
+- [x] **세트 타입 구분** — 웜업/본세트/드롭/실패 4종 (C1, DB v9 `exercise_records.set_type`)
+  - 볼륨 집계는 `work` + `drop` 만 포함 (`countsTowardVolume` getter)
+  - `InlineSetInput` 좌측 드롭다운 (웜/본/드/실)
+  - `ExerciseGroupCard` 세트 행에 타입 뱃지 (웜업=회색 아웃라인 / 드롭=코럴 채움 / 실패=코럴 필)
+  - 헤더 볼륨 옆 "본세트 기준" 보조 라벨 (웜업/실패 있을 때만)
+- [x] **종목별 진행 차트** (A2, `ExerciseProgressionSheet`)
+  - 메트릭 3종 토글: 최고 무게 / e1RM (Epley, reps≤10) / 세션 볼륨
+  - 기간 토글: 1개월 / 3개월 / 6개월
+  - 요약 카드 (최고 기록·세션 수·평균 RPE) + 최근 10세션 리스트
+  - 진입: `ExerciseGroupCard` 헤더 탭
+- [x] **운동 달력 히트맵** (D1, `WorkoutHeatmapCard`)
+  - 최근 13주 × 7일 GitHub 스타일
+  - 본세트 볼륨 분위수(Q1/Q2/Q3+) 기반 4단계 색상
+  - 셀 탭 → `selectedDateProvider` + `/exercise` 라우팅
+  - 요약 탭 최상단 배치
+
 ## 백로그 📋
 
 > 우선순위 없음 — 추가할 때 항목 작성
 
 - [x] 주간/월간 운동 볼륨 추세선 차트
 - [x] 날짜별 식단 칼로리 히스토리 차트
-- [ ] 운동 기록 캘린더 뷰 (부위별 Dot 표시)
+- [x] 운동 기록 캘린더 뷰 (히트맵 형태로 구현, v9)
 - [ ] 오프라인 모드 명시적 안내 (동기화 실패 시 배너)
 - [x] 다크 모드 지원 (전수 정비 완료)
 - [ ] 스트릭 시스템 (연속 기록 동기부여)
 - [ ] 설정 화면에서 키 수정 기능 (온보딩 이후 변경)
 - [ ] AI 인사이트 캐싱 (같은 날 데이터 변경 없으면 재호출 생략)
+- [ ] 개인 기록(PR) 카드 + 3대 운동 합산 (요약 탭)
+- [ ] 원판 계산기 (플레이트 브레이크다운)
+- [ ] 기본 운동 라이브러리 (30~50종 시드)
 
