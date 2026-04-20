@@ -5,6 +5,10 @@
     <!-- <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/> -->
     <!-- flutter_local_notifications 진동 -->
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- 사진 음식 분석 — 카메라 촬영 + 갤러리 읽기 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <application
         android:label="nacfson_health"
         android:name="${applicationName}"

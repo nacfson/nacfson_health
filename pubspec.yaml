@@ -49,6 +49,11 @@ dependencies:
   # AI
   google_generative_ai: ^0.4.7
 
+  # 사진 음식 분석
+  image_picker: ^1.1.2
+  image: ^4.2.0
+  crypto: ^3.0.5
+
   # 휴식 타이머 — 네이티브 위젯/알림
   live_activities: ^2.4.3           # iOS Dynamic Island + Lock Screen Live Activity
   flutter_local_notifications: ^17.2.4  # Android persistent notification (chronometer + actions)
