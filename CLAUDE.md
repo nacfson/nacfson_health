@@ -4,12 +4,12 @@
 
 ## 프로젝트 요약
 
-- **목표**: 구글 폼/시트 대체 개인 맞춤형 피트니스 & 식단 통합 대시보드
-- **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, googleapis
-- **DB 버전**: v7 (테이블 6개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles)
+- **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
+- **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
+- **DB 버전**: v9 (테이블 8개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화
-- **데이터 흐름**: UI → Provider(StateNotifier) → Repository(Interface) → SQLite(구현체) ↔ SyncService ↔ Google Sheets API
+- **데이터 흐름**: UI → Provider(StateNotifier) → Repository(Interface) → SQLite(구현체) ↔ SupabaseService ↔ Supabase API
 
 ## Task Routing (반드시 준수할 것)
 

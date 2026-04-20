@@ -182,6 +182,7 @@ class SqliteExerciseRepository implements ExerciseRepository {
       'weight': record.weight,
       'reps': record.reps,
       'rpe': record.rpe,
+      'set_type': record.setType.value,
     };
   }
 
@@ -199,6 +200,7 @@ class SqliteExerciseRepository implements ExerciseRepository {
       weight: (map['weight'] as num).toDouble(),
       reps: map['reps'] as int,
       rpe: (map['rpe'] as num).toDouble(),
+      setType: SetType.fromString(map['set_type'] as String?),
     );
   }
 }

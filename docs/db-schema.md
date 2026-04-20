@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v8  
+> **현재 버전**: v9  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -16,8 +16,20 @@
 | v4 | `food_templates` | 음식 프리셋 (2026-04) |
 | v5 | `weight_records` 신규 + `exercise_templates.exercise_type` 컬럼 추가 | 체중 기록 + 운동 부위 분류 (2026-04) |
 | v6 | `exercise_type=''` 인 잔여 템플릿 삭제 | v5 마이그레이션 기본값 정리 (2026-04) |
-| v7 | `user_profiles` 신규 | 온보딩/AI 인사이트 사용자 정보 (2026-04) |
+| v7 | `user_profiles` 신규 + Google Sheets 동기화 제거(Supabase 전환) | 온보딩/AI 인사이트 (2026-04) |
 | v8 | `workout_routines`(루틴 프리셋) + `daily_routine`(오늘 루틴) 신규 | 루틴 플래너 + 인라인 세트 입력 (2026-04) |
+| v9 | `exercise_records.set_type` 컬럼 추가 (`warmup`/`work`/`drop`/`failure`) | 세트 타입 구분 + 본세트 기준 볼륨 집계 (2026-04) |
+
+### v9 마이그레이션 (`exercise_records.set_type`)
+
+```sql
+ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
+```
+
+- 기존 모든 레코드는 DEFAULT로 `'work'` 자동 부여.
+- Supabase 원격 테이블에도 동일 컬럼을 대시보드에서 수동 ALTER 필요 (`docs/changelog-v7.md` 의 Supabase 운영 항목 참고).
+- 엔티티: `ExerciseRecord.setType: SetType` (enum: `warmup`/`work`/`drop`/`failure`, 기본 `work`).
+- 집계 규칙: `countsTowardVolume` getter → `work` + `drop` 만 True (웜업/실패 제외).
 
 ---
 
@@ -46,9 +58,11 @@
 | `weight` | REAL | 사용 중량 (kg) |
 | `reps` | INTEGER | 반복 횟수 |
 | `rpe` | REAL | 자각강도 (1~10) |
+| `set_type` | TEXT | 세트 타입 (`warmup`/`work`/`drop`/`failure`, DEFAULT `work`) — v9 |
 
 **SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
 **지원 연산**: Create · Read · Update · Delete (전체 CRUD)
+**볼륨 집계**: `set_type IN ('work', 'drop')` 만 합산 (웜업/실패 제외) — `ExerciseRecord.countsTowardVolume`
 
 ---
 

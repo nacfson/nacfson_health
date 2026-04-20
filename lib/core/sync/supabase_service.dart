@@ -37,6 +37,7 @@ class SupabaseService {
               'weight': r.weight,
               'reps': r.reps,
               'rpe': r.rpe,
+              'set_type': r.setType.value,
               'is_deleted': r.syncStatus == SyncStatus.deleted,
             })
         .toList();
@@ -233,6 +234,7 @@ class SupabaseService {
       weight: (row['weight'] as num).toDouble(),
       reps: row['reps'] as int,
       rpe: (row['rpe'] as num).toDouble(),
+      setType: SetType.fromString(row['set_type'] as String?),
     );
   }
 
