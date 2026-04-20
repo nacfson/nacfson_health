@@ -2,7 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/diet/presentation/providers/diet_provider.dart';
+import '../../features/exercise/data/repositories/workout_routine_repository.dart';
+import '../../features/exercise/domain/entities/exercise_record.dart'
+    show SyncStatus;
 import '../../features/exercise/presentation/providers/exercise_provider.dart';
+import '../../features/exercise/presentation/providers/workout_routine_provider.dart';
 import '../../features/settings/data/repositories/exercise_template_repository.dart';
 import '../../features/settings/data/repositories/food_template_repository.dart';
 import '../../features/settings/domain/entities/exercise_template.dart';
@@ -80,6 +84,8 @@ final syncStateProvider = StateNotifierProvider<SyncStateNotifier, SyncState>((
   final templateNotifier = ref.read(exerciseTemplatesProvider.notifier);
   final foodTemplateRepo = ref.read(foodTemplateRepositoryProvider);
   final foodTemplateNotifier = ref.read(foodTemplatesProvider.notifier);
+  final workoutRoutineRepo = ref.read(workoutRoutineRepositoryProvider);
+  final workoutRoutineNotifier = ref.read(workoutRoutinesProvider.notifier);
 
   return SyncStateNotifier(
     supabaseService: supabaseService,
@@ -94,6 +100,8 @@ final syncStateProvider = StateNotifierProvider<SyncStateNotifier, SyncState>((
     foodTemplateNotifier: foodTemplateNotifier,
     weightRepo: weightRepo,
     weightNotifier: weightNotifier,
+    workoutRoutineRepo: workoutRoutineRepo,
+    workoutRoutineNotifier: workoutRoutineNotifier,
   );
 });
 
@@ -110,6 +118,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   final FoodTemplateNotifier _foodTemplateNotifier;
   final WeightRepository _weightRepo;
   final WeightNotifier _weightNotifier;
+  final WorkoutRoutineRepository _workoutRoutineRepo;
+  final WorkoutRoutineNotifier _workoutRoutineNotifier;
 
   SyncStateNotifier({
     required SupabaseService supabaseService,
@@ -124,6 +134,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
     required FoodTemplateNotifier foodTemplateNotifier,
     required WeightRepository weightRepo,
     required WeightNotifier weightNotifier,
+    required WorkoutRoutineRepository workoutRoutineRepo,
+    required WorkoutRoutineNotifier workoutRoutineNotifier,
   })  : _supabaseService = supabaseService,
         _prefs = prefs,
         _exerciseRepo = exerciseRepo,
@@ -136,6 +148,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _foodTemplateNotifier = foodTemplateNotifier,
         _weightRepo = weightRepo,
         _weightNotifier = weightNotifier,
+        _workoutRoutineRepo = workoutRoutineRepo,
+        _workoutRoutineNotifier = workoutRoutineNotifier,
         super(SyncState.idle);
 
   Future<SyncResult> performSync() async {
@@ -153,6 +167,7 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _templateRepo,
         _foodTemplateRepo,
         _weightRepo,
+        _workoutRoutineRepo,
         _prefs,
       );
       await Future.wait<void>([
@@ -161,6 +176,7 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _weightNotifier.refresh(),
         _templateNotifier.refresh(),
         _foodTemplateNotifier.refresh(),
+        _workoutRoutineNotifier.refresh(),
       ]);
       state = SyncState.idle;
       return result;
@@ -298,6 +314,7 @@ Future<SyncResult> _syncAll(
   ExerciseTemplateRepository templateRepo,
   FoodTemplateRepository foodTemplateRepo,
   WeightRepository weightRepo,
+  WorkoutRoutineRepository workoutRoutineRepo,
   SyncPreferences prefs,
 ) async {
   final errors = <String>[];
@@ -390,6 +407,23 @@ Future<SyncResult> _syncAll(
     errors.add('음식 템플릿 Push 오류: $e');
   }
 
+  try {
+    final pendingRoutines = await workoutRoutineRepo.getPendingSync();
+    if (pendingRoutines.isNotEmpty) {
+      await supabaseService.batchPushWorkoutRoutines(pendingRoutines);
+      final uuidsToMark = pendingRoutines
+          .where((r) => r.syncStatus != SyncStatus.deleted)
+          .map((r) => r.uuid)
+          .toList();
+      if (uuidsToMark.isNotEmpty) {
+        await workoutRoutineRepo.markAsSynced(uuidsToMark);
+      }
+    }
+    pushed += pendingRoutines.length;
+  } catch (e) {
+    errors.add('운동 루틴 Push 오류: $e');
+  }
+
   // 2. Pull: Supabase → 로컬
   final lastSync = prefs.lastSyncTime;
 
@@ -438,6 +472,15 @@ Future<SyncResult> _syncAll(
     errors.add('음식 템플릿 Pull 오류: $e');
   }
 
+  try {
+    final remoteRoutines =
+        await supabaseService.readWorkoutRoutinesDelta(since: lastSync);
+    await workoutRoutineRepo.mergeRemoteRoutines(remoteRoutines);
+    pulled += remoteRoutines.length;
+  } catch (e) {
+    errors.add('운동 루틴 Pull 오류: $e');
+  }
+
   // 3. Hard Delete: sync_status == deleted
   try {
     await exerciseRepo.hardDeleteSyncedDeleted();
@@ -445,6 +488,7 @@ Future<SyncResult> _syncAll(
     await weightRepo.hardDeleteSyncedDeleted();
     await templateRepo.hardDeleteSyncedDeleted();
     await foodTemplateRepo.hardDeleteSyncedDeleted();
+    await workoutRoutineRepo.hardDeleteSyncedDeleted();
   } catch (e) {
     errors.add('Hard Delete 오류: $e');
   }

@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/diet/domain/entities/diet_record.dart' as diet;
 import '../../features/exercise/domain/entities/exercise_record.dart';
+import '../../features/exercise/domain/entities/routine_item.dart';
+import '../../features/exercise/domain/entities/workout_routine.dart';
 import '../../features/settings/domain/entities/exercise_template.dart';
 import '../../features/settings/domain/entities/food_template.dart';
 import '../../features/weight/domain/entities/weight_record.dart' as weight;
@@ -97,6 +101,24 @@ class SupabaseService {
         .upsert(rows, onConflict: 'uuid');
   }
 
+  Future<void> batchPushWorkoutRoutines(List<WorkoutRoutine> routines) async {
+    if (routines.isEmpty) return;
+    final userId = _client.auth.currentUser!.id;
+    final rows = routines
+        .map((r) => {
+              'uuid': r.uuid,
+              'user_id': userId,
+              'name': r.name,
+              // JSONB 컬럼이므로 구조화된 리스트로 전송 (JSON 문자열로 감싸지 않음)
+              'items_json': r.items.map((i) => i.toJson()).toList(),
+              'created_at': r.createdAt.toUtc().toIso8601String(),
+              'updated_at': r.updatedAt.toUtc().toIso8601String(),
+              'is_deleted': r.syncStatus == SyncStatus.deleted,
+            })
+        .toList();
+    await _client.from('workout_routines').upsert(rows, onConflict: 'uuid');
+  }
+
   Future<void> batchPushFoodTemplates(List<FoodTemplate> templates) async {
     if (templates.isEmpty) return;
     final userId = _client.auth.currentUser!.id;
@@ -181,6 +203,20 @@ class SupabaseService {
     return (rows as List).map((r) => _rowToFoodTemplate(r as Map<String, dynamic>)).toList();
   }
 
+  Future<List<WorkoutRoutine>> readWorkoutRoutinesDelta(
+      {DateTime? since}) async {
+    var query = _client
+        .from('workout_routines')
+        .select()
+        .eq('is_deleted', false);
+    final rows = since != null
+        ? await query.gt('updated_at', since.toUtc().toIso8601String())
+        : await query;
+    return (rows as List)
+        .map((r) => _rowToWorkoutRoutine(r as Map<String, dynamic>))
+        .toList();
+  }
+
   // ==========================================================================
   // Row → Entity 변환
   // ==========================================================================
@@ -234,6 +270,26 @@ class SupabaseService {
       exerciseType: (row['exercise_type'] as String?) ?? '',
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
       syncStatus: TemplateSyncStatus.synced,
+    );
+  }
+
+  WorkoutRoutine _rowToWorkoutRoutine(Map<String, dynamic> row) {
+    final raw = row['items_json'];
+    final List itemsList = raw is String
+        ? (jsonDecode(raw) as List)
+        : (raw is List ? raw : const []);
+    final items = itemsList
+        .map((e) => RoutineItem.fromJson(
+              (e as Map).cast<String, dynamic>(),
+            ))
+        .toList();
+    return WorkoutRoutine(
+      uuid: row['uuid'] as String,
+      name: row['name'] as String,
+      items: items,
+      createdAt: DateTime.parse(row['created_at'] as String).toLocal(),
+      updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
+      syncStatus: SyncStatus.synced,
     );
   }
 

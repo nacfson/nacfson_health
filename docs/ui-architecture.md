@@ -136,9 +136,11 @@ int _calculateSelectedIndex(BuildContext context) {
 
 모든 입력 폼은 `RecordFormSheet`(DraggableScrollableSheet) 컨테이너로 감싸져 드래그로 높이 조절 가능 (45%~95%).
 
-- **ExerciseForm**: 운동 기록 (exerciseType, exerciseName, currentSet, weight, reps, rpe)
+- **InlineSetInput** _(v8, 운동)_: 카드 하단 1행 입력기 (kg / 회 / RPE + ✓ / ✕). 직전 세트 값 프리필 → 연속 입력. 모달 폼 대체.
 - **DietForm**: 식단 기록 (mealType, foodName, totalCalories, carbs, protein, fat, satisfaction, memo, timestamp)
 - **WeightForm**: 체중 기록 (weight, timestamp) — `showDatePicker`로 날짜 선택, `DateTime(y, m, d)` 자정 저장
+
+> 운동 도메인은 v8부터 모달 `ExerciseForm`을 폐기하고, 카드 내 인라인 입력 + AppBar의 루틴 프리셋 시트(`RoutinePresetSheet`)로 대체됨.
 
 > **날짜 선택 패턴**: 날짜만 선택할 경우 `DateTime(year, month, day)` 자정 저장. `todayWeightProvider`는 year/month/day 비교이므로 자정 타임스탬프와 호환됨.
 
@@ -156,6 +158,9 @@ int _calculateSelectedIndex(BuildContext context) {
 | `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 |
 | `ThemeModeCard` | `lib/features/settings/presentation/widgets/theme_mode_card.dart` | SegmentedButton 3-way 테마 전환 |
 | `_AiInsightCard` | `lib/features/summary/presentation/screens/summary_screen.dart` 내 private | Gemini 인사이트 카드 (loading/error/data + 새로고침) |
+| `ExerciseGroupCard` _(v8)_ | `lib/features/exercise/presentation/widgets/exercise_group_card.dart` | 운동 카드. `editable=true`(오늘)면 `+ 세트 추가` 버튼·인라인 입력·"루틴에서 제거" 메뉴 노출. `editable=false`(과거)면 읽기 전용 |
+| `InlineSetInput` _(v8)_ | `lib/features/exercise/presentation/widgets/inline_set_input.dart` | 카드 하단 1행 입력기. add/edit 모드 지원, 직전 세트 프리필, ✓ 저장 후 필드 유지 |
+| `RoutinePresetSheet` _(v8)_ | `lib/features/exercise/presentation/widgets/routine_preset_sheet.dart` | 저장된 루틴 프리셋 시트. 탭=불러오기(교체/추가 confirm), 메뉴=이름변경/삭제 |
 
 **전역 날짜 상태**: `lib/shared/providers/selected_date_provider.dart`
 - `selectedDateProvider` (StateProvider<DateTime>, 자정 정규화)

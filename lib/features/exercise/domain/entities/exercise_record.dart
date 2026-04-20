@@ -38,7 +38,7 @@ class ExerciseRecord {
     required this.rpe,
   });
 
-  double get volume => weight * reps * currentSet;
+  double get volume => weight * reps;
 
   ExerciseRecord copyWith({
     int? id,

@@ -4,6 +4,7 @@ import '../../../../shared/providers/selected_date_provider.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../../data/repositories/exercise_repository.dart';
 import '../../data/repositories/sqlite_exercise_repository.dart';
+import 'routine_planner_provider.dart';
 
 // Web 환경용 메모리 기반 Repository (임시 구현)
 class _MemoryExerciseRepository implements ExerciseRepository {
@@ -140,6 +141,66 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
       r.timestamp.day == date.day
     ).toList();
   }
+
+  /// 같은 운동명·같은 날짜의 마지막 세트 다음 번호로 자동 부여하여 추가한다.
+  /// 휴식 타이머 시작은 호출자(UI)가 별도로 책임진다.
+  Future<void> addSetAutoNumber({
+    required String exerciseType,
+    required String exerciseName,
+    required double weight,
+    required int reps,
+    required double rpe,
+    DateTime? when,
+  }) async {
+    final now = when ?? DateTime.now();
+    final maxSet = state
+        .where((r) =>
+            r.exerciseName == exerciseName &&
+            r.timestamp.year == now.year &&
+            r.timestamp.month == now.month &&
+            r.timestamp.day == now.day)
+        .fold<int>(0, (m, r) => r.currentSet > m ? r.currentSet : m);
+    final record = ExerciseRecord(
+      timestamp: now,
+      updatedAt: now,
+      exerciseType: exerciseType,
+      exerciseName: exerciseName,
+      currentSet: maxSet + 1,
+      weight: weight,
+      reps: reps,
+      rpe: rpe,
+    );
+    await _repository.add(record);
+    state = await _repository.getAll();
+  }
+
+  /// 세트를 삭제한 뒤 같은 운동명·같은 날짜 세트들의 currentSet을
+  /// timestamp 순으로 1..N 재부여한다.
+  Future<void> deleteSetAndRenumber(String uuid) async {
+    final target = state.firstWhere(
+      (r) => r.uuid == uuid,
+      orElse: () => throw StateError('record not found'),
+    );
+    await _repository.delete(uuid);
+
+    final remaining = (await _repository.getAll())
+        .where((r) =>
+            r.exerciseName == target.exerciseName &&
+            r.timestamp.year == target.timestamp.year &&
+            r.timestamp.month == target.timestamp.month &&
+            r.timestamp.day == target.timestamp.day)
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    for (var i = 0; i < remaining.length; i++) {
+      final r = remaining[i];
+      final desired = i + 1;
+      if (r.currentSet != desired) {
+        await _repository.update(r.copyWith(currentSet: desired));
+      }
+    }
+    state = await _repository.getAll();
+  }
 }
 
 /// 오늘(00:00~23:59) 운동 기록 목록 - 최신순
@@ -232,6 +293,73 @@ final selectedDateTotalVolumeProvider = Provider<double>((ref) {
   return ref
       .watch(selectedDateExerciseRecordsProvider)
       .fold(0.0, (sum, r) => sum + r.volume);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 오늘 루틴 + 기록 통합 카드 데이터
+// ─────────────────────────────────────────────────────────────────────────────
+
+class ExerciseCardData {
+  final String exerciseType;
+  final String exerciseName;
+  final List<ExerciseRecord> records; // 세트 timestamp 오름차순
+  const ExerciseCardData({
+    required this.exerciseType,
+    required this.exerciseName,
+    required this.records,
+  });
+}
+
+/// 오늘 루틴(계획)과 오늘 기록을 union 한 카드 리스트.
+/// - 계획 순서가 우선
+/// - 기록만 있고 계획에 없는 운동은 뒤에 timestamp 순으로 append
+final todayExerciseCardsProvider =
+    Provider<List<ExerciseCardData>>((ref) {
+  final routine = ref.watch(routinePlannerProvider);
+  final records = ref.watch(todayExerciseRecordsProvider);
+
+  final byName = <String, List<ExerciseRecord>>{};
+  for (final r in records) {
+    byName.putIfAbsent(r.exerciseName, () => []).add(r);
+  }
+  for (final list in byName.values) {
+    list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  }
+
+  final cards = <ExerciseCardData>[];
+  final seen = <String>{};
+  for (final item in routine) {
+    seen.add(item.exerciseName);
+    cards.add(ExerciseCardData(
+      exerciseType: item.exerciseType,
+      exerciseName: item.exerciseName,
+      records: byName[item.exerciseName] ?? const [],
+    ));
+  }
+
+  // 기록만 있고 계획에 없는 운동들 — 첫 timestamp 순서대로 뒤에 붙임
+  final extras = byName.entries
+      .where((e) => !seen.contains(e.key))
+      .toList()
+    ..sort((a, b) =>
+        a.value.first.timestamp.compareTo(b.value.first.timestamp));
+  for (final entry in extras) {
+    cards.add(ExerciseCardData(
+      exerciseType: entry.value.first.exerciseType,
+      exerciseName: entry.key,
+      records: entry.value,
+    ));
+  }
+  return cards;
+});
+
+/// 같은 운동명의 오늘 가장 최근 세트(있다면) — 인라인 입력 프리필용.
+final latestSetOfTodayProvider =
+    Provider.family<ExerciseRecord?, String>((ref, exerciseName) {
+  final today = ref.watch(todayExerciseRecordsProvider);
+  final match = today.where((r) => r.exerciseName == exerciseName).toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  return match.isEmpty ? null : match.first;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

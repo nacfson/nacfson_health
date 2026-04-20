@@ -42,6 +42,19 @@
 
 ---
 
+## 3-1. 운동 도메인 규칙
+
+- **볼륨 공식**: `weight × reps` (세트 번호는 표시용이며 볼륨 계산에 포함하지 않음). v8 이전에는 `weight × reps × currentSet`이었으나 정정됨.
+- **세트 번호 자동 관리**: UI/Provider 레벨에서 직접 입력하지 않음.
+  - 추가: `ExerciseNotifier.addSetAutoNumber` — 같은 운동/같은 날짜의 max(currentSet) + 1
+  - 삭제: `ExerciseNotifier.deleteSetAndRenumber` — 삭제 후 timestamp 순으로 1..N 재부여 (수정된 row는 자동 modified)
+- **루틴 vs 기록 분리**:
+  - 루틴(`daily_routine` / `workout_routines`)은 "할 예정"인 계획. `exercise_records`에 영향 없음.
+  - 카드만 얹은 상태로 앱을 닫아도 시트엔 절대 올라가지 않음.
+  - 실제 세트 입력 → `exercise_records.created` insert 시점에서만 동기화 큐에 진입.
+
+---
+
 ## 4. Bottom Sheet 사용 규칙
 
 - **상태 관리**: `lib/core/providers/sheet_state_provider.dart`의 `openSheet()` 헬퍼 사용 — `showModalBottomSheet`/`showDialog` 직접 호출 금지

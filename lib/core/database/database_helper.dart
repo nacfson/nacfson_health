@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -114,6 +114,27 @@ class DatabaseHelper {
         sync_status INTEGER DEFAULT 1
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE workout_routines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        uuid TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        items_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        sync_status INTEGER DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE daily_routine (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT UNIQUE NOT NULL,
+        items_json TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -183,6 +204,28 @@ class DatabaseHelper {
           target_calories INTEGER NOT NULL,
           updated_at INTEGER NOT NULL,
           sync_status INTEGER DEFAULT 1
+        )
+      ''');
+    }
+    if (oldVersion < 8) {
+      // v8: 루틴 프리셋(workout_routines) + 오늘 루틴(daily_routine) 테이블 생성
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS workout_routines (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          uuid TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL,
+          items_json TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          sync_status INTEGER DEFAULT 1
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS daily_routine (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date TEXT UNIQUE NOT NULL,
+          items_json TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
         )
       ''');
     }
