@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:native_liquid_glass/native_liquid_glass.dart';
@@ -76,8 +74,7 @@ class RestTimerBar extends ConsumerWidget {
     const contentPadding = EdgeInsets.symmetric(horizontal: 6);
 
     if (useNativeGlass) {
-      // iOS 26+ : 네이티브 UIGlassEffect. BackdropFilter 미사용
-      // (Impeller + BackdropFilter 조합에서 상단에 빨간 잔상 남는 버그 회피).
+      // iOS 26+ : 네이티브 UIGlassEffect.
       return Material(
         type: MaterialType.transparency,
         child: SizedBox(
@@ -101,31 +98,27 @@ class RestTimerBar extends ConsumerWidget {
       );
     }
 
-    // Fallback : iOS ≤ 25 / Android / Web — 기존 BackdropFilter 경로.
+    // iOS ≤ 25 / Android / Web : blur 없는 solid pill.
+    // BackdropFilter 를 쓰지 않는 이유는 docs/build-debug.md
+    // "휴식 타이머 — 상단 빨간 잔상 버그" 참고.
     return Material(
       type: MaterialType.transparency,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: cs.surface.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: tint, width: 1.2),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.25),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: tint, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: accent.withValues(alpha: 0.20),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            padding: contentPadding,
-            child: row,
-          ),
+          ],
         ),
+        padding: contentPadding,
+        child: row,
       ),
     );
   }

@@ -519,6 +519,27 @@ rg "Color\(0xFF[0-9A-Fa-f]{6}\)" lib/ --glob '!**/app_theme.dart'
 
 ---
 
+## 13-1. 휴식 타이머 — 상단 빨간 잔상 버그 (Impeller + BackdropFilter)
+
+**증상**: 휴식 타이머가 활성화되는 순간 앱 **상단 전체 너비**에 어두운 적갈색 띠가 그려짐. AppBar 영역 위/SafeArea 안쪽에 노출.
+
+**원인**: Flutter Impeller 렌더러와 `BackdropFilter`(`ImageFilter.blur`)를 상단 overlay 위치에서 합성할 때 iOS 시뮬레이터/일부 환경에서 발생하는 렌더 artifact. `RestTimerBar` 는 `_RootTimerOverlay`에 의해 status bar 바로 아래 `Positioned` 로 올라가므로 artifact 가 가장 눈에 띈다.
+
+**해결**: `BackdropFilter` 폴백 경로를 **완전히 제거**했다 (`lib/features/exercise/presentation/widgets/rest_timer_bar.dart`).
+- iOS 26+ : `LiquidGlassContainer` (네이티브 UIGlassEffect) 유지.
+- 그 외(iOS ≤ 25 / Android / Web) : blur 없는 **solid pill** (`cs.surface` 배경 + 테두리 + boxShadow) 사용. glass 효과는 포기, 대신 Impeller 호환성 이슈 차단.
+- 추가 방어: `_RootTimerOverlay` 의 `RestTimerBar` 를 `RepaintBoundary` 로 감싸 레이어 합성이 상위 위젯으로 번지지 않게 격리 (`lib/app.dart`).
+
+**재발 감지 체크리스트**:
+- [ ] 상단에 빨간/적갈색 띠가 보이면 `rest_timer_bar.dart` 빌드 함수에 `debugPrint('[RestTimer] supportsLiquidGlass=$useNativeGlass')` 찍어 현재 경로 확인.
+- [ ] 누군가 `BackdropFilter` + `ImageFilter.blur` 를 다시 추가했는지 `rg "BackdropFilter" lib/features/exercise` 로 확인.
+- [ ] `BottomNavShell` (`lib/shared/widgets/bottom_nav_shell.dart:202-208`)에도 동일 폴백이 남아있음 — 하단이라 artifact 가 덜 보여 지금은 유지. 여기서도 같은 증상이 보이면 동일 패턴으로 정리.
+
+**금지**:
+- `RestTimerBar` 의 fallback 에 `BackdropFilter` 나 `ImageFilter.blur` 를 재도입하지 말 것. 글래스 효과는 `LiquidGlassContainer` 경로 **전용** 으로 둔다.
+
+---
+
 ## 14. 휴식 타이머 — iOS Live Activity Widget Extension 추가 (수동)
 
 `live_activities` 패키지는 Dart 측을 처리하지만, iOS Widget Extension 타겟은 Xcode UI에서 사용자가 직접 추가해야 합니다 (project.pbxproj 자동 생성은 안전하지 않음).
