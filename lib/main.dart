@@ -17,6 +17,7 @@ import 'features/exercise/data/rest_notification_service_ios.dart';
 import 'shared/providers/user_profile_provider.dart';
 import 'features/settings/data/repositories/sqlite_exercise_template_repository.dart';
 import 'features/settings/domain/entities/exercise_template.dart';
+import 'features/settings/presentation/providers/exercise_template_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,6 +60,7 @@ void main() async {
   runApp(
     ProviderScope(
       overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
         syncPreferencesProvider.overrideWithValue(syncPrefs),
         // 미리 로드한 값으로 초기화 → 비동기 _load() 제거, 플리커 없음
         onboardingDoneProvider.overrideWith((ref) => OnboardingNotifier(onboardingDone)),

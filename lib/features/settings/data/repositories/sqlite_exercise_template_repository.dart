@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/database/database_helper.dart';
 import '../../domain/entities/exercise_template.dart';
+import '../default_exercise_templates.dart';
 import 'exercise_template_repository.dart';
 
 class SqliteExerciseTemplateRepository implements ExerciseTemplateRepository {
@@ -33,6 +34,33 @@ class SqliteExerciseTemplateRepository implements ExerciseTemplateRepository {
       _toMap(record),
       conflictAlgorithm: ConflictAlgorithm.ignore, // name UNIQUE 충돌 시 무시
     );
+  }
+
+  @override
+  Future<int> seedDefaults(List<DefaultExerciseTemplateSeed> seeds) async {
+    final db = await _dbHelper.database;
+    final now = DateTime.now();
+    int inserted = 0;
+    for (final s in seeds) {
+      // 결정론적 UUID v5: 다중 기기에서도 동일 이름은 동일 UUID
+      final uuid = _uuid.v5(
+        Namespace.oid.value,
+        'nacfson-default-exercise:${s.name}',
+      );
+      final count = await db.insert(
+        'exercise_templates',
+        {
+          'uuid': uuid,
+          'name': s.name,
+          'exercise_type': s.exerciseType,
+          'updated_at': now.millisecondsSinceEpoch,
+          'sync_status': TemplateSyncStatus.created.value,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      if (count > 0) inserted++;
+    }
+    return inserted;
   }
 
   @override

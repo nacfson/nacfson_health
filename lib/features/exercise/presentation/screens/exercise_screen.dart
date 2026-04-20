@@ -15,6 +15,7 @@ import '../../domain/entities/routine_item.dart';
 import '../providers/exercise_provider.dart';
 import '../providers/routine_planner_provider.dart';
 import '../providers/workout_routine_provider.dart';
+import '../widgets/direct_routine_input_dialog.dart';
 import '../widgets/exercise_group_card.dart';
 import '../widgets/routine_preset_sheet.dart';
 
@@ -54,8 +55,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
         templates: templates,
         labelOf: (t) => t.name,
         groupKeyOf: (t) => t.exerciseType,
-        emptyHint: '등록된 운동 템플릿이 없습니다.\n설정에서 자주 하는 운동을 템플릿으로 추가해 보세요.',
+        emptyHint: '등록된 운동 템플릿이 없습니다.\n"직접 입력"으로 운동을 바로 추가하거나,\n설정에서 템플릿을 관리할 수 있습니다.',
         onEmptyAction: () => context.push('/settings'),
+        onDirectInput: _openDirectInput,
       );
       if (picked != null && mounted) {
         await ref.read(routinePlannerProvider.notifier).addItem(
@@ -69,6 +71,54 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       try {
         ref.read(activeSheetProvider.notifier).state = null;
       } catch (_) {}
+    }
+  }
+
+  static String _normalizeName(String s) =>
+      s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  Future<void> _openDirectInput() async {
+    final result = await showDirectRoutineInputDialog(context);
+    if (result == null || !mounted) return;
+
+    await ref.read(routinePlannerProvider.notifier).addItem(
+          RoutineItem(
+            exerciseType: result.type,
+            exerciseName: result.name,
+          ),
+        );
+    if (!mounted) return;
+
+    final templates = ref.read(exerciseTemplatesProvider);
+    final normalized = _normalizeName(result.name);
+    final alreadyTemplate =
+        templates.any((t) => _normalizeName(t.name) == normalized);
+    if (alreadyTemplate) return;
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('템플릿 저장'),
+        content: Text(
+          '"${result.name}"을(를) 운동 템플릿에도 저장할까요?\n'
+          '다음에 더 빠르게 선택할 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('이번만'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    if (save == true && mounted) {
+      await ref
+          .read(exerciseTemplatesProvider.notifier)
+          .addTemplate(result.name, result.type);
     }
   }
 

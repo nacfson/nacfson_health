@@ -1,4 +1,5 @@
 import '../../domain/entities/exercise_template.dart';
+import '../default_exercise_templates.dart';
 
 abstract class ExerciseTemplateRepository {
   /// 삭제된 항목 제외 전체 목록
@@ -9,6 +10,10 @@ abstract class ExerciseTemplateRepository {
 
   /// Soft delete (sync_status = deleted)
   Future<void> delete(String uuid);
+
+  /// 기본 템플릿 시드. 결정론적 UUID v5로 name UNIQUE 충돌 시 자연 dedup.
+  /// 반환값은 실제 삽입된 건수.
+  Future<int> seedDefaults(List<DefaultExerciseTemplateSeed> seeds);
 
   // ── Sync 전용 ─────────────────────────────────────────────────────────────
   Future<List<ExerciseTemplate>> getPendingSync(); // status != synced

@@ -16,6 +16,8 @@ Future<T?> showTemplatePickerSheet<T>({
   String emptyHint = '등록된 템플릿이 없습니다.',
   VoidCallback? onEmptyAction,
   String onEmptyActionLabel = '템플릿 관리로 이동',
+  VoidCallback? onDirectInput,
+  String directInputLabel = '직접 입력',
 }) {
   return showModalBottomSheet<T>(
     context: context,
@@ -31,6 +33,8 @@ Future<T?> showTemplatePickerSheet<T>({
       emptyHint: emptyHint,
       onEmptyAction: onEmptyAction,
       onEmptyActionLabel: onEmptyActionLabel,
+      onDirectInput: onDirectInput,
+      directInputLabel: directInputLabel,
     ),
   );
 }
@@ -45,6 +49,8 @@ class _TemplatePickerSheet<T> extends StatefulWidget {
   final String emptyHint;
   final VoidCallback? onEmptyAction;
   final String onEmptyActionLabel;
+  final VoidCallback? onDirectInput;
+  final String directInputLabel;
 
   const _TemplatePickerSheet({
     required this.title,
@@ -56,6 +62,8 @@ class _TemplatePickerSheet<T> extends StatefulWidget {
     required this.emptyHint,
     this.onEmptyAction,
     required this.onEmptyActionLabel,
+    this.onDirectInput,
+    required this.directInputLabel,
   });
 
   @override
@@ -145,18 +153,28 @@ class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
                   ),
                 ),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.title,
-                      style: TextStyle(
-                        fontFamily: 'Pretendard',
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.8,
-                        color: cs.onSurface,
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontFamily: 'Pretendard',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.8,
+                          color: cs.onSurface,
+                        ),
                       ),
                     ),
+                    if (widget.onDirectInput != null)
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(widget.directInputLabel),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          widget.onDirectInput!();
+                        },
+                      ),
                     IconButton(
                       icon: Container(
                         padding: const EdgeInsets.all(4),
