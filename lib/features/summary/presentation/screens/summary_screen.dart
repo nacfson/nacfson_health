@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -5,12 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/ai/health_insight_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 
-import '../../../../shared/providers/selected_date_provider.dart';
 import '../../../../shared/widgets/date_navigation_bar.dart';
+import '../../../../shared/providers/selected_date_provider.dart';
 import '../../../exercise/presentation/widgets/volume_trend_chart.dart';
 import '../../../diet/presentation/widgets/calorie_trend_chart.dart';
 import '../../domain/entities/daily_summary.dart';
 import '../providers/summary_provider.dart';
+import '../widgets/coach_chat_sheet.dart';
 import '../widgets/workout_heatmap_card.dart';
 
 class SummaryScreen extends ConsumerWidget {
@@ -537,20 +539,63 @@ class _EmptyDietCard extends StatelessWidget {
 
 // ── AI 건강 인사이트 카드 ──────────────────────────────────────────────────────
 
-class _AiInsightCard extends ConsumerWidget {
+class _AiInsightCard extends ConsumerStatefulWidget {
   const _AiInsightCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AiInsightCard> createState() => _AiInsightCardState();
+}
+
+class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
+  Timer? _debounceTicker;
+
+  @override
+  void dispose() {
+    _debounceTicker?.cancel();
+    super.dispose();
+  }
+
+  void _scheduleTickerIfNeeded() {
+    if (_debounceTicker != null) return;
+    _debounceTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final last = ref.read(insightLastRefreshAtProvider);
+      if (last == null) {
+        _debounceTicker?.cancel();
+        _debounceTicker = null;
+        return;
+      }
+      final elapsed = DateTime.now().difference(last).inSeconds;
+      if (elapsed >= kInsightRefreshDebounceSeconds) {
+        _debounceTicker?.cancel();
+        _debounceTicker = null;
+        // last 값을 비워 canRefresh 가 true 가 되도록
+        ref.read(insightLastRefreshAtProvider.notifier).state = null;
+      } else {
+        // 카운트다운 표시 갱신
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final mintTint = isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint;
+    final mintTint =
+        isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint;
     final insightAsync = ref.watch(healthInsightProvider);
-    final selectedDate = ref.watch(selectedDateProvider);
-    final dateKey = insightCacheKey(selectedDate);
-    final counts = ref.watch(insightCallCountProvider);
-    final used = counts[dateKey] ?? 0;
-    final canRefresh = used < kInsightDailyLimit;
+    final lastRefresh = ref.watch(insightLastRefreshAtProvider);
+    final canRefresh = lastRefresh == null ||
+        DateTime.now().difference(lastRefresh).inSeconds >=
+            kInsightRefreshDebounceSeconds;
+
+    int remainingSeconds = 0;
+    if (!canRefresh && lastRefresh != null) {
+      remainingSeconds = kInsightRefreshDebounceSeconds -
+          DateTime.now().difference(lastRefresh).inSeconds;
+      _scheduleTickerIfNeeded();
+    }
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 4, 20, 8),
@@ -563,7 +608,6 @@ class _AiInsightCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 헤더
           Row(
             children: [
               Container(
@@ -594,7 +638,9 @@ class _AiInsightCard extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Powered by Gemini · 오늘 $used/$kInsightDailyLimit',
+                      canRefresh
+                          ? 'Powered by Gemini'
+                          : 'Powered by Gemini · ${remainingSeconds.clamp(0, 59)}초 후 새로고침 가능',
                       style: TextStyle(
                         fontFamily: 'Pretendard',
                         fontSize: 10,
@@ -619,16 +665,19 @@ class _AiInsightCard extends ConsumerWidget {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text(
-                                '오늘 AI 인사이트는 $kInsightDailyLimit회까지 이용할 수 있습니다. 내일 다시 확인해주세요.',
+                                '잠시 후 다시 시도해주세요 (1분 디바운스)',
                               ),
                             ),
                           );
                           return;
                         }
-                        // 현재 날짜 캐시 삭제 후 재호출
+                        ref
+                            .read(insightLastRefreshAtProvider.notifier)
+                            .state = DateTime.now();
+                        // 세션 캐시 초기화 → 완전히 새 호출
                         ref
                             .read(insightCacheProvider.notifier)
-                            .update((s) => Map.from(s)..remove(dateKey));
+                            .update((_) => const {});
                         ref.invalidate(healthInsightProvider);
                       },
                       child: Icon(
@@ -642,7 +691,6 @@ class _AiInsightCard extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // 본문
           insightAsync.when(
             loading: () => Text(
               'AI가 오늘의 건강 데이터를 분석하고 있습니다...',
@@ -656,10 +704,8 @@ class _AiInsightCard extends ConsumerWidget {
             error: (e, _) {
               final msg = e.toString();
               final String text;
-              if (msg.contains('DAILY_LIMIT_REACHED')) {
-                text =
-                    '오늘 AI 인사이트는 $kInsightDailyLimit회까지 이용할 수 있습니다. 내일 다시 확인해주세요.';
-              } else if (msg.contains('API')) {
+              if (msg.contains('GEMINI_API_KEY_MISSING') ||
+                  msg.contains('API')) {
                 text = 'Gemini API 키를 .env 파일에 설정해주세요.';
               } else {
                 text = '인사이트를 불러오지 못했습니다. 새로고침해보세요.';
@@ -690,6 +736,25 @@ class _AiInsightCard extends ConsumerWidget {
                 color: cs.onSurface,
                 height: 1.6,
                 letterSpacing: -0.2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => showCoachChatSheet(context),
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+              label: const Text(
+                '코치에게 더 물어보기',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.colorMint,
+                visualDensity: VisualDensity.compact,
               ),
             ),
           ),
