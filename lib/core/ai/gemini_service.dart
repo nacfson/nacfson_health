@@ -14,7 +14,10 @@ import 'coach_chat_models.dart';
 ///
 /// - 텍스트 인사이트: gemini-2.5-flash-lite (저비용, 자동 생성 카드)
 /// - 음식 Vision 분석: gemini-2.5-flash (Vision 안정 지원 + JSON 모드)
-/// - 코치 챗봇: gemini-2.5-flash (JSON 응답 — answer + follow_ups)
+/// - 코치 챗봇: gemini-2.5-flash-lite (JSON 응답 — answer + follow_ups).
+///   2.5-flash 는 thinking 토큰이 maxOutputTokens 를 잠식해 응답이
+///   MAX_TOKENS 로 잘리는 회귀가 있어 2026-04 flash-lite 로 이관.
+///   flash-lite 는 thinking 거의 없음 + JSON 모드 정상 지원.
 class GeminiService {
   late final GenerativeModel _model;
   late final GenerativeModel _visionModel;
@@ -37,7 +40,7 @@ class GeminiService {
       ),
     );
     _chatModel = GenerativeModel(
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-flash-lite',
       apiKey: apiKey,
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
