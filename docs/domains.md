@@ -13,4 +13,4 @@
 | **settings** | 운동·음식 템플릿 관리 (SQLite + 시트 동기화), 기록 폼에서는 `shared/widgets/template_picker_sheet.dart`로 공통 피커 호출 | `exerciseTemplatesProvider`, `foodTemplatesProvider` |
 | **theme** | 다크/라이트/시스템 모드 전환 (shared_preferences 영구 저장) | `themeModeProvider` (`ThemeModeNotifier`) |
 | **onboarding** | 첫 실행 키/체중 입력 + 라우팅 게이트 (`refreshListenable`) | `onboardingDoneProvider`, `heightMProvider` |
-| **ai** | Gemini 기반 일일 건강 조언 (세션 캐시 + 일일 호출 상한 3회) | `healthInsightProvider`, `insightCacheProvider`, `insightCallCountProvider` |
+| **ai** | Gemini 기반 건강 인사이트 + 코치 챗봇 (데이터 해시 캐시 + 60초 디바운스 + 세션 휘발 챗) | `healthInsightProvider`, `insightCacheProvider`, `insightLastRefreshAtProvider`, `insightCanRefreshProvider`, `suggestedPromptsProvider`, `coachChatProvider`, `coachChatCallCountProvider`, `foodVisionAnalysisProvider` |

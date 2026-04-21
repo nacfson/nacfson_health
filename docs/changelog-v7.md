@@ -70,3 +70,63 @@ v6 시절 작성된 다음 서술은 본 changelog 작성 시점까지 갱신이
 - [ ] `SpreadsheetStatusCard` → `SupabaseStatusCard` 리네임 (UX 혼동 방지)
 - [ ] `SupabaseService.ensureAllRequiredSheets()` no-op 함수 제거 (호출자 정리 후)
 - [ ] 오프라인 모드 명시 배너 (features.md 백로그)
+
+---
+
+## 7.x — Contextual Coach Chatbot 도입 (2026-04)
+
+> 관련 브랜치: `claude/chatbot-conversion-planning-al8WD`  
+> 관련 리서치: Exerbot 2025 (88% DAU), JMIR 2024 하이브리드 챗봇 권고
+
+### 변경 요약
+
+- **단발 인사이트 카드 → 컨텍스트 챗봇 하이브리드** 전환.
+- 기존 `_AiInsightCard` 는 그대로 유지(자동 생성 한줄 인사이트)하되, 카드 하단에 "💬 코치에게 더 물어보기" CTA 추가.
+- CTA 탭 시 **하단 모달 시트(90% 높이)** 에서 자유 질의 응답 + 컨텍스트 추천 칩 노출.
+
+### 모델/예산 정책
+
+| 호출 종류 | 모델 | 일일 한도 | 캐시/방어 |
+|---|---|---|---|
+| 자동 인사이트 카드 | `gemini-2.5-flash-lite` | **무제한** | 데이터 해시 캐시 + UI 60초 디바운스 |
+| 코치 챗봇 | `gemini-2.5-flash` | **30회/일** (메시지 기준) | follow_ups 같은 JSON에 포함 (추가 호출 0) |
+| 음식 Vision | `gemini-2.5-flash` | 5회/일 (변경 없음) | sha256 해시 캐시 |
+
+### 신규 / 수정 파일
+
+- `lib/core/ai/coach_chat_models.dart` — `ChatRole`, `ChatMessage`, `CoachReply`, `HealthContext`, `SuggestedPrompt`, `PromptCategory`, `SuggestedPromptKind`
+- `lib/core/ai/gemini_service.dart` — `_chatModel` (`gemini-2.5-flash`, JSON 모드) + `coachChat()` 메서드
+- `lib/core/ai/health_insight_provider.dart` — 일일 제한 제거, 데이터 해시 기반 캐시 키, 60초 디바운스 providers 추가
+- `lib/core/ai/suggested_prompts_provider.dart` — **신규**, 20+ 규칙 플러그인 구조 (`_PromptRule`), `evaluateSuggestedPrompts` pure function
+- `lib/core/ai/coach_chat_notifier.dart` — **신규**, `CoachChatNotifier` (autoDispose), `CoachChatCallCountNotifier` (일일 30회 한도, 자정 자동 리셋)
+- `lib/features/summary/presentation/widgets/chat_message_bubble.dart` — **신규**, user/assistant 버블
+- `lib/features/summary/presentation/widgets/suggested_prompt_chip.dart` — **신규**, `ActionChip` + `FollowUpChip` (카테고리 아이콘)
+- `lib/features/summary/presentation/widgets/coach_chat_sheet.dart` — **신규**, 모달 시트 + 빈 상태 + 대화 리스트 + 입력창
+- `lib/features/summary/presentation/screens/summary_screen.dart` — `_AiInsightCard` 에 디바운스 카운트다운 라벨 + CTA 추가
+- `lib/main.dart` — `InsightCallCountNotifier` pre-load/override 제거
+- `test/core/ai/suggested_prompts_test.dart` — **신규**, 규칙 평가 & 랭킹 단위 테스트
+
+### 규칙 카테고리 (총 23개 규칙)
+
+| 카테고리 | 대표 규칙 |
+|---|---|
+| 🍱 식단 | `diet.missing_today`(navigation), `diet.cal_over`, `diet.cal_under`(저녁), `diet.repetitive` |
+| 🥗 매크로 | `macro.protein_low`, `macro.protein_high`, `macro.carb_low`(운동일), `macro.fat_high` |
+| 💪 운동 | `workout.volume_drop`, `workout.same_muscle_3d`, `workout.rpe_high/low`, `workout.rest_day_long`, `workout.today_missing` |
+| ⚖️ 체중 | `weight.weekly_gain/loss`, `weight.plateau`, `weight.high_variance`, `weight.no_record_3d` |
+| 🔥 동기부여 | `motivation.streak_7d`, `motivation.weekly_review` (일요일 저녁) |
+| ⏰ 시간대 | `time.morning_plan` (06~09시 & 식단 0), `time.late_night_craving` (22시+ & 칼로리 초과) |
+
+### 랭킹 알고리즘
+
+1. priority 내림차순 정렬
+2. 카테고리 다양성: 같은 카테고리가 3개 연속 나오지 않도록 round-robin 끼워넣기
+3. 최대 5개 선별
+4. 어떤 규칙도 매칭 안 되면 fallback 3개 (`오늘 내 하루 건강 총평` / `이번 주 운동 개선 포인트` / `지금 먹으면 좋은 간식 추천`)
+
+### UX 원칙
+
+- **첫 진입 시 자동 인사 없음** — 추천 칩만 노출 → API 비용 절약
+- **Follow-up = 같은 응답 JSON** — 대화 이어가기도 API 비용 0 추가
+- **autoDispose 로 세션 휘발** — 히스토리는 메모리에만, 시트 닫으면 초기화
+- **네비게이션 타입 칩** (`diet.missing_today`) 은 Gemini 호출 없이 `context.go('/diet')` 로 이동

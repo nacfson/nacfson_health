@@ -72,45 +72,77 @@
 
 > 상세 스키마(컬럼 정의, SyncStatus 정책, 마이그레이션 SQL)는 `docs/db-schema.md` 참조.
 
-## AI 인사이트 데이터 흐름 (v7)
+## AI 인사이트 & 코치 챗봇 데이터 흐름 (v7+)
 
-`lib/core/ai/health_insight_provider.dart` → `lib/core/ai/gemini_service.dart`.
+`lib/core/ai/` 모듈은 세 축으로 구성된다 — **자동 인사이트 카드**, **코치 챗봇**, **사진 음식 분석**.
+
+### 1) 자동 인사이트 카드 — `health_insight_provider.dart`
 
 ```
 ┌──────────────────────────────────────────────────────┐
 │  Inputs (Riverpod watch)                              │
 │  • selectedDateProvider                               │
-│  • dailySummaryProvider (운동·식단 합성)              │
-│  • heightMProvider (SharedPreferences `user_height_m`)│
+│  • dailySummaryProvider                               │
+│  • heightMProvider                                    │
 │  • latestWeightProvider + weightChartDataProvider     │
 └─────────────────────┬────────────────────────────────┘
                       │
-                      ▼
+                      ▼  HealthContext 스냅샷 + contentHash
 ┌──────────────────────────────────────────────────────┐
-│  insightCacheProvider (세션 메모리 캐시)              │
-│  • 키: YYYYMMDD                                       │
-│  • Hit  → 즉시 반환                                   │
-│  • Miss → 다음 단계                                   │
+│  insightCacheProvider (세션 캐시)                     │
+│  • 키: YYYYMMDD-{contentHash}                         │
+│  • 데이터 변경 시 키 자동 변경 → 새 호출              │
+│  • 변경 없으면 HIT — 불필요 재호출 방지                │
 └─────────────────────┬────────────────────────────────┘
                       │
                       ▼
 ┌──────────────────────────────────────────────────────┐
-│  insightCallCountProvider (SharedPreferences)        │
-│  키: insight_call_count_v1, 상한 kInsightDailyLimit=3 │
-│  • 초과 → throw StateError('DAILY_LIMIT_REACHED')     │
-│  • 통과 → 호출 직전 카운트++ (실패해도 소모)           │
-└─────────────────────┬────────────────────────────────┘
-                      │
-                      ▼
-┌──────────────────────────────────────────────────────┐
-│  GeminiService (gemini-2.5-flash-lite)               │
-│  • .env GEMINI_API_KEY                               │
-│  • 한국어 150자 이내 조언                             │
+│  GeminiService.getHealthInsight (gemini-2.5-flash-lite) │
+│  • 일일 호출 제한 없음                                │
+│  • 무한 재호출 방어:                                  │
+│    (a) 해시 캐시  (b) UI 60초 디바운스                │
 └──────────────────────────────────────────────────────┘
 ```
 
-**비용 방어 원칙**: 호출 직전 카운트 증가(increment-before) — 네트워크 실패/예외에도 카운트 소모. 사용자는 다음날 또는 캐시된 응답으로 우회.  
-**캐시 무효화**: 카드의 새로고침 아이콘이 `insightCacheProvider`에서 해당 키 삭제 후 `ref.invalidate(healthInsightProvider)`.
+수동 새로고침은 `insightLastRefreshAtProvider`에 탭 시각을 기록하고, `insightCanRefreshProvider` 가 60초 경과 여부로 버튼 활성화를 결정한다. 새로고침 시 세션 캐시를 비우고 `ref.invalidate(healthInsightProvider)`.
+
+### 2) 코치 챗봇 — `coach_chat_notifier.dart` + `suggested_prompts_provider.dart`
+
+```
+요약 탭 _AiInsightCard "더 물어보기" CTA
+                │
+                ▼
+showCoachChatSheet (90% 하단 모달)
+                │
+                ├─ 빈 상태 → suggestedPromptsProvider (규칙 기반, API 호출 0)
+                │                │
+                │                └─ 20+ 규칙을 카테고리 다양성·우선순위로 랭킹
+                │
+                └─ 메시지 리스트 + 입력창
+                         │
+                         ▼  coachChatProvider.send(userMessage)
+                   ┌──────────────────────────────────────┐
+                   │ coachChatCallCountProvider            │
+                   │ 키: coach_chat_count_v1, 상한 30회/일  │
+                   │ • 초과 → CHAT_DAILY_LIMIT_REACHED 에러 │
+                   │ • 통과 → 호출 직전 카운트++           │
+                   └───────────────────┬──────────────────┘
+                                       ▼
+                   ┌──────────────────────────────────────┐
+                   │ GeminiService.coachChat               │
+                   │ (gemini-2.5-flash, JSON 모드)         │
+                   │ • 최근 6턴 history + HealthContext    │
+                   │ • 응답 스키마:                        │
+                   │   {answer, follow_ups: [..., ..., ...]} │
+                   │ • follow_ups 는 같은 호출에 포함      │
+                   │   → 추가 API 호출 0                    │
+                   └──────────────────────────────────────┘
+```
+
+`coachChatProvider` 는 **autoDispose** 로 모달이 닫히면 히스토리 휘발. 어시스턴트 마지막 메시지의 `follow_ups` 를 다음 추천 칩으로 노출해 대화를 이어간다.
+
+**비용 방어 원칙**: 호출 직전 카운트 증가(increment-before) — 네트워크 실패/예외에도 카운트 소모.  
+**세션 히스토리**: SharedPreferences 영속 X — 매번 새 대화로 시작.
 
 ---
 

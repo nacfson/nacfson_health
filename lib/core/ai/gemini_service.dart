@@ -8,14 +8,17 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../../features/diet/domain/entities/food_analysis_result.dart';
 import '../../features/summary/domain/entities/daily_summary.dart';
 import '../../features/weight/domain/entities/weight_record.dart';
+import 'coach_chat_models.dart';
 
-/// Gemini AI 건강 인사이트 + 음식 사진 분석 서비스.
+/// Gemini AI 건강 인사이트 + 음식 사진 분석 + 코치 챗봇 서비스.
 ///
-/// - 텍스트 인사이트: gemini-2.5-flash-lite (저비용)
+/// - 텍스트 인사이트: gemini-2.5-flash-lite (저비용, 자동 생성 카드)
 /// - 음식 Vision 분석: gemini-2.5-flash (Vision 안정 지원 + JSON 모드)
+/// - 코치 챗봇: gemini-2.5-flash (JSON 응답 — answer + follow_ups)
 class GeminiService {
   late final GenerativeModel _model;
   late final GenerativeModel _visionModel;
+  late final GenerativeModel _chatModel;
 
   GeminiService() {
     final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
@@ -29,6 +32,15 @@ class GeminiService {
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
         temperature: 0.2,
+        maxOutputTokens: 1024,
+      ),
+    );
+    _chatModel = GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: apiKey,
+      generationConfig: GenerationConfig(
+        responseMimeType: 'application/json',
+        temperature: 0.4,
         maxOutputTokens: 1024,
       ),
     );
@@ -196,6 +208,89 @@ class GeminiService {
 }
 
 items가 비어 있어도 됩니다(단일 음식 또는 isFood=false인 경우).''';
+  }
+
+  /// 코치 챗봇 단일 턴.
+  ///
+  /// 매 호출마다 최신 건강 데이터([healthContext])를 시스템 프롬프트에 재주입한다.
+  /// [history]는 세션 메모리 기반이며 마지막 6턴(3 user + 3 assistant)만 전달한다.
+  /// 응답은 JSON {"answer": ..., "follow_ups": [...]} 스키마.
+  /// 파싱 실패 시 raw 텍스트를 answer로 반환하고 follow_ups는 빈 배열.
+  Future<CoachReply> coachChat({
+    required String userMessage,
+    required List<ChatMessage> history,
+    required HealthContext healthContext,
+  }) async {
+    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
+      throw StateError('GEMINI_API_KEY_MISSING');
+    }
+
+    // 최근 6턴만 컨텍스트로 전달 (토큰 절약)
+    final trimmed = history.length > 6
+        ? history.sublist(history.length - 6)
+        : history;
+
+    final contents = <Content>[
+      Content.text(_buildCoachSystemInstruction(healthContext)),
+      for (final m in trimmed)
+        m.role == ChatRole.user
+            ? Content.text('[사용자] ${m.content}')
+            : Content.model([TextPart(m.content)]),
+      Content.text('[사용자] $userMessage'),
+    ];
+
+    try {
+      final response = await _chatModel.generateContent(contents);
+      final text = response.text?.trim() ?? '';
+      if (text.isEmpty) {
+        return const CoachReply(
+            answer: '응답이 비어 있어요. 잠시 후 다시 시도해주세요.', followUps: []);
+      }
+      return _parseCoachReply(text);
+    } catch (e, st) {
+      debugPrint('[GeminiService.coach] ${e.runtimeType}: $e');
+      debugPrint('[GeminiService.coach] stack: $st');
+      rethrow;
+    }
+  }
+
+  String _buildCoachSystemInstruction(HealthContext ctx) {
+    return '''당신은 한국어 건강 코치입니다. 따뜻하고 구체적인 조언을 제공하세요.
+${ctx.toPromptContext()}
+
+규칙:
+1. 답변은 한국어, 200자 이내, 친근한 코치 말투.
+2. 사용자 데이터에 근거해 구체적인 수치/예시 포함.
+3. follow_ups는 사용자가 다음에 궁금해할 만한 짧은 질문 3개 (각 25자 이내).
+4. 응답은 반드시 아래 JSON 스키마만 출력 (마크다운/코드블록 없이):
+{"answer": "...", "follow_ups": ["...", "...", "..."]}
+''';
+  }
+
+  CoachReply _parseCoachReply(String text) {
+    try {
+      final decoded = json.decode(text);
+      if (decoded is Map<String, dynamic>) {
+        final answer = (decoded['answer'] as String?)?.trim() ?? '';
+        final rawFollowUps = decoded['follow_ups'];
+        final followUps = rawFollowUps is List
+            ? rawFollowUps
+                .whereType<String>()
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .take(3)
+                .toList()
+            : <String>[];
+        if (answer.isNotEmpty) {
+          return CoachReply(answer: answer, followUps: followUps);
+        }
+      }
+      return CoachReply(answer: text, followUps: const []);
+    } catch (_) {
+      // JSON 파싱 실패 시 raw 텍스트를 answer로 fallback
+      return CoachReply(answer: text, followUps: const []);
+    }
   }
 
   FoodAnalysisResult _parseFoodAnalysisJson(String text) {

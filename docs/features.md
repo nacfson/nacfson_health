@@ -102,12 +102,19 @@
 - [x] `SyncPreferences` 사용자 프로필 저장 — `user_gender` / `user_age_group` / `fitness_goal`
 - [x] 설정 화면 '영양 목표' 카드 — 목표 선택 bottom sheet + '목표 기반 재계산' 버튼
 
-### AI 건강 인사이트
+### AI 건강 인사이트 & 코치 챗봇
 - [x] `GeminiService` — `gemini-2.5-flash-lite` 기반 한국어 건강 조언 생성 (`.env` API 키)
 - [x] `healthInsightProvider` — `FutureProvider.autoDispose`, 체중·식단·운동 종합 분석
 - [x] `_AiInsightCard` — 요약 화면 AI 인사이트 카드 (로딩/에러/데이터 상태, 새로고침)
-- [x] `InsightCallCountNotifier` — 날짜별 호출 횟수 SharedPreferences 영속 (하루 3회 상한)
+- [x] **일일 호출 제한 해제** — `insightCacheProvider` 데이터 해시 기반 캐싱 + UI 60초 디바운스로 방어
+- [x] `insightLastRefreshAtProvider` / `insightCanRefreshProvider` — 수동 새로고침 디바운스 타이머 + 카운트다운 라벨
 - [x] BMI 동적 계산 (`_BmiBar` → ConsumerWidget, `heightMProvider` 연동)
+- [x] **코치 챗봇** (`coachChatProvider`, autoDispose) — `gemini-2.5-flash`, JSON 모드 (answer + follow_ups), 최근 6턴 히스토리
+- [x] **일일 호출 한도 30회** (`coachChatCallCountProvider`, 자정 자동 리셋, increment-before 정책)
+- [x] **추천 칩 Provider** (`suggestedPromptsProvider`) — 20+ 규칙 기반 (식단/매크로/운동/체중/루틴/동기부여/시간대), 카테고리 다양성 랭킹, 최대 5개, fallback 3개
+- [x] **`showCoachChatSheet`** — 90% 높이 하단 모달, 빈 상태 추천 칩 + 대화 + follow-up 칩 이어가기
+- [x] **요약 카드 "더 물어보기" CTA** (`_AiInsightCard` 하단 TextButton)
+- [x] `evaluateSuggestedPrompts` pure function — 테스트 용이성을 위해 Provider와 분리
 
 ---
 
