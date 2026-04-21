@@ -53,8 +53,16 @@ List<SuggestedPrompt> evaluateSuggestedPrompts({
     final c = rule.evaluate(ctx);
     if (c != null) candidates.add(c);
   }
-  final ranked = _rank(candidates);
-  return ranked.isNotEmpty ? ranked : _fallbackPrompts();
+
+  // `_DietMissingTodayRule` 은 오늘 식단이 비기만 하면 매칭되므로, 신규
+  // 사용자(데이터 0)에서 단독으로 1개만 노출되는 어색한 상태가 발생한다.
+  // 다른 의미 있는 신호가 하나도 없으면 fallback 3개로 대체한다.
+  final meaningful = candidates
+      .where((c) => c.prompt.id != 'diet.missing_today')
+      .toList();
+  if (meaningful.isEmpty) return _fallbackPrompts();
+
+  return _rank(candidates);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

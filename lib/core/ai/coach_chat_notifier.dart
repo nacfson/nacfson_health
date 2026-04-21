@@ -32,9 +32,12 @@ class CoachChatCallCountNotifier extends StateNotifier<Map<String, int>> {
     if (raw == null || raw.isEmpty) return;
     try {
       final decoded = json.decode(raw) as Map<String, dynamic>;
-      state = decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+      final loaded = decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
+      // 레이스 방어: 비동기 로드 완료 전에 increment() 가 먼저 실행되어
+      // 이미 메모리에 카운트가 쌓였을 수 있다. 같은 키는 메모리 값이 우선.
+      state = {...loaded, ...state};
     } catch (_) {
-      // ignore — 손상된 캐시는 비워두고 새로 시작
+      // 손상된 캐시는 비워두고 새로 시작
     }
   }
 
@@ -111,6 +114,9 @@ class CoachChatNotifier extends StateNotifier<CoachChatState> {
       return;
     }
 
+    // 새 사용자 메시지를 추가하기 *전* 의 history. coachChat() 내부에서
+    // userMessage 를 별도로 append 하므로, 여기에서는 직전 히스토리만 전달.
+    final priorHistory = state.messages;
     final userMsg = ChatMessage(
       role: ChatRole.user,
       content: trimmed,
@@ -129,7 +135,7 @@ class CoachChatNotifier extends StateNotifier<CoachChatState> {
       final ctx = _buildHealthContext();
       final reply = await GeminiService().coachChat(
         userMessage: trimmed,
-        history: state.messages,
+        history: priorHistory,
         healthContext: ctx,
       );
       final assistantMsg = ChatMessage(

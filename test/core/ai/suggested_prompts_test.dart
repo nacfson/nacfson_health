@@ -129,11 +129,26 @@ void main() {
       expect(result.any((p) => p.id == 'workout.same_muscle_3d'), isTrue);
     });
 
-    test('주간 체중 +1.5kg 증가 시 weight.weekly_gain 최고 우선순위로 노출', () {
+    test('주간 체중 +1.5kg 증가 시 weight.weekly_gain 칩 노출', () {
+      // 오늘 식단이 있어 diet.missing_today 는 매칭되지 않음 → weekly_gain 이
+      // 가장 높은 priority 후보가 된다.
       final result = evaluateSuggestedPrompts(
         now: now,
         summary: _summary(),
-        diets: const [],
+        diets: [
+          DietRecord(
+            uuid: 'd1',
+            timestamp: now,
+            updatedAt: now,
+            mealType: 'lunch',
+            foodName: '닭가슴살',
+            totalCalories: 300,
+            carbs: 0,
+            protein: 50,
+            fat: 0,
+            satisfaction: 3,
+          ),
+        ],
         exercises: const [],
         latestWeight: _weight(now, 72.5),
         allWeights: [
@@ -159,20 +174,14 @@ void main() {
       expect(result.any((p) => p.id == 'diet.cal_under'), isTrue);
     });
 
-    test('diet.missing_today 는 navigation 타입이며 priority 최상단', () {
-      final result = evaluateSuggestedPrompts(
-        now: now,
-        summary: _summary(),
-        diets: const [],
-        exercises: const [],
-        latestWeight: null,
-        allWeights: const [],
-      );
-      // fallback 상태에서는 missing_today 도 매칭되지만 fallback 이 우선
+    test('diet.missing_today 는 navigation 타입이며 의미 있는 신호와 함께 최상단', () {
+      // diets/exercises/weights 가 모두 비어 있되 단백질 부족이라는 다른 신호가
+      // 있을 때 → missing_today 가 함께 노출되며 우선순위 최상단.
       final withSignal = evaluateSuggestedPrompts(
         now: now,
         summary: _summary(
-          diet: _diet(consumed: 0, target: 2000, protein: 20, proteinTarget: 100),
+          diet: _diet(
+              consumed: 0, target: 2000, protein: 20, proteinTarget: 100),
         ),
         diets: const [],
         exercises: const [],

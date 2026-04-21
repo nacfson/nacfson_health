@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
+
 import '../../features/summary/domain/entities/daily_summary.dart';
 import '../../features/weight/domain/entities/weight_record.dart';
 
@@ -97,6 +101,9 @@ class HealthContext {
   }
 
   /// 캐시 키용 short hash — 핵심 수치가 바뀌면 값이 바뀌도록.
+  ///
+  /// Dart `hashCode` 는 플랫폼별 비결정성과 충돌 가능성이 있어 캐시 키로
+  /// 부적절하다. 충돌 내성을 확보하기 위해 sha256 의 앞 8 hex 자리를 사용.
   String contentHash() {
     final diet = summary?.dietNutrition;
     final workout = summary?.workoutPerformance;
@@ -115,7 +122,8 @@ class HealthContext {
           ? recentWeights.last.weight.toStringAsFixed(1)
           : '-',
     ];
-    return parts.join(':').hashCode.toRadixString(36);
+    final digest = sha256.convert(utf8.encode(parts.join(':')));
+    return digest.toString().substring(0, 8);
   }
 }
 

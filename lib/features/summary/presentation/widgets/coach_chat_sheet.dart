@@ -284,9 +284,11 @@ class _FollowUpRow extends ConsumerWidget {
 void _handlePromptTap(
     BuildContext context, WidgetRef ref, SuggestedPrompt p) {
   if (p.kind == SuggestedPromptKind.navigation) {
+    // pop 직후 같은 context 는 deactivated 될 수 있어 라우팅 전에 router 캡처.
+    final router = GoRouter.of(context);
     Navigator.of(context).pop();
     if (p.id == 'diet.missing_today') {
-      context.go('/diet');
+      router.go('/diet');
     }
     return;
   }
