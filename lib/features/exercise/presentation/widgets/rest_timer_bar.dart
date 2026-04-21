@@ -9,7 +9,7 @@ import '../providers/rest_timer_provider.dart';
 ///
 /// `restTimerProvider`를 watch하여 활성 시에만 표시됩니다.
 /// `_RootTimerOverlay`에서 AppBar title 오른쪽 빈 공간(상단 우측)에 배치되도록 설계됨.
-/// ±15초 조정은 알림(`RestNotificationService`)의 액션으로 대체.
+/// ±15초 조정은 바 인라인 버튼과 알림(`RestNotificationService`) 액션 모두 지원.
 class RestTimerBar extends ConsumerWidget {
   const RestTimerBar({super.key});
 
@@ -54,6 +54,20 @@ class RestTimerBar extends ConsumerWidget {
         ),
         const SizedBox(width: 8),
         _CircleButton(
+          icon: Icons.remove,
+          tooltip: '15초 빼기',
+          onTap: () =>
+              ref.read(restTimerProvider.notifier).addSeconds(-15),
+        ),
+        const SizedBox(width: 2),
+        _CircleButton(
+          icon: Icons.add,
+          tooltip: '15초 더하기',
+          onTap: () =>
+              ref.read(restTimerProvider.notifier).addSeconds(15),
+        ),
+        const SizedBox(width: 4),
+        _CircleButton(
           icon: state.isPaused
               ? Icons.play_arrow_rounded
               : Icons.pause_rounded,
@@ -62,7 +76,7 @@ class RestTimerBar extends ConsumerWidget {
           onTap: () =>
               ref.read(restTimerProvider.notifier).togglePause(),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 2),
         _CircleButton(
           icon: Icons.close,
           tooltip: '종료',
