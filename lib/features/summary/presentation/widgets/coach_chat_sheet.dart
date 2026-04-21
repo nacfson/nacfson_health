@@ -15,6 +15,9 @@ Future<void> showCoachChatSheet(BuildContext context) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    // ShellRoute 의 shellNavigator 위가 아니라 rootNavigator 위로 push 해야
+    // BottomNavShell 의 glassmorphic 하단 탭 바가 시트 입력창을 가리지 않는다.
+    useRootNavigator: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -340,10 +343,22 @@ class _ErrorBanner extends ConsumerWidget {
       text =
           '오늘 코치 대화는 $kCoachChatDailyLimit회까지 이용할 수 있어요. 내일 다시 이용해주세요.';
     } else if (error.contains('GEMINI_API_KEY_MISSING') ||
-        error.contains('API')) {
-      text = 'Gemini API 키가 설정되지 않았어요. .env 파일을 확인해주세요.';
+        error.contains('API_KEY') ||
+        error.contains('API key')) {
+      text = 'Gemini API 키가 설정되지 않았거나 유효하지 않아요. .env 파일을 확인해주세요.';
+    } else if (error.contains('RESOURCE_EXHAUSTED') ||
+        error.contains('quota') ||
+        error.contains('429') ||
+        error.contains('403') ||
+        error.contains('PERMISSION_DENIED')) {
+      text = '현재 AI 코치 사용량이 많아요. 잠시 후 다시 시도해주세요.';
+    } else if (error.contains('SocketException') ||
+        error.contains('TimeoutException') ||
+        error.contains('Failed host lookup') ||
+        error.contains('ClientException')) {
+      text = '네트워크 연결을 확인하고 다시 시도해주세요.';
     } else {
-      text = '응답을 받지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.';
+      text = '일시적인 오류가 발생했어요. 잠시 후 다시 시도해주세요.';
     }
 
     return Container(

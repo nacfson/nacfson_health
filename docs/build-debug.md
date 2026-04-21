@@ -278,6 +278,8 @@ curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$KEY" | hea
 
 **회피**: 리스트에서 `gemini-2.5-flash-lite` / `gemini-flash-lite-latest` / `gemma-3-1b-it` 는 보통 무료 티어가 열려 있다. [lib/core/ai/gemini_service.dart](../lib/core/ai/gemini_service.dart) 의 `model:` 인자만 교체. `gemini-2.0-flash`, `gemini-2.0-flash-lite` 는 일부 계정/지역에서 무료 티어가 0으로 내려가 있어 회피 모델로 부적합.
 
+**코치 챗 회귀 (2026-04)**: `coachChat` 이 `gemini-2.5-flash` 로 `responseMimeType: 'application/json'` + `maxOutputTokens: 1024` 조합을 쓰면 thinking 토큰이 ~979 tok 소비(`thoughtsTokenCount`) → JSON 이 중간에 잘려 `finishReason: MAX_TOKENS`. `_parseCoachReply` 파싱 실패로 raw 텍스트 또는 빈 응답이 나가고, SDK 가 빈 content 에서 예외를 던지면 `_ErrorBanner` 까지 도달한다. **해결**: `_chatModel` 을 `gemini-2.5-flash-lite` 로 고정. flash-lite 는 thinking 거의 없음 + JSON 모드 정상 지원(실측 `finishReason: STOP`, `thoughtsTokenCount: 2`). 2.5-flash 로 되돌릴 경우 `thinkingConfig` 로 thinking 예산을 0 으로 명시하거나 `maxOutputTokens` 를 4096+ 로 상향해야 한다.
+
 ---
 
 ## 7. ConsumerStatefulWidget FAB 설정 — dispose() 일관성
