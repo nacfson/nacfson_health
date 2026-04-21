@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/exercise_record.dart';
+import '../../domain/entities/routine_item.dart';
 import '../providers/exercise_provider.dart';
 import '../providers/rest_timer_provider.dart';
+import '../providers/routine_planner_provider.dart';
 
 /// 카드 하단에 인라인으로 펼쳐지는 1행 세트 입력기.
 /// - `add` 모드: 직전 세트 값을 프리필하고 ✓ 저장 시 같은 운동의 다음 세트로 누적.
@@ -119,6 +121,14 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
           rpe: rpe,
           setType: _selectedType,
         );
+        // 루틴 = 오늘 카드 컨테이너. 세트 기록 시 같은 이름이 루틴에 없으면 자동 편입.
+        // addItem 내부에서 중복 이름은 무시되므로 항상 호출해도 안전.
+        await ref.read(routinePlannerProvider.notifier).addItem(
+              RoutineItem(
+                exerciseType: widget.exerciseType,
+                exerciseName: widget.exerciseName,
+              ),
+            );
         // 휴식 타이머 자동 시작
         final defaultSec = ref.read(defaultRestSecondsProvider);
         ref

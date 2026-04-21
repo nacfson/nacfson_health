@@ -1,4 +1,5 @@
 import '../../../../core/database/base_syncable_sqlite_repository.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../repositories/exercise_repository.dart';
 
@@ -10,6 +11,29 @@ class SqliteExerciseRepository
 
   @override
   Future<List<ExerciseRecord>> getByDate(DateTime date) => queryByDate(date);
+
+  @override
+  Future<int> deleteByExerciseNameOnDate(
+      String exerciseName, DateTime date) async {
+    final db = await DatabaseHelper.instance.database;
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    return db.update(
+      tableName,
+      {
+        'sync_status': SyncStatus.deleted.value,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      where:
+          'exercise_name = ? AND timestamp >= ? AND timestamp < ? AND sync_status != ?',
+      whereArgs: [
+        exerciseName,
+        startOfDay.millisecondsSinceEpoch,
+        endOfDay.millisecondsSinceEpoch,
+        SyncStatus.deleted.value,
+      ],
+    );
+  }
 
   @override
   ExerciseRecord copyWithSync(
