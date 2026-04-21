@@ -1,15 +1,6 @@
-// modified(2) 없음 — 템플릿은 생성/삭제만 지원
-enum TemplateSyncStatus {
-  synced(0),
-  created(1),
-  deleted(3);
+import '../../../../core/sync/sync_status.dart';
 
-  final int value;
-  const TemplateSyncStatus(this.value);
-
-  static TemplateSyncStatus fromInt(int v) =>
-      TemplateSyncStatus.values.firstWhere((e) => e.value == v);
-}
+export '../../../../core/sync/sync_status.dart' show TemplateSyncStatus;
 
 class ExerciseTemplate {
   final int? id; // LOCAL ONLY — 시트 연동 시 사용 금지

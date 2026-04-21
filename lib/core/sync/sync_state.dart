@@ -1,16 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../features/diet/data/repositories/diet_repository.dart';
 import '../../features/diet/presentation/providers/diet_provider.dart';
+import '../../features/exercise/data/repositories/exercise_repository.dart';
 import '../../features/exercise/data/repositories/workout_routine_repository.dart';
-import '../../features/exercise/domain/entities/exercise_record.dart'
-    show SyncStatus;
 import '../../features/exercise/presentation/providers/exercise_provider.dart';
 import '../../features/exercise/presentation/providers/workout_routine_provider.dart';
 import '../../features/settings/data/repositories/exercise_template_repository.dart';
 import '../../features/settings/data/repositories/food_template_repository.dart';
-import '../../features/settings/domain/entities/exercise_template.dart';
-import '../../features/settings/domain/entities/food_template.dart';
 import '../../features/settings/presentation/providers/exercise_template_provider.dart';
 import '../../features/settings/presentation/providers/food_template_provider.dart';
 import '../../features/weight/data/repositories/weight_repository.dart';
@@ -19,6 +17,7 @@ import '../nutrition/nutrition_targets.dart';
 import 'google_auth_service.dart';
 import 'supabase_service.dart';
 import 'sync_preferences.dart';
+import 'sync_status.dart';
 
 export '../nutrition/nutrition_targets.dart' show NutritionTargets;
 
@@ -111,8 +110,8 @@ final syncStateProvider = StateNotifierProvider<SyncStateNotifier, SyncState>((
 class SyncStateNotifier extends StateNotifier<SyncState> {
   final SupabaseService _supabaseService;
   final SyncPreferences _prefs;
-  final dynamic _exerciseRepo;
-  final dynamic _dietRepo;
+  final ExerciseRepository _exerciseRepo;
+  final DietRepository _dietRepo;
   final ExerciseNotifier _exerciseNotifier;
   final DietNotifier _dietNotifier;
   final ExerciseTemplateRepository _templateRepo;
@@ -127,8 +126,8 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   SyncStateNotifier({
     required SupabaseService supabaseService,
     required SyncPreferences prefs,
-    required dynamic exerciseRepo,
-    required dynamic dietRepo,
+    required ExerciseRepository exerciseRepo,
+    required DietRepository dietRepo,
     required ExerciseNotifier exerciseNotifier,
     required DietNotifier dietNotifier,
     required ExerciseTemplateRepository templateRepo,
@@ -287,8 +286,8 @@ typedef NutritionTargetsProvider = NutritionTargetsNotifier;
 
 Future<SyncResult> _syncAll(
   SupabaseService supabaseService,
-  dynamic exerciseRepo,
-  dynamic dietRepo,
+  ExerciseRepository exerciseRepo,
+  DietRepository dietRepo,
   ExerciseTemplateRepository templateRepo,
   FoodTemplateRepository foodTemplateRepo,
   WeightRepository weightRepo,
@@ -305,14 +304,14 @@ Future<SyncResult> _syncAll(
     if (pendingExercise.isNotEmpty) {
       await supabaseService.batchPushExerciseRecords(pendingExercise);
       final uuidsToMark = pendingExercise
-          .where((r) => r.syncStatus.value != 3)
-          .map<String>((r) => r.uuid as String)
+          .where((r) => r.syncStatus != SyncStatus.deleted)
+          .map((r) => r.uuid)
           .toList();
       if (uuidsToMark.isNotEmpty) {
         await exerciseRepo.markAsSynced(uuidsToMark);
       }
     }
-    pushed += (pendingExercise as List).length;
+    pushed += pendingExercise.length;
   } catch (e) {
     errors.add('운동 기록 Push 오류: $e');
   }
@@ -322,14 +321,14 @@ Future<SyncResult> _syncAll(
     if (pendingDiet.isNotEmpty) {
       await supabaseService.batchPushDietRecords(pendingDiet);
       final uuidsToMark = pendingDiet
-          .where((r) => r.syncStatus.value != 3)
-          .map<String>((r) => r.uuid as String)
+          .where((r) => r.syncStatus != SyncStatus.deleted)
+          .map((r) => r.uuid)
           .toList();
       if (uuidsToMark.isNotEmpty) {
         await dietRepo.markAsSynced(uuidsToMark);
       }
     }
-    pushed += (pendingDiet as List).length;
+    pushed += pendingDiet.length;
   } catch (e) {
     errors.add('식단 기록 Push 오류: $e');
   }
@@ -373,7 +372,7 @@ Future<SyncResult> _syncAll(
     if (pendingFoodTemplates.isNotEmpty) {
       await supabaseService.batchPushFoodTemplates(pendingFoodTemplates);
       final uuidsToMark = pendingFoodTemplates
-          .where((t) => t.syncStatus != FoodTemplateSyncStatus.deleted)
+          .where((t) => t.syncStatus != TemplateSyncStatus.deleted)
           .map((t) => t.uuid)
           .toList();
       if (uuidsToMark.isNotEmpty) {

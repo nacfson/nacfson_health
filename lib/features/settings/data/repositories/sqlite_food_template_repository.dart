@@ -15,7 +15,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     final result = await db.query(
       'food_templates',
       where: 'sync_status != ?',
-      whereArgs: [FoodTemplateSyncStatus.deleted.value],
+      whereArgs: [TemplateSyncStatus.deleted.value],
       orderBy: 'updated_at ASC',
     );
     return result.map(_fromMap).toList();
@@ -26,7 +26,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     final db = await _dbHelper.database;
     final record = template.copyWith(
       uuid: template.uuid.isEmpty ? _uuid.v4() : template.uuid,
-      syncStatus: FoodTemplateSyncStatus.created,
+      syncStatus: TemplateSyncStatus.created,
     );
     await db.insert(
       'food_templates',
@@ -41,7 +41,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     await db.update(
       'food_templates',
       {
-        'sync_status': FoodTemplateSyncStatus.deleted.value,
+        'sync_status': TemplateSyncStatus.deleted.value,
         'updated_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'uuid = ?',
@@ -55,7 +55,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     final result = await db.query(
       'food_templates',
       where: 'sync_status != ?',
-      whereArgs: [FoodTemplateSyncStatus.synced.value],
+      whereArgs: [TemplateSyncStatus.synced.value],
     );
     return result.map(_fromMap).toList();
   }
@@ -66,7 +66,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     final db = await _dbHelper.database;
     await db.update(
       'food_templates',
-      {'sync_status': FoodTemplateSyncStatus.synced.value},
+      {'sync_status': TemplateSyncStatus.synced.value},
       where: 'uuid IN (${uuids.map((_) => '?').join(',')})',
       whereArgs: uuids,
     );
@@ -81,7 +81,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
         final db = await _dbHelper.database;
         await db.insert(
           'food_templates',
-          _toMap(t.copyWith(syncStatus: FoodTemplateSyncStatus.synced)),
+          _toMap(t.copyWith(syncStatus: TemplateSyncStatus.synced)),
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
       }
@@ -95,7 +95,7 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     await db.delete(
       'food_templates',
       where: 'sync_status = ?',
-      whereArgs: [FoodTemplateSyncStatus.deleted.value],
+      whereArgs: [TemplateSyncStatus.deleted.value],
     );
   }
 
@@ -104,9 +104,9 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
     final db = await _dbHelper.database;
     await db.update(
       'food_templates',
-      {'sync_status': FoodTemplateSyncStatus.created.value},
+      {'sync_status': TemplateSyncStatus.created.value},
       where: 'sync_status != ?',
-      whereArgs: [FoodTemplateSyncStatus.deleted.value],
+      whereArgs: [TemplateSyncStatus.deleted.value],
     );
   }
 
@@ -144,6 +144,6 @@ class SqliteFoodTemplateRepository implements FoodTemplateRepository {
         protein: (map['protein'] as num).toDouble(),
         fat: (map['fat'] as num).toDouble(),
         updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
-        syncStatus: FoodTemplateSyncStatus.fromInt(map['sync_status'] as int),
+        syncStatus: TemplateSyncStatus.fromInt(map['sync_status'] as int),
       );
 }

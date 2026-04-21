@@ -1,15 +1,6 @@
-enum SyncStatus {
-  synced(0), // 시트와 동일
-  created(1), // Insert 필요
-  modified(2), // Update 필요
-  deleted(3); // Soft Delete
+import '../../../../core/sync/sync_status.dart';
 
-  final int value;
-  const SyncStatus(this.value);
-
-  static SyncStatus fromInt(int v) =>
-      SyncStatus.values.firstWhere((e) => e.value == v);
-}
+export '../../../../core/sync/sync_status.dart' show SyncStatus;
 
 class WeightRecord {
   final int? id; // LOCAL ONLY

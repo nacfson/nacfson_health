@@ -1,15 +1,6 @@
-// modified(2) 없음 — 템플릿은 생성/삭제만 지원
-enum FoodTemplateSyncStatus {
-  synced(0),
-  created(1),
-  deleted(3);
+import '../../../../core/sync/sync_status.dart';
 
-  final int value;
-  const FoodTemplateSyncStatus(this.value);
-
-  static FoodTemplateSyncStatus fromInt(int v) =>
-      FoodTemplateSyncStatus.values.firstWhere((e) => e.value == v);
-}
+export '../../../../core/sync/sync_status.dart' show TemplateSyncStatus;
 
 class FoodTemplate {
   final int? id; // LOCAL ONLY — 시트 연동 시 사용 금지
@@ -20,7 +11,7 @@ class FoodTemplate {
   final double protein; // 단백질 g
   final double fat; // 지방 g
   final DateTime updatedAt;
-  final FoodTemplateSyncStatus syncStatus;
+  final TemplateSyncStatus syncStatus;
 
   const FoodTemplate({
     this.id,
@@ -31,7 +22,7 @@ class FoodTemplate {
     required this.protein,
     required this.fat,
     required this.updatedAt,
-    this.syncStatus = FoodTemplateSyncStatus.created,
+    this.syncStatus = TemplateSyncStatus.created,
   });
 
   FoodTemplate copyWith({
@@ -43,7 +34,7 @@ class FoodTemplate {
     double? protein,
     double? fat,
     DateTime? updatedAt,
-    FoodTemplateSyncStatus? syncStatus,
+    TemplateSyncStatus? syncStatus,
   }) =>
       FoodTemplate(
         id: id ?? this.id,

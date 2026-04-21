@@ -1,15 +1,6 @@
-enum SyncStatus {
-  synced(0),
-  created(1),
-  modified(2),
-  deleted(3);
+import '../../../../core/sync/sync_status.dart';
 
-  final int value;
-  const SyncStatus(this.value);
-
-  static SyncStatus fromInt(int v) =>
-      SyncStatus.values.firstWhere((e) => e.value == v);
-}
+export '../../../../core/sync/sync_status.dart' show SyncStatus;
 
 class UserProfile {
   final int? id;
