@@ -1,3 +1,4 @@
+import '../../../../core/database/syncable_entity.dart';
 import '../../../../core/sync/sync_status.dart';
 
 export '../../../../core/sync/sync_status.dart' show SyncStatus;
@@ -22,11 +23,15 @@ enum SetType {
   }
 }
 
-class ExerciseRecord {
+class ExerciseRecord implements SyncableEntity {
   final int? id; // LOCAL ONLY - 시트 연동 시 사용 금지
+  @override
   final String uuid; // 글로벌 PK (UUID v4), 빈 문자열이면 Repository에서 자동 생성
+  @override
   final DateTime timestamp;
+  @override
   final DateTime updatedAt;
+  @override
   final SyncStatus syncStatus;
   final String exerciseType;
   final String exerciseName;

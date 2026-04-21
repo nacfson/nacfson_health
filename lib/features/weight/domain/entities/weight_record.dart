@@ -1,12 +1,17 @@
+import '../../../../core/database/syncable_entity.dart';
 import '../../../../core/sync/sync_status.dart';
 
 export '../../../../core/sync/sync_status.dart' show SyncStatus;
 
-class WeightRecord {
+class WeightRecord implements SyncableEntity {
   final int? id; // LOCAL ONLY
+  @override
   final String uuid; // 글로벌 PK (UUID v4)
+  @override
   final DateTime timestamp;
+  @override
   final DateTime updatedAt;
+  @override
   final SyncStatus syncStatus;
   final double weight;
 
