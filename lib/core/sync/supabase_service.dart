@@ -2,13 +2,14 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../features/diet/domain/entities/diet_record.dart' as diet;
+import '../../features/diet/domain/entities/diet_record.dart';
 import '../../features/exercise/domain/entities/exercise_record.dart';
 import '../../features/exercise/domain/entities/routine_item.dart';
 import '../../features/exercise/domain/entities/workout_routine.dart';
 import '../../features/settings/domain/entities/exercise_template.dart';
 import '../../features/settings/domain/entities/food_template.dart';
-import '../../features/weight/domain/entities/weight_record.dart' as weight;
+import '../../features/weight/domain/entities/weight_record.dart';
+import 'sync_status.dart';
 
 class SupabaseService {
   SupabaseClient get _client => Supabase.instance.client;
@@ -44,7 +45,7 @@ class SupabaseService {
     await _client.from('exercise_records').upsert(rows, onConflict: 'uuid');
   }
 
-  Future<void> batchPushDietRecords(List<diet.DietRecord> records) async {
+  Future<void> batchPushDietRecords(List<DietRecord> records) async {
     if (records.isEmpty) return;
     final userId = _client.auth.currentUser!.id;
     final rows = records
@@ -61,14 +62,13 @@ class SupabaseService {
               'fat': r.fat,
               'satisfaction': r.satisfaction,
               'memo': r.memo,
-              'is_deleted': r.syncStatus == diet.SyncStatus.deleted,
+              'is_deleted': r.syncStatus == SyncStatus.deleted,
             })
         .toList();
     await _client.from('diet_records').upsert(rows, onConflict: 'uuid');
   }
 
-  Future<void> batchPushWeightRecords(
-      List<weight.WeightRecord> records) async {
+  Future<void> batchPushWeightRecords(List<WeightRecord> records) async {
     if (records.isEmpty) return;
     final userId = _client.auth.currentUser!.id;
     final rows = records
@@ -78,7 +78,7 @@ class SupabaseService {
               'timestamp': r.timestamp.toUtc().toIso8601String(),
               'updated_at': r.updatedAt.toUtc().toIso8601String(),
               'weight': r.weight,
-              'is_deleted': r.syncStatus == weight.SyncStatus.deleted,
+              'is_deleted': r.syncStatus == SyncStatus.deleted,
             })
         .toList();
     await _client.from('weight_records').upsert(rows, onConflict: 'uuid');
@@ -133,7 +133,7 @@ class SupabaseService {
               'protein': t.protein,
               'fat': t.fat,
               'updated_at': t.updatedAt.toUtc().toIso8601String(),
-              'is_deleted': t.syncStatus == FoodTemplateSyncStatus.deleted,
+              'is_deleted': t.syncStatus == TemplateSyncStatus.deleted,
             })
         .toList();
     await _client.from('food_templates').upsert(rows, onConflict: 'uuid');
@@ -156,8 +156,7 @@ class SupabaseService {
     return (rows as List).map((r) => _rowToExerciseRecord(r as Map<String, dynamic>)).toList();
   }
 
-  Future<List<diet.DietRecord>> readDietRecordsDelta(
-      {DateTime? since}) async {
+  Future<List<DietRecord>> readDietRecordsDelta({DateTime? since}) async {
     var query = _client
         .from('diet_records')
         .select()
@@ -168,8 +167,7 @@ class SupabaseService {
     return (rows as List).map((r) => _rowToDietRecord(r as Map<String, dynamic>)).toList();
   }
 
-  Future<List<weight.WeightRecord>> readWeightRecordsDelta(
-      {DateTime? since}) async {
+  Future<List<WeightRecord>> readWeightRecordsDelta({DateTime? since}) async {
     var query = _client
         .from('weight_records')
         .select()
@@ -238,12 +236,12 @@ class SupabaseService {
     );
   }
 
-  diet.DietRecord _rowToDietRecord(Map<String, dynamic> row) {
-    return diet.DietRecord(
+  DietRecord _rowToDietRecord(Map<String, dynamic> row) {
+    return DietRecord(
       uuid: row['uuid'] as String,
       timestamp: DateTime.parse(row['timestamp'] as String).toLocal(),
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
-      syncStatus: diet.SyncStatus.synced,
+      syncStatus: SyncStatus.synced,
       mealType: row['meal_type'] as String,
       foodName: row['food_name'] as String,
       totalCalories: row['total_calories'] as int,
@@ -255,12 +253,12 @@ class SupabaseService {
     );
   }
 
-  weight.WeightRecord _rowToWeightRecord(Map<String, dynamic> row) {
-    return weight.WeightRecord(
+  WeightRecord _rowToWeightRecord(Map<String, dynamic> row) {
+    return WeightRecord(
       uuid: row['uuid'] as String,
       timestamp: DateTime.parse(row['timestamp'] as String).toLocal(),
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
-      syncStatus: weight.SyncStatus.synced,
+      syncStatus: SyncStatus.synced,
       weight: (row['weight'] as num).toDouble(),
     );
   }
@@ -304,7 +302,7 @@ class SupabaseService {
       protein: (row['protein'] as num).toDouble(),
       fat: (row['fat'] as num).toDouble(),
       updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
-      syncStatus: FoodTemplateSyncStatus.synced,
+      syncStatus: TemplateSyncStatus.synced,
     );
   }
 }

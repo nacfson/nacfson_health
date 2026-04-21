@@ -1,15 +1,6 @@
-enum SyncStatus {
-  synced(0), // 시트와 동일
-  created(1), // Insert 필요
-  modified(2), // Update 필요
-  deleted(3); // Soft Delete
+import '../../../../core/sync/sync_status.dart';
 
-  final int value;
-  const SyncStatus(this.value);
-
-  static SyncStatus fromInt(int v) =>
-      SyncStatus.values.firstWhere((e) => e.value == v);
-}
+export '../../../../core/sync/sync_status.dart' show SyncStatus;
 
 /// 세트 타입 — 볼륨/PR 집계 시 `work`(기본)와 `drop`을 포함하고 웜업/실패는 제외한다.
 /// 드롭세트는 본세트와 함께 집계에 포함(근성장 기여).
