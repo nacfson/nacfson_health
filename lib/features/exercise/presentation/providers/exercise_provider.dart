@@ -55,7 +55,7 @@ class _MemoryExerciseRepository implements ExerciseRepository {
 
   @override
   Future<List<ExerciseRecord>> getPendingSync() async =>
-      _records.where((r) => r.syncStatus != 0).toList();
+      _records.where((r) => r.syncStatus != SyncStatus.synced).toList();
 
   @override
   Future<void> markAsSynced(List<String> uuids) async {

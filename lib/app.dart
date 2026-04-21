@@ -32,7 +32,16 @@ class NacfsonHealthApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       builder: (context, child) {
-        return _RootTimerOverlay(child: child ?? const SizedBox.shrink());
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () {
+            final focus = FocusManager.instance.primaryFocus;
+            if (focus != null && focus.hasPrimaryFocus) {
+              focus.unfocus();
+            }
+          },
+          child: _RootTimerOverlay(child: child ?? const SizedBox.shrink()),
+        );
       },
     );
   }

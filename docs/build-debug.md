@@ -26,6 +26,34 @@ flutter analyze
 
 ---
 
+## 1-1. 실기기 iPhone — 아이콘 탭 시 앱이 튕김 / 안 열림
+
+**증상**: `flutter run -d <iPhone>` 으로 설치된 앱이 Flutter 터미널을 종료하고 나면 아이콘 탭 시 바로 꺼짐 (splash 후 튕김).
+
+**원인**: `flutter run` 의 기본 모드는 **Debug**. Debug 빌드는 Dart Development Service(DDS) 와의 상시 연결을 전제로 하므로, Flutter 툴체인이 분리되면 런타임이 초기화되지 못하고 즉시 종료된다. iOS 코드사인 / 프로비저닝과 무관한 **빌드 모드 문제**다.
+
+**해결**: 단독 실행 가능한 **Release 빌드**로 설치. 프로젝트 루트에 `Makefile` 과 `.vscode/launch.json` 이 준비되어 있다.
+
+```bash
+# 터미널 경로 — 기본이 Release
+make install-ios
+
+# hot reload 가 필요한 개발 세션만 Debug
+make run-ios-dev
+```
+
+VS Code 에서는 F5 → "iPhone (Release)" 가 기본 엔트리. Debug 가 필요할 때만 드롭다운에서 "iPhone (Debug — 디버거 연결 시에만)" 선택.
+
+**규칙**:
+- 아이폰에 **오래 남길 빌드**는 항상 `--release`. Debug 빌드를 단독 실행이 되는 산출물로 오해하지 말 것.
+- `flutter run` 자체는 CLI 플래그 없이는 항상 Debug 로 떨어지므로 **직접 타이핑 지양**, 가능한 한 Makefile / launch.json 진입점을 사용한다.
+- Personal Apple ID 팀 서명은 유효기간 7일 — 튕김이 다시 시작되면 모드 문제가 아니라 **서명 만료**일 수 있다. 같은 `make install-ios` 로 재설치.
+
+**금지**:
+- Xcode scheme 의 Run Build Configuration 을 Release 로 바꾸는 방식으로 이 문제를 해결하려 하지 말 것. `flutter run` 은 CLI 플래그로 컨피그를 결정하므로 scheme 기본값은 반영되지 않는다 (Xcode 에서 직접 Run 할 때만 의미가 있음).
+
+---
+
 ## 2. Riverpod StateNotifier 비동기 초기화 → 라우터 깜빡임 / 온보딩 루프
 
 **증상**: 앱 재시작 시 온보딩 완료 상태임에도 `/onboarding` 리다이렉트 발생
@@ -674,3 +702,39 @@ end
 - `permission_handler_apple 9.4.7`: `CTCarrier` deprecated (iOS 16+)
 
 **App Store 제출 시 주의**: 위 해결책은 PrivacyInfo 매니페스트를 **번들에서 제외** 한다. App Store 제출 단계에서 매니페스트가 필요하면 `remove_build_file` 대신 `target.resources_build_phase.add_file_reference(ref)` 로 Resources phase 에 재등록하는 방식으로 전환해야 한다.
+
+---
+
+## N+1. Personal Apple ID 팀 + Live Activity — aps-environment 엔타이틀먼트 없이 사용하기
+
+**증상** (Xcode 빌드 에러 3종, 무료 Personal 팀 사용 시):
+
+1. `Personal development teams ... do not support the Push Notifications capability.`
+2. `Provisioning profile ... doesn't include the Push Notifications capability.`
+3. `Provisioning profile ... doesn't include the aps-environment entitlement.`
+
+**원인**: 과거(`live_activities` **≤ v2.4.3**) 버전은 `Activity.request(... pushType: .token)` 을 강제 호출했기에 Runner 타겟에 `aps-environment` 엔타이틀먼트가 필수였다. Personal (무료) Apple ID 팀은 Apple 정책상 Push Notifications capability 서명을 할 수 없어, 이 엔타이틀먼트를 유지하면 Personal 팀 빌드가 통과하지 못한다.
+
+**해결 — 플러그인 v2.4.4+ 의 `iOSEnableRemoteUpdates: false` 사용 (유료 가입 불필요)**
+
+1. `pubspec.yaml` 에서 `live_activities: ^2.4.7` (또는 v2.4.4 이상). 플러그인 제약상 `permission_handler: ^12.0.1` 이 함께 요구됨.
+2. `lib/features/exercise/data/rest_notification_service_ios.dart` 의 `createActivity` 호출에 `iOSEnableRemoteUpdates: false` 전달:
+   ```dart
+   await _liveActivities.createActivity(id, data, iOSEnableRemoteUpdates: false);
+   ```
+3. v2.4.7 에서 `init()` 시그니처 변경: `requireNotificationPermission` → `requestAndroidNotificationPermission`.
+4. `ios/Runner/Runner.entitlements` 에서 `aps-environment` 키 제거 (App Groups 는 위젯 공유에 필요하니 유지).
+5. `ios/Runner/Info.plist` 의 `NSSupportsLiveActivities`, `NSSupportsLiveActivitiesFrequentUpdates` 는 **유지** (Push 엔타이틀먼트와 무관).
+6. Xcode 의 Runner 타겟 → Signing & Capabilities 에 "Push Notifications" 항목이 남아 있으면 삭제.
+
+**플러그인 문서 인용** (`live_activities.dart:53-55`):
+> `iOSEnableRemoteUpdates` indicates if the live activity should allow remote updates via push notifications. **If set to false**, the live activity will not receive remote updates. If set to true, Push Notifications capability must be enabled in your Xcode project.
+
+**검증**: Xcode 실기기 빌드 → 세 오류 모두 사라짐. 휴식 타이머 시작 시 Lock Screen/Dynamic Island 정상 표시 + 콘솔에 `createActivity FAILED ... ActivityInput error 0` 로그 없음.
+
+**App Store 제출 트레이드오프**: 원격 푸시로 Activity 를 갱신하는 기능은 포기하게 된다. 로컬 타이머 갱신(`updateActivity`)은 정상 작동. 배포 전환 시점에 Apple Developer Program 유료 가입 후 엔타이틀먼트를 되돌리고 `iOSEnableRemoteUpdates: true` 로 바꾸면 된다.
+
+**하네스 프롬프트 — 향후 발생 시**:
+- Push Notifications/aps-environment 서명 오류를 보면 먼저 서명 팀이 Personal 인지 확인한다.
+- Personal 팀을 유지하면서 Live Activity 를 쓰려면 반드시 v2.4.4+ + `iOSEnableRemoteUpdates: false` 조합을 사용한다.
+- v2.4.3 이하로 다운그레이드하면 이 해결책은 복원 불가 — 반드시 플러그인 버전을 먼저 확인한다.

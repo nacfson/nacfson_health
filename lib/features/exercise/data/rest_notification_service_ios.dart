@@ -42,7 +42,7 @@ class RestNotificationServiceIOS implements RestNotificationService {
     try {
       await _liveActivities.init(
         appGroupId: _appGroupId,
-        requireNotificationPermission: false,
+        requestAndroidNotificationPermission: false,
       );
       // 이전 세션이 휴식 중 강제 종료되면 _activityId 는 사라지지만 iOS는 Activity 를
       // 유지한다. 새 실행에서 중복으로 보이지 않도록 정리.
@@ -97,7 +97,11 @@ class RestNotificationServiceIOS implements RestNotificationService {
     };
 
     try {
-      await _liveActivities.createActivity(id, data);
+      await _liveActivities.createActivity(
+        id,
+        data,
+        iOSEnableRemoteUpdates: false,
+      );
       _activityId = id;
       debugPrint(
         '[LiveActivity] created id=$id name="${exerciseName ?? ''}" endAt=$endAt',

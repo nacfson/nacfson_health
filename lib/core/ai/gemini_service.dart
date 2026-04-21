@@ -32,7 +32,8 @@ class GeminiService {
       generationConfig: GenerationConfig(
         responseMimeType: 'application/json',
         temperature: 0.2,
-        maxOutputTokens: 1024,
+        // 복합 플레이트(여러 items) 에서 1024 로는 잘림 — 실측 후 상향.
+        maxOutputTokens: 4096,
       ),
     );
     _chatModel = GenerativeModel(
