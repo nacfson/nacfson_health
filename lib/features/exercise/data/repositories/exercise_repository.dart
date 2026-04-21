@@ -7,6 +7,10 @@ abstract class ExerciseRepository {
   Future<void> update(ExerciseRecord record);
   Future<void> delete(String uuid);
 
+  /// 선택된 날짜의 특정 운동명 레코드를 모두 soft delete 한다.
+  /// 반환값: 실제로 상태가 변경된 레코드 수.
+  Future<int> deleteByExerciseNameOnDate(String exerciseName, DateTime date);
+
   // Sync 관련 메서드
   Future<List<ExerciseRecord>> getPendingSync();
   Future<void> markAsSynced(List<String> uuids);

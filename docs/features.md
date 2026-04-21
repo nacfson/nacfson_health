@@ -33,7 +33,11 @@
 - [x] DB v8 — `workout_routines` (Supabase 동기화) + `daily_routine` (로컬 전용) 테이블
 - [x] `RoutinePlannerNotifier` — 오늘 루틴(`daily_routine`) 항목 추가/제거/교체/병합
 - [x] `WorkoutRoutineNotifier` — 프리셋(저장된 루틴) CRUD + Supabase 양방향 동기화
-- [x] `todayExerciseCardsProvider` — 계획(루틴)과 기록(세트)을 union 한 카드 데이터
+- [x] `todayExerciseCardsProvider` — 루틴(`daily_routine`)을 기준으로 오늘 기록을 join 한 카드 데이터 (v9+: extras 경로 제거, 루틴=카드 1:1)
+- [x] 세트 저장 시 루틴 자동 편입 (`InlineSetInput._submit` → `routinePlannerProvider.addItem`)
+- [x] `RoutinePlannerNotifier._load` 자기치유 — 루틴에 없는 기존 기록을 자동 편입
+- [x] "운동 제거" 메뉴 — 루틴 항목 + 선택 날짜 기록을 함께 soft delete, 기록 있을 시 확인 다이얼로그
+- [x] `ExerciseRepository.deleteByExerciseNameOnDate` — 운동명+일자 기준 일괄 soft delete
 - [x] `InlineSetInput` — 카드 하단 1행 입력기, 직전 세트 값 프리필 + 연속 입력
 - [x] `addSetAutoNumber` — 같은 운동의 다음 세트 번호 자동 부여
 - [x] `deleteSetAndRenumber` — 세트 삭제 후 동일 운동의 currentSet 재부여

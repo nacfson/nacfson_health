@@ -48,10 +48,12 @@
 - **세트 번호 자동 관리**: UI/Provider 레벨에서 직접 입력하지 않음.
   - 추가: `ExerciseNotifier.addSetAutoNumber` — 같은 운동/같은 날짜의 max(currentSet) + 1
   - 삭제: `ExerciseNotifier.deleteSetAndRenumber` — 삭제 후 timestamp 순으로 1..N 재부여 (수정된 row는 자동 modified)
-- **루틴 vs 기록 분리**:
-  - 루틴(`daily_routine` / `workout_routines`)은 "할 예정"인 계획. `exercise_records`에 영향 없음.
-  - 카드만 얹은 상태로 앱을 닫아도 시트엔 절대 올라가지 않음.
-  - 실제 세트 입력 → `exercise_records.created` insert 시점에서만 동기화 큐에 진입.
+- **루틴 = 오늘 카드 컨테이너 (v9+)**:
+  - 오늘 탭의 운동 카드는 `daily_routine` 항목을 기준으로만 렌더링된다 (`todayExerciseCardsProvider`). 루틴에 없는 운동은 카드로 표시되지 않는다.
+  - 세트 저장(`InlineSetInput._submit`) 시점에 `RoutinePlannerNotifier.addItem` 이 자동 호출되어 같은 이름이 없으면 루틴에 편입된다 (중복은 무시).
+  - 앱 로드 시 `RoutinePlannerNotifier._load` 가 기록은 있지만 루틴에 없는 운동을 자동 편입(self-heal)한다 — 이번 리팩터링 이전 데이터 보정용.
+  - "운동 제거" 메뉴(`ExerciseGroupCard`)는 `daily_routine` 항목 + 선택 날짜의 `exercise_records` 를 함께 soft delete. 기록이 있으면 확인 다이얼로그 경유.
+  - 루틴(`daily_routine`)은 로컬 전용이라 자유롭게 수정 가능. `workout_routines` 프리셋은 여전히 Supabase LWW.
 
 ---
 

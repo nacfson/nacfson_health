@@ -122,6 +122,51 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     }
   }
 
+  /// 운동 카드 제거 — 루틴 항목 + 선택 날짜의 해당 운동 기록을 함께 삭제.
+  /// 기록이 1개 이상이면 확인 다이얼로그로 사용자에게 경고한다.
+  Future<void> _removeExerciseCard(ExerciseCardData card) async {
+    final recordCount = card.records.length;
+    if (recordCount > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('운동 제거'),
+          content: Text(
+            '"${card.exerciseName}"의 오늘 세트 $recordCount개도 함께 삭제됩니다.\n'
+            '진행할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('삭제'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await ref.read(exerciseRecordsProvider.notifier).deleteAllOnDate(
+            card.exerciseName,
+            ref.read(selectedDateProvider),
+          );
+      if (!mounted) return;
+    }
+    await ref
+        .read(routinePlannerProvider.notifier)
+        .removeByName(card.exerciseName);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${card.exerciseName}"를 오늘 루틴에서 제거했습니다'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _openRoutinePresetSheet() async {
     ref.read(activeSheetProvider.notifier).state = SheetType.exercise;
     try {
@@ -284,9 +329,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               exerciseType: c.exerciseType,
               records: c.records,
               editable: true,
-              onRemoveFromRoutine: () => ref
-                  .read(routinePlannerProvider.notifier)
-                  .removeByName(c.exerciseName),
+              onRemoveFromRoutine: () => _removeExerciseCard(c),
               onDelete: (uuid) => ref
                   .read(exerciseRecordsProvider.notifier)
                   .deleteSetAndRenumber(uuid),

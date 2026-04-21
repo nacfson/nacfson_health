@@ -193,9 +193,12 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 | `items_json` | TEXT | 해당 일자에 계획된 운동 항목 직렬화 |
 | `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
 
-**동기화 미적용** — 로컬 전용. 사용자가 오늘 어떤 운동을 할 계획인지 기억하기 위한 임시 데이터.  
+**동기화 미적용** — 로컬 전용. 오늘 운동 카드의 컨테이너 역할 (v9+).  
 **지원 연산**: Upsert (1일 1행) · Read · Delete  
-**비고**: 카드만 얹은(세트 0인) 상태에서 앱을 닫아도 `exercise_records` 시트엔 아무것도 올라가지 않는다. 실제 세트가 입력될 때만 `exercise_records` insert.
+**비고**:
+- 카드만 얹은(세트 0인) 상태에서 앱을 닫아도 `exercise_records` 는 변함없다. 실제 세트가 입력될 때만 `exercise_records` insert.
+- v9+ 규칙: 세트 저장 시 `InlineSetInput._submit` 이 `RoutinePlannerNotifier.addItem` 을 자동 호출하여 루틴에 편입시킨다. 앱 로드 시 `RoutinePlannerNotifier._load` 의 자기치유 로직이 "기록은 있으나 루틴에 없는" 운동을 자동 편입(기존 데이터 보정).
+- "운동 제거" 메뉴(`ExerciseGroupCard`)는 `daily_routine` 항목과 함께 선택 날짜의 `exercise_records` 를 `deleteByExerciseNameOnDate` 로 일괄 soft delete 한다.
 
 ---
 

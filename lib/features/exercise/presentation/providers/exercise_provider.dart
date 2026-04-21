@@ -44,6 +44,29 @@ class _MemoryExerciseRepository implements ExerciseRepository {
       _records.removeWhere((r) => r.uuid == id);
 
   @override
+  Future<int> deleteByExerciseNameOnDate(
+      String exerciseName, DateTime date) async {
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    int count = 0;
+    for (int i = 0; i < _records.length; i++) {
+      final r = _records[i];
+      final inRange = !r.timestamp.isBefore(startOfDay) &&
+          r.timestamp.isBefore(endOfDay);
+      if (r.exerciseName == exerciseName &&
+          inRange &&
+          r.syncStatus != SyncStatus.deleted) {
+        _records[i] = r.copyWith(
+          syncStatus: SyncStatus.deleted,
+          updatedAt: DateTime.now(),
+        );
+        count++;
+      }
+    }
+    return count;
+  }
+
+  @override
   Future<void> deleteAll() async => _records.clear();
 
   @override
@@ -132,6 +155,15 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
   Future<void> deleteRecord(String id) async {
     await _repository.delete(id);
     state = await _repository.getAll();
+  }
+
+  /// 특정 날짜의 같은 운동명 레코드를 모두 soft delete 한다 (루틴 카드 제거 시 사용).
+  /// 반환값: 실제 삭제된 레코드 수.
+  Future<int> deleteAllOnDate(String exerciseName, DateTime date) async {
+    final count =
+        await _repository.deleteByExerciseNameOnDate(exerciseName, date);
+    state = await _repository.getAll();
+    return count;
   }
 
   List<ExerciseRecord> getByDate(DateTime date) {
@@ -314,9 +346,10 @@ class ExerciseCardData {
   });
 }
 
-/// 오늘 루틴(계획)과 오늘 기록을 union 한 카드 리스트.
-/// - 계획 순서가 우선
-/// - 기록만 있고 계획에 없는 운동은 뒤에 timestamp 순으로 append
+/// 오늘 루틴(계획)을 기준으로 오늘 기록을 join 한 카드 리스트.
+/// 루틴에 없는 운동은 카드로 표시되지 않는다 (루틴 = 카드 컨테이너).
+/// 세트 저장 시 `RoutinePlannerNotifier.addItem` 이 자동 호출되어 루틴에 편입되고,
+/// 과거 데이터는 `RoutinePlannerNotifier._load` 자기치유 로직이 누락분을 보정한다.
 final todayExerciseCardsProvider =
     Provider<List<ExerciseCardData>>((ref) {
   final routine = ref.watch(routinePlannerProvider);
@@ -330,31 +363,14 @@ final todayExerciseCardsProvider =
     list.sort((a, b) => a.timestamp.compareTo(b.timestamp));
   }
 
-  final cards = <ExerciseCardData>[];
-  final seen = <String>{};
-  for (final item in routine) {
-    seen.add(item.exerciseName);
-    cards.add(ExerciseCardData(
-      exerciseType: item.exerciseType,
-      exerciseName: item.exerciseName,
-      records: byName[item.exerciseName] ?? const [],
-    ));
-  }
-
-  // 기록만 있고 계획에 없는 운동들 — 첫 timestamp 순서대로 뒤에 붙임
-  final extras = byName.entries
-      .where((e) => !seen.contains(e.key))
-      .toList()
-    ..sort((a, b) =>
-        a.value.first.timestamp.compareTo(b.value.first.timestamp));
-  for (final entry in extras) {
-    cards.add(ExerciseCardData(
-      exerciseType: entry.value.first.exerciseType,
-      exerciseName: entry.key,
-      records: entry.value,
-    ));
-  }
-  return cards;
+  return [
+    for (final item in routine)
+      ExerciseCardData(
+        exerciseType: item.exerciseType,
+        exerciseName: item.exerciseName,
+        records: byName[item.exerciseName] ?? const [],
+      ),
+  ];
 });
 
 /// 같은 운동명의 오늘 가장 최근 세트(있다면) — 인라인 입력 프리필용.

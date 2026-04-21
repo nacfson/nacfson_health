@@ -130,7 +130,7 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
                     itemBuilder: (_) => const [
                       PopupMenuItem(
                         value: 'remove',
-                        child: Text('루틴에서 제거'),
+                        child: Text('운동 제거'),
                       ),
                     ],
                   )

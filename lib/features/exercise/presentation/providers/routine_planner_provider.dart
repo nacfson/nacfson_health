@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers/selected_date_provider.dart';
 import '../../data/repositories/daily_routine_repository.dart';
+import '../../data/repositories/exercise_repository.dart';
 import '../../domain/entities/daily_routine.dart';
 import '../../domain/entities/routine_item.dart';
+import 'exercise_provider.dart';
 
 class _MemoryDailyRoutineRepository implements DailyRoutineRepository {
   final Map<String, DailyRoutine> _store = {};
@@ -35,15 +37,18 @@ final dailyRoutineRepositoryProvider =
 final routinePlannerProvider =
     StateNotifierProvider<RoutinePlannerNotifier, List<RoutineItem>>((ref) {
   final repo = ref.watch(dailyRoutineRepositoryProvider);
+  final exRepo = ref.watch(exerciseRepositoryProvider);
   final date = ref.watch(selectedDateProvider);
-  return RoutinePlannerNotifier(repo, date);
+  return RoutinePlannerNotifier(repo, exRepo, date);
 });
 
 class RoutinePlannerNotifier extends StateNotifier<List<RoutineItem>> {
   final DailyRoutineRepository _repository;
+  final ExerciseRepository _exerciseRepository;
   final DateTime _date;
 
-  RoutinePlannerNotifier(this._repository, this._date) : super(const []) {
+  RoutinePlannerNotifier(this._repository, this._exerciseRepository, this._date)
+      : super(const []) {
     _load();
   }
 
@@ -51,6 +56,31 @@ class RoutinePlannerNotifier extends StateNotifier<List<RoutineItem>> {
     final routine = await _repository.getByDate(_date);
     if (!mounted) return;
     state = routine?.items ?? const [];
+    // 자기치유: "루틴에는 없지만 기록이 있는" 운동을 자동 편입한다.
+    // 이번 리팩터링 이전 데이터 또는 다른 경로로 직접 기록된 케이스 보정용.
+    await _selfHealOrphanRecords();
+  }
+
+  Future<void> _selfHealOrphanRecords() async {
+    try {
+      final records = await _exerciseRepository.getByDate(_date);
+      if (!mounted) return;
+      final existing = state.map((i) => i.exerciseName).toSet();
+      final orphans = <RoutineItem>[];
+      for (final r in records) {
+        if (existing.add(r.exerciseName)) {
+          orphans.add(RoutineItem(
+            exerciseType: r.exerciseType,
+            exerciseName: r.exerciseName,
+          ));
+        }
+      }
+      if (orphans.isNotEmpty) {
+        await appendMany(orphans);
+      }
+    } catch (_) {
+      // 기록 로드 실패 시 루틴 로드 자체는 유지
+    }
   }
 
   Future<void> _persist(List<RoutineItem> items) async {

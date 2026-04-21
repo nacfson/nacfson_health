@@ -158,8 +158,8 @@ int _calculateSelectedIndex(BuildContext context) {
 | `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg)/성별/나이대/목표(다이어트/린매스업/벌크업) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 + `calculateTargets(...)` 결과를 `nutritionTargetsProvider`에 seed. 실시간 프리뷰(`_NutritionPreview`) 포함 |
 | `ThemeModeCard` | `lib/features/settings/presentation/widgets/theme_mode_card.dart` | SegmentedButton 3-way 테마 전환 |
 | `_AiInsightCard` | `lib/features/summary/presentation/screens/summary_screen.dart` 내 private | Gemini 인사이트 카드 (loading/error/data + 새로고침) |
-| `ExerciseGroupCard` _(v8)_ | `lib/features/exercise/presentation/widgets/exercise_group_card.dart` | 운동 카드. `editable=true`(오늘)면 `+ 세트 추가` 버튼·인라인 입력·"루틴에서 제거" 메뉴 노출. `editable=false`(과거)면 읽기 전용 |
-| `InlineSetInput` _(v8)_ | `lib/features/exercise/presentation/widgets/inline_set_input.dart` | 카드 하단 1행 입력기. add/edit 모드 지원, 직전 세트 프리필, ✓ 저장 후 필드 유지 |
+| `ExerciseGroupCard` _(v8 · v9+ 메뉴 라벨/동작 변경)_ | `lib/features/exercise/presentation/widgets/exercise_group_card.dart` | 운동 카드. `editable=true`(오늘)면 `+ 세트 추가` 버튼·인라인 입력·"운동 제거" 메뉴 노출. "운동 제거"는 루틴 항목과 선택 날짜의 해당 운동 기록을 함께 soft delete (기록이 있으면 확인 다이얼로그). `editable=false`(과거)면 읽기 전용 |
+| `InlineSetInput` _(v8 · v9+ 루틴 자동 편입)_ | `lib/features/exercise/presentation/widgets/inline_set_input.dart` | 카드 하단 1행 입력기. add/edit 모드 지원, 직전 세트 프리필, ✓ 저장 후 필드 유지. add 모드 저장 시 `routinePlannerProvider.addItem` 호출로 루틴에 자동 편입 (루틴=카드 컨테이너) |
 | `RoutinePresetSheet` _(v8)_ | `lib/features/exercise/presentation/widgets/routine_preset_sheet.dart` | 저장된 루틴 프리셋 시트. 탭=불러오기(교체/추가 confirm), 메뉴=이름변경/삭제 |
 
 **전역 날짜 상태**: `lib/shared/providers/selected_date_provider.dart`

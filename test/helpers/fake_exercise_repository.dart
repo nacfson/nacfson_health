@@ -52,6 +52,28 @@ class FakeExerciseRepository implements ExerciseRepository {
   }
 
   @override
+  Future<int> deleteByExerciseNameOnDate(
+      String exerciseName, DateTime date) async {
+    int count = 0;
+    for (int i = 0; i < _store.length; i++) {
+      final r = _store[i];
+      final sameDay = r.timestamp.year == date.year &&
+          r.timestamp.month == date.month &&
+          r.timestamp.day == date.day;
+      if (r.exerciseName == exerciseName &&
+          sameDay &&
+          r.syncStatus != SyncStatus.deleted) {
+        _store[i] = r.copyWith(
+          syncStatus: SyncStatus.deleted,
+          updatedAt: DateTime.now(),
+        );
+        count++;
+      }
+    }
+    return count;
+  }
+
+  @override
   Future<List<ExerciseRecord>> getPendingSync() async {
     return _store.where((r) => r.syncStatus != SyncStatus.synced).toList();
   }
