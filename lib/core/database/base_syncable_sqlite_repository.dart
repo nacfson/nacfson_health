@@ -14,6 +14,9 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final Uuid _uuid = const Uuid();
 
+  /// SQLite 기본 SQLITE_MAX_VARIABLE_NUMBER(999) 대비 여유 마진.
+  static const int _maxBindsPerQuery = 900;
+
   // ── Subclass 구현 훅 ──────────────────────────────────────────────────────
 
   String get tableName;
@@ -114,20 +117,28 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
   Future<void> markAsSynced(List<String> uuids) async {
     if (uuids.isEmpty) return;
     final db = await _dbHelper.database;
-    await db.update(
-      tableName,
-      {'sync_status': SyncStatus.synced.value},
-      where: 'uuid IN (${uuids.map((_) => '?').join(',')})',
-      whereArgs: uuids,
-    );
+    for (var i = 0; i < uuids.length; i += _maxBindsPerQuery) {
+      final end = i + _maxBindsPerQuery;
+      final chunk = uuids.sublist(i, end > uuids.length ? uuids.length : end);
+      await db.update(
+        tableName,
+        {'sync_status': SyncStatus.synced.value},
+        where: 'uuid IN (${chunk.map((_) => '?').join(',')})',
+        whereArgs: chunk,
+      );
+    }
   }
 
   /// LWW (Last-Write-Wins): uuid 가 없으면 insert, 있으면 updated_at 이 더 큰 쪽으로 덮어쓴다.
+  ///
+  /// Insert 경로는 `add()` 를 재사용하지 않는다 — `add()` 는 `updatedAt` 을 현재 시간으로 덮고
+  /// `syncStatus` 를 `created` 로 강제하므로, remote 메타데이터가 왜곡되어 다음 push 때
+  /// 서버의 `updated_at` 을 과거 값으로 되돌릴 위험이 있다.
   Future<void> mergeRemoteRecords(List<T> remote) async {
     for (final remoteRecord in remote) {
       final existing = await findByUuid(remoteRecord.uuid);
       if (existing == null) {
-        await add(remoteRecord);
+        await _insertFromRemote(remoteRecord);
       } else {
         final remoteTime = remoteRecord.updatedAt.millisecondsSinceEpoch;
         final localTime = existing.updatedAt.millisecondsSinceEpoch;
@@ -136,6 +147,15 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
         }
       }
     }
+  }
+
+  Future<void> _insertFromRemote(T remoteRecord) async {
+    final db = await _dbHelper.database;
+    final synced = copyWithSync(
+      remoteRecord,
+      syncStatus: SyncStatus.synced,
+    );
+    await db.insert(tableName, toMap(synced));
   }
 
   Future<void> hardDeleteSyncedDeleted() async {
