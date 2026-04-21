@@ -15,6 +15,7 @@ import 'features/exercise/data/rest_notification_service.dart';
 import 'features/exercise/data/rest_notification_service_android.dart';
 import 'features/exercise/data/rest_notification_service_ios.dart';
 import 'shared/providers/user_profile_provider.dart';
+import 'features/settings/data/default_exercise_templates.dart';
 import 'features/settings/data/repositories/sqlite_exercise_template_repository.dart';
 import 'features/settings/domain/entities/exercise_template.dart';
 import 'features/settings/presentation/providers/exercise_template_provider.dart';
@@ -52,6 +53,17 @@ void main() async {
         ));
       }
       await syncPrefs.clearExerciseTemplates();
+    }
+
+    // 기본 운동 템플릿 사전 시드 — Provider lazy bootstrap 과의 race condition 방지.
+    // FAB 첫 탭 시 ref.read(exerciseTemplatesProvider) 가 동기적으로 호출되므로
+    // 앱 시작 전에 SQLite 에 16개 기본 템플릿을 물려 둔다.
+    final seedFlag =
+        prefs.getBool(ExerciseTemplateNotifier.seedFlagKey) ?? false;
+    if (!seedFlag) {
+      final repo = SqliteExerciseTemplateRepository();
+      await repo.seedDefaults(kDefaultExerciseTemplates);
+      await prefs.setBool(ExerciseTemplateNotifier.seedFlagKey, true);
     }
   }
 

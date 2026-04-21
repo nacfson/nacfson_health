@@ -27,7 +27,8 @@ final exerciseTemplatesProvider =
 
 class ExerciseTemplateNotifier
     extends StateNotifier<List<ExerciseTemplate>> {
-  static const _seedFlagKey = 'exercise_templates_default_seeded_v1';
+  /// main.dart 의 사전 시드 루틴과 공유하는 SharedPreferences 키.
+  static const seedFlagKey = 'exercise_templates_default_seeded_v1';
 
   final ExerciseTemplateRepository _repository;
   final SharedPreferences _prefs;
@@ -42,9 +43,9 @@ class ExerciseTemplateNotifier
   }
 
   Future<void> _maybeSeedDefaults() async {
-    if (_prefs.getBool(_seedFlagKey) ?? false) return;
+    if (_prefs.getBool(seedFlagKey) ?? false) return;
     final inserted = await _repository.seedDefaults(kDefaultExerciseTemplates);
-    await _prefs.setBool(_seedFlagKey, true);
+    await _prefs.setBool(seedFlagKey, true);
     if (inserted > 0) {
       state = await _repository.getAll();
     }

@@ -46,7 +46,7 @@
 ### 휴식 타이머 (v7.1)
 - [x] **인앱 sticky 미니바** (`RestTimerBar` — BottomNavShell 오버레이, 모든 탭에서 가시성 유지)
 - [x] 운동 세트 신규 저장 시 자동 시작 (`InlineSetInput._submit` → `restTimerProvider.start`)
-- [x] ±15초 빠른 조정 / 일시정지·재개 / 수동 종료
+- [x] ±15초 빠른 조정 (`RestTimerBar` 인라인 버튼 + 알림 액션) / 일시정지·재개 / 수동 종료
 - [x] 백그라운드 복귀 정확성 (`endAt` 기반 계산, Timer.periodic은 UI 갱신 전용)
 - [x] 5초 전 햅틱 1회 + 0초 도달 시 강한 햅틱 (`HapticFeedback`)
 - [x] iOS Live Activity (Dynamic Island + Lock Screen) — `RestNotificationServiceIOS` + `live_activities` 패키지 + `RestActivityWidget.swift` (App Group `group.com.nacfson.nacfsonHealth` 통일, Xcode 수동 단계는 `docs/build-debug.md` §14)

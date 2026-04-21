@@ -238,7 +238,6 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
               hasScrollBody: false,
               child: isToday
                   ? _TodayEmptyState(
-                      onAdd: _openTemplatePickerForRoutine,
                       onLoadRoutine: _openRoutinePresetSheet,
                     )
                   : const EmptyState(
@@ -334,9 +333,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
 // ── 오늘 빈 상태 ──────────────────────────────────────────────────────────────
 
 class _TodayEmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
   final VoidCallback onLoadRoutine;
-  const _TodayEmptyState({required this.onAdd, required this.onLoadRoutine});
+  const _TodayEmptyState({required this.onLoadRoutine});
 
   @override
   Widget build(BuildContext context) {
@@ -364,20 +362,10 @@ class _TodayEmptyState extends StatelessWidget {
             style: TextStyle(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            children: [
-              FilledButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('운동 추가'),
-                onPressed: onAdd,
-              ),
-              FilledButton.tonalIcon(
-                icon: const Icon(Icons.playlist_play),
-                label: const Text('루틴 불러오기'),
-                onPressed: onLoadRoutine,
-              ),
-            ],
+          FilledButton.tonalIcon(
+            icon: const Icon(Icons.playlist_play),
+            label: const Text('루틴 불러오기'),
+            onPressed: onLoadRoutine,
           ),
         ],
       ),
