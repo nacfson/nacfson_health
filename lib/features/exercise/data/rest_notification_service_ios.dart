@@ -1,5 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:live_activities/live_activities.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
 
 import 'rest_notification_service.dart';
@@ -24,8 +28,19 @@ class RestNotificationServiceIOS implements RestNotificationService {
   }
 
   static const _defaultAppGroupId = 'group.com.nacfson.nacfsonHealth';
+  static const _bridgeChannel = MethodChannel('nacfson/rest_activity');
+  static const _preAlertId = 9101;
+  static const _completionAlertId = 9102;
+
+  /// 실제 타이머 종료 후 iOS 가 위젯을 자동 dismiss 하기까지의 grace. 이 간격 안에
+  /// 위젯은 "휴식 완료" 상태로 남음. 사용자가 +15초 연타해서 newEndAt 이 초기
+  /// dismiss 시각을 초과하면 위젯이 카운트다운 도중 사라질 수 있으므로
+  /// `update()` 시에도 재스케줄을 시도.
+  static const _dismissGrace = Duration(seconds: 15);
 
   final LiveActivities _liveActivities = LiveActivities();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   final String _appGroupId;
   final _uuid = const Uuid();
 
@@ -35,6 +50,8 @@ class RestNotificationServiceIOS implements RestNotificationService {
   late final Future<void> _initFuture;
 
   String? _activityId;
+  bool _notificationsInitialized = false;
+  bool _permissionRequested = false;
   // ignore: unused_field
   RestNotificationActionHandler? _actionHandler;
 
@@ -57,6 +74,46 @@ class RestNotificationServiceIOS implements RestNotificationService {
       debugPrint('[LiveActivity] init OK, cleaned ${stale.length} stale');
     } catch (e, s) {
       debugPrint('[LiveActivity] init FAILED: $e\n$s');
+    }
+  }
+
+  Future<void> _ensureNotificationsInit() async {
+    if (_notificationsInitialized) return;
+    tz.initializeTimeZones();
+    const settings = InitializationSettings(
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+    );
+    await _notifications.initialize(settings);
+    _notificationsInitialized = true;
+  }
+
+  Future<bool> _ensurePermission() async {
+    await _ensureNotificationsInit();
+    final ios = _notifications.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    if (ios == null) return false;
+    if (_permissionRequested) return true;
+    _permissionRequested = true;
+    final granted = await ios.requestPermissions(alert: true, sound: true);
+    return granted ?? false;
+  }
+
+  Future<void> _scheduleDismissBridge({
+    required String activityId,
+    required DateTime dismissAt,
+  }) async {
+    try {
+      await _bridgeChannel.invokeMethod('scheduleDismiss', <String, Object>{
+        'activityId': activityId,
+        'dismissAtMs': dismissAt.millisecondsSinceEpoch.toDouble(),
+      });
+    } catch (e, s) {
+      // 브리지 미등록 또는 ActivityKit 조회 실패. 위젯 자체의 "완료" 폴백으로 보완.
+      debugPrint('[LiveActivity] scheduleDismissBridge FAILED: $e\n$s');
     }
   }
 
@@ -88,7 +145,7 @@ class RestNotificationServiceIOS implements RestNotificationService {
       return null;
     }
 
-    final id = _uuid.v4();
+    final customId = _uuid.v4();
     final data = <String, dynamic>{
       'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
       'isPaused': false,
@@ -97,16 +154,27 @@ class RestNotificationServiceIOS implements RestNotificationService {
     };
 
     try {
-      await _liveActivities.createActivity(
-        id,
+      // 플러그인은 ActivityKit 이 부여한 진짜 Activity.id 를 반환한다.
+      // updateActivity 는 Activity.id 로만 엄격히 매칭하므로(플러그인 LiveActivitiesPlugin.swift:291)
+      // 반드시 반환값을 저장해야 이후 update 가 성공한다.
+      final returnedId = await _liveActivities.createActivity(
+        customId,
         data,
+        removeWhenAppIsKilled: true,
         iOSEnableRemoteUpdates: false,
       );
-      _activityId = id;
+      _activityId = returnedId ?? customId;
       debugPrint(
-        '[LiveActivity] created id=$id name="${exerciseName ?? ''}" endAt=$endAt',
+        '[LiveActivity] created id=$_activityId name="${exerciseName ?? ''}" endAt=$endAt',
       );
-      return id;
+      final id = _activityId;
+      if (id != null) {
+        await _scheduleDismissBridge(
+          activityId: id,
+          dismissAt: endAt.add(_dismissGrace),
+        );
+      }
+      return _activityId;
     } catch (e, s) {
       debugPrint('[LiveActivity] createActivity FAILED: $e\n$s');
       _activityId = null;
@@ -121,6 +189,9 @@ class RestNotificationServiceIOS implements RestNotificationService {
   }) async {
     await _initFuture;
     final id = _activityId;
+    debugPrint(
+      '[LiveActivity] update called id=$id endAt=$endAt paused=$isPaused',
+    );
     if (id == null) return;
     final data = <String, dynamic>{
       'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
@@ -128,8 +199,17 @@ class RestNotificationServiceIOS implements RestNotificationService {
     };
     try {
       await _liveActivities.updateActivity(id, data);
+      debugPrint('[LiveActivity] updateActivity id=$id OK');
     } catch (e, s) {
       debugPrint('[LiveActivity] updateActivity id=$id FAILED: $e\n$s');
+    }
+    // +15 연타 등으로 새 endAt 이 초기 dismiss 시각을 넘길 수 있으니 재스케줄.
+    // 일시정지 상태에선 endAt 이 display 용이라 dismiss 를 밀지 않음.
+    if (!isPaused) {
+      await _scheduleDismissBridge(
+        activityId: id,
+        dismissAt: endAt.add(_dismissGrace),
+      );
     }
   }
 
@@ -144,5 +224,66 @@ class RestNotificationServiceIOS implements RestNotificationService {
       debugPrint('[LiveActivity] endActivity id=$id FAILED: $e\n$s');
     }
     _activityId = null;
+  }
+
+  @override
+  Future<void> schedulePreAlert({required DateTime endAt}) async {
+    final granted = await _ensurePermission();
+    if (!granted) return;
+
+    // 기존 예약 정리 후 재예약하여 +15초 연타 race 방지.
+    await cancelPreAlert();
+
+    const details = NotificationDetails(
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBanner: true,
+        presentSound: true,
+        interruptionLevel: InterruptionLevel.timeSensitive,
+      ),
+    );
+
+    final now = DateTime.now();
+    final preAt = endAt.subtract(const Duration(seconds: 5));
+    if (preAt.isAfter(now)) {
+      try {
+        await _notifications.zonedSchedule(
+          _preAlertId,
+          '휴식 5초 남음',
+          '곧 다음 세트를 시작합니다',
+          tz.TZDateTime.from(preAt, tz.local),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (e, s) {
+        debugPrint('[LiveActivity] schedulePreAlert 5s FAILED: $e\n$s');
+      }
+    }
+
+    if (endAt.isAfter(now)) {
+      try {
+        await _notifications.zonedSchedule(
+          _completionAlertId,
+          '휴식 완료!',
+          '다음 세트를 시작하세요 💪',
+          tz.TZDateTime.from(endAt, tz.local),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (e, s) {
+        debugPrint('[LiveActivity] scheduleCompletion FAILED: $e\n$s');
+      }
+    }
+  }
+
+  @override
+  Future<void> cancelPreAlert() async {
+    if (!_notificationsInitialized) return;
+    await _notifications.cancel(_preAlertId);
+    await _notifications.cancel(_completionAlertId);
   }
 }

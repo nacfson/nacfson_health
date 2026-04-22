@@ -206,8 +206,9 @@ class _CircleButton extends StatelessWidget {
             : const Color(0xFFEEF0F2));
     final fg = emphasized ? Colors.white : cs.onSurface;
 
-    return Tooltip(
-      message: tooltip,
+    return Semantics(
+      label: tooltip,
+      button: true,
       child: InkResponse(
         radius: 18,
         onTap: onTap,

@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'rest_notification_service.dart';
 
@@ -13,9 +16,14 @@ class RestNotificationServiceAndroid implements RestNotificationService {
   }
 
   static const _notificationId = 9001;
+  static const _preAlertId = 9101;
+  static const _completionAlertId = 9102;
   static const _channelId = 'rest_timer_channel';
   static const _channelName = '휴식 타이머';
   static const _channelDescription = '운동 세트 사이 휴식 카운트다운';
+  static const _alertChannelId = 'rest_timer_alert_channel';
+  static const _alertChannelName = '휴식 종료 알림';
+  static const _alertChannelDescription = '휴식 종료 5초 전 및 완료 알림';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -25,6 +33,7 @@ class RestNotificationServiceAndroid implements RestNotificationService {
 
   Future<void> _initialize() async {
     if (_initialized) return;
+    tz.initializeTimeZones();
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
@@ -143,6 +152,70 @@ class RestNotificationServiceAndroid implements RestNotificationService {
   @override
   set onAction(RestNotificationActionHandler? handler) {
     _actionHandler = handler;
+  }
+
+  @override
+  Future<void> schedulePreAlert({required DateTime endAt}) async {
+    await _initialize();
+    final granted = await _ensurePermission();
+    if (!granted) return;
+
+    await cancelPreAlert();
+
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _alertChannelId,
+        _alertChannelName,
+        channelDescription: _alertChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.alarm,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
+
+    final now = DateTime.now();
+    final preAt = endAt.subtract(const Duration(seconds: 5));
+    if (preAt.isAfter(now)) {
+      try {
+        await _plugin.zonedSchedule(
+          _preAlertId,
+          '휴식 5초 남음',
+          '곧 다음 세트를 시작합니다',
+          tz.TZDateTime.from(preAt, tz.local),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (e, s) {
+        debugPrint('[RestNotif] schedulePreAlert 5s FAILED: $e\n$s');
+      }
+    }
+    if (endAt.isAfter(now)) {
+      try {
+        await _plugin.zonedSchedule(
+          _completionAlertId,
+          '휴식 완료!',
+          '다음 세트를 시작하세요 💪',
+          tz.TZDateTime.from(endAt, tz.local),
+          details,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      } catch (e, s) {
+        debugPrint('[RestNotif] scheduleCompletion FAILED: $e\n$s');
+      }
+    }
+  }
+
+  @override
+  Future<void> cancelPreAlert() async {
+    if (!_initialized) return;
+    await _plugin.cancel(_preAlertId);
+    await _plugin.cancel(_completionAlertId);
   }
 
   String _bodyText(bool paused) =>

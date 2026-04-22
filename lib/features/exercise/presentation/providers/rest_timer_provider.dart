@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/sync/sync_preferences.dart';
@@ -71,7 +72,8 @@ class RestTimerState {
   }
 }
 
-class RestTimerNotifier extends StateNotifier<RestTimerState> {
+class RestTimerNotifier extends StateNotifier<RestTimerState>
+    with WidgetsBindingObserver {
   RestTimerNotifier(this._notifications) : super(const RestTimerState()) {
     _notifications.onAction = (actionId) {
       switch (actionId) {
@@ -83,6 +85,20 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
           break;
       }
     };
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  // ignore: avoid_renaming_method_parameters — StateNotifier.state 와 이름 충돌 회피.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycle) {
+    if (lifecycle != AppLifecycleState.resumed) return;
+    if (!state.isActive || state.isPaused) return;
+    final endAt = state.endAt;
+    if (endAt == null) return;
+    // 백그라운드에서 Timer.periodic 이 멎은 동안 타이머가 종료됐으면 즉시 정리.
+    if (endAt.isBefore(DateTime.now())) {
+      stop();
+    }
   }
 
   final RestNotificationService _notifications;
@@ -121,6 +137,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
       exerciseName: exerciseName,
     );
 
+    await _notifications.schedulePreAlert(endAt: endAt);
     _startTicker();
   }
 
@@ -132,6 +149,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
           ((state.pausedRemaining ?? state.remainingSeconds) + delta)
               .clamp(_minSeconds, _maxSeconds);
       if (newRemaining > 5) _firedFiveSecondHaptic = false;
+      final displayEnd = DateTime.now().add(Duration(seconds: newRemaining));
       state = state.copyWith(
         pausedRemaining: newRemaining,
         remainingSeconds: newRemaining,
@@ -139,6 +157,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
             ? newRemaining
             : state.totalSeconds,
       );
+      await _notifications.update(endAt: displayEnd, isPaused: true);
       return;
     }
 
@@ -162,6 +181,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
     );
 
     await _notifications.update(endAt: actualEnd, isPaused: false);
+    await _notifications.schedulePreAlert(endAt: actualEnd);
   }
 
   Future<void> togglePause() async {
@@ -178,6 +198,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
       );
       _startTicker();
       await _notifications.update(endAt: newEnd, isPaused: false);
+      await _notifications.schedulePreAlert(endAt: newEnd);
     } else {
       _ticker?.cancel();
       final remaining = state.remainingSeconds;
@@ -189,6 +210,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
         endAt: state.endAt ?? DateTime.now(),
         isPaused: true,
       );
+      await _notifications.cancelPreAlert();
     }
   }
 
@@ -196,6 +218,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
     _ticker?.cancel();
     _ticker = null;
     state = const RestTimerState();
+    await _notifications.cancelPreAlert();
     await _notifications.end();
   }
 
@@ -230,6 +253,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     super.dispose();
   }

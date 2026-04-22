@@ -29,7 +29,6 @@ struct RestActivityWidget: Widget {
                 .padding()
                 .activityBackgroundTint(Color(.systemBackground))
         } dynamicIsland: { context in
-            let prefs = readRestPrefs(context)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Image(systemName: "timer")
@@ -37,26 +36,36 @@ struct RestActivityWidget: Widget {
                         .imageScale(.large)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
-                        .font(.system(size: 22, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(.primary)
+                    TimelineView(.periodic(from: Date(), by: 1)) { _ in
+                        let prefs = readRestPrefs(context)
+                        timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                            .font(.system(size: 22, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(.primary)
+                    }
                 }
                 DynamicIslandExpandedRegion(.center) {
+                    let prefs = readRestPrefs(context)
                     Text(prefs.name.isEmpty ? "휴식 중" : prefs.name)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    progressBar(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                    TimelineView(.periodic(from: Date(), by: 1)) { _ in
+                        let prefs = readRestPrefs(context)
+                        progressBar(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                    }
                 }
             } compactLeading: {
                 Image(systemName: "timer")
                     .foregroundColor(.mint)
             } compactTrailing: {
-                timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
-                    .monospacedDigit()
-                    .foregroundColor(.primary)
+                TimelineView(.periodic(from: Date(), by: 1)) { _ in
+                    let prefs = readRestPrefs(context)
+                    timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                        .monospacedDigit()
+                        .foregroundColor(.primary)
+                }
             } minimal: {
                 Image(systemName: "timer")
                     .foregroundColor(.mint)
@@ -69,6 +78,10 @@ struct RestActivityWidget: Widget {
         if isPaused {
             Text("일시정지")
                 .font(.caption)
+        } else if Date() >= endDate {
+            Text("완료")
+                .font(.caption)
+                .foregroundColor(.mint)
         } else {
             Text(timerInterval: Date()...endDate, countsDown: true)
         }
@@ -76,8 +89,8 @@ struct RestActivityWidget: Widget {
 
     @ViewBuilder
     private func progressBar(endDate: Date, isPaused: Bool) -> some View {
-        if isPaused {
-            ProgressView(value: 0.0)
+        if isPaused || Date() >= endDate {
+            ProgressView(value: isPaused ? 0.0 : 1.0)
                 .tint(.mint)
         } else {
             ProgressView(
@@ -96,33 +109,46 @@ struct RestLockScreenView: View {
     let context: ActivityViewContext<LiveActivitiesAppAttributes>
 
     var body: some View {
-        let prefs = readRestPrefs(context)
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "timer")
-                    .foregroundColor(.mint)
-                Text(prefs.name.isEmpty ? "휴식 중" : prefs.name)
-                    .font(.headline)
-                Spacer()
-                if prefs.isPaused {
-                    Text("일시정지")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text(timerInterval: Date()...prefs.endDate, countsDown: true)
+        TimelineView(.periodic(from: Date(), by: 1)) { _ in
+            let prefs = readRestPrefs(context)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: Date() >= prefs.endDate ? "checkmark.circle.fill" : "timer")
+                        .foregroundColor(.mint)
+                    Text(prefs.name.isEmpty ? (Date() >= prefs.endDate ? "휴식 완료" : "휴식 중") : prefs.name)
+                        .font(.headline)
+                    Spacer()
+                    trailingLabel(endDate: prefs.endDate, isPaused: prefs.isPaused)
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }
+                if !prefs.isPaused && Date() < prefs.endDate {
+                    ProgressView(
+                        timerInterval: Date()...prefs.endDate,
+                        countsDown: true,
+                        label: { EmptyView() },
+                        currentValueLabel: { EmptyView() }
+                    )
+                    .tint(.mint)
+                } else if Date() >= prefs.endDate {
+                    ProgressView(value: 1.0)
+                        .tint(.mint)
+                }
             }
-            if !prefs.isPaused {
-                ProgressView(
-                    timerInterval: Date()...prefs.endDate,
-                    countsDown: true,
-                    label: { EmptyView() },
-                    currentValueLabel: { EmptyView() }
-                )
-                .tint(.mint)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private func trailingLabel(endDate: Date, isPaused: Bool) -> some View {
+        if isPaused {
+            Text("일시정지")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        } else if Date() >= endDate {
+            Text("완료")
+                .foregroundColor(.mint)
+        } else {
+            Text(timerInterval: Date()...endDate, countsDown: true)
         }
     }
 }

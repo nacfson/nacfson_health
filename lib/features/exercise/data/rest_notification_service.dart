@@ -32,6 +32,13 @@ abstract class RestNotificationService {
   /// 위젯/알림을 종료합니다.
   Future<void> end();
 
+  /// 종료 5초 전 및 종료 시점에 로컬 알림을 예약합니다.
+  /// 앱이 suspend/killed 상태여도 iOS/Android 가 시스템 레벨에서 전달합니다.
+  Future<void> schedulePreAlert({required DateTime endAt});
+
+  /// 예약된 pre-alert 와 완료 알림을 모두 취소합니다.
+  Future<void> cancelPreAlert();
+
   /// 알림 액션 버튼 또는 Live Activity 인텐트 콜백을 등록합니다.
   /// 핸들러는 `RestNotificationAction` 상수 중 하나를 받습니다.
   set onAction(RestNotificationActionHandler? handler);
@@ -56,6 +63,12 @@ class NoopRestNotificationService implements RestNotificationService {
 
   @override
   Future<void> end() async {}
+
+  @override
+  Future<void> schedulePreAlert({required DateTime endAt}) async {}
+
+  @override
+  Future<void> cancelPreAlert() async {}
 
   @override
   set onAction(RestNotificationActionHandler? handler) {}

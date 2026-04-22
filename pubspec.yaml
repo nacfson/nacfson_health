@@ -56,8 +56,9 @@ dependencies:
 
   # 휴식 타이머 — 네이티브 위젯/알림
   live_activities: ^2.4.7           # iOS Dynamic Island + Lock Screen Live Activity (v2.4.4+ iOSEnableRemoteUpdates:false 로 aps-environment 불필요)
-  flutter_local_notifications: ^17.2.4  # Android persistent notification (chronometer + actions)
+  flutter_local_notifications: ^17.2.4  # Android persistent notification (chronometer + actions), iOS 5초전/완료 예약 알림
   permission_handler: ^12.0.1       # Android 13+ POST_NOTIFICATIONS 권한 요청 (live_activities v2.4.4+ 요구)
+  timezone: ^0.9.4                  # flutter_local_notifications zonedSchedule 에 필요
 
 dev_dependencies:
   flutter_test:
