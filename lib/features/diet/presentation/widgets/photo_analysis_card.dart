@@ -167,6 +167,10 @@ class _PhotoAnalysisCardState extends ConsumerState<PhotoAnalysisCard> {
   Future<void> _showSourcePicker() async {
     await showModalBottomSheet<void>(
       context: context,
+      // ShellRoute 의 shellNavigator 위가 아니라 rootNavigator 위로 push 해야
+      // BottomNavShell 의 glassmorphic 하단 탭 바가 시트를 가리지 않는다.
+      useRootNavigator: true,
+      useSafeArea: true,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

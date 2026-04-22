@@ -30,6 +30,10 @@ void openSheet({
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // ShellRoute 의 shellNavigator 위가 아니라 rootNavigator 위로 push 해야
+    // BottomNavShell 의 glassmorphic 하단 탭 바가 시트 입력창을 가리지 않는다.
+    useRootNavigator: true,
+    useSafeArea: true,
     builder: (ctx) => child,
   ).then((_) {
     // 시트가 닫히면 즉시 FAB 복귀시킴 (microtask 지연 제거)

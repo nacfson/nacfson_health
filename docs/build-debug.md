@@ -390,6 +390,37 @@ final overall = ((exerciseProgress + dietProgress) / 2 * 100).toInt();
 
 ---
 
+## 10-1. 모달 시트가 하단 글래스 NavBar 에 가림 — `useRootNavigator` + `useSafeArea` 필수
+
+**증상**: 식단 탭(또는 운동/체중/설정)의 입력 시트를 열면 하단 BottomNav(glassmorphic, 높이 `72 + viewPadding.bottom`) 가 시트의 마지막 액션·홈 인디케이터 부근을 시각적으로 가린다. 손가락으로 그 영역을 탭해도 NavBar 가 터치를 가로채 시트의 버튼이 눌리지 않는다.
+
+**원인**: `showModalBottomSheet` 를 옵션 없이 호출하면 ShellRoute 의 **shellNavigator** 위에 push 된다. `_GlassmorphicNavBar` (`lib/shared/widgets/bottom_nav_shell.dart`) 도 같은 shell 안에 있으므로 시트와 같은 z-stack 에서 충돌. SafeArea 미적용 시 홈 인디케이터까지 시트 콘텐츠가 침범.
+
+**해결 패턴**:
+```dart
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  // ShellRoute 의 shellNavigator 위가 아니라 rootNavigator 위로 push 해야
+  // BottomNavShell 의 glassmorphic 하단 탭 바가 시트 입력창을 가리지 않는다.
+  useRootNavigator: true,
+  useSafeArea: true,
+  builder: (_) => ...,
+);
+```
+
+선례: 코치 챗 시트 fix `#20` (`lib/features/summary/presentation/widgets/coach_chat_sheet.dart:14-26`). 이후 공통 `openSheet()` (`lib/core/providers/sheet_state_provider.dart`) 와 도메인별 시트 전부에 동일 패턴 적용.
+
+**규칙**:
+- 신규 `showModalBottomSheet` 호출은 항상 `useRootNavigator: true` + `useSafeArea: true` 동반.
+- builder 안에 자체 `SafeArea` 를 두른 시트(예: 소스 피커, 목표 피커)에도 `useSafeArea: true` 를 추가해 일관성 유지 (Flutter 가 중복 SafeArea 를 단축 처리하므로 무해).
+- 시트 콘텐츠 padding 은 손대지 않는다. `RecordFormSheet` 의 `viewInsets.bottom + 16` 은 키보드 회피용으로 그대로 두고, 홈 인디케이터는 `useSafeArea` 가 처리.
+- 다이얼로그(`showDialog`) 는 본 규칙 비대상.
+
+**RestTimerBar z-order 호환성**: `_RootTimerOverlay` 는 `MaterialApp.router.builder` 단계에서 child 전체를 Stack 으로 감싸므로, 시트가 root Navigator 로 올라와도 `RestTimerBar` 는 항상 그 위에 그려진다. `§13` 의 과거 우려는 현재 구조에서는 적용되지 않는다 (`§13` 의 "금지" 항이 갱신됨).
+
+---
+
 ## 11. AuthCallbackScreen — initState 구독 + 배경 동기화
 
 **증상**: 설정 화면에서 Google 로그인 후 의도치 않게 운동 탭으로 점프하거나, `performSync()` 실패 시 콘솔에 unhandled async error 기록.
@@ -545,7 +576,11 @@ rg "Color\(0xFF[0-9A-Fa-f]{6}\)" lib/ --glob '!**/app_theme.dart'
 
 **금지**:
 - `BottomNavShell` 또는 특정 Screen 내부 Stack에 `RestTimerBar`를 배치하지 말 것 (모달 시트에 가려짐).
-- `useRootNavigator: true`로 시트를 띄우는 방식으로 우회하면 FAB/네비 바와 시트의 z-order가 깨지므로 오버레이 경로를 유지한다.
+
+**참고 — `useRootNavigator: true` 와의 호환성**:
+- 현재 `RestTimerBar` 는 `MaterialApp.router.builder` 의 `_RootTimerOverlay` Stack 으로 root Navigator **외부**에 그려진다. 따라서 시트를 root Navigator 로 띄워도 (`useRootNavigator: true`) RestTimerBar 가 항상 그 위에 표시된다.
+- `openSheet()` 경유 시트는 `activeSheetProvider` 를 세팅하므로 RestTimerBar 위치 계산이 자동으로 키보드/홈인디케이터 위로 점프한다. `openSheet` 미경유 시트는 `activeSheetProvider` 를 건드리지 않아 RestTimerBar 가 NavBar 위 기본 위치에 머문다 — 의도된 동작.
+- 자세한 모달 시트 호출 규칙은 `§10-1` 참조. 글래스 NavBar 에 가림 문제는 그 규칙으로 해소.
 
 ---
 

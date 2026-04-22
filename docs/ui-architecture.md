@@ -130,6 +130,37 @@ int _calculateSelectedIndex(BuildContext context) {
 - `bottom_nav_shell.dart`의 `_showFab`는 `activeSheetProvider`를 watch → 시트 열림 시 FAB 자동 숨김
 - 모든 화면(`exercise_screen`, `diet_screen`)은 `openSheet()` 경유하여 시트 오픈
 
+### 3.2 모달 시트 호출 규칙 (필수)
+
+ShellRoute 위로 띄우는 **모든** `showModalBottomSheet` 호출은 다음 두 옵션을 함께 지정한다.
+
+```dart
+showModalBottomSheet(
+  context: context,
+  isScrollControlled: true,
+  // BottomNavShell 의 glassmorphic NavBar 가 시트 하단을 가리지 않도록
+  // ShellRoute 의 shellNavigator 가 아닌 rootNavigator 위로 push.
+  useRootNavigator: true,
+  useSafeArea: true,                 // 노치/홈 인디케이터 자동 보정
+  builder: (_) => ...,
+);
+```
+
+**왜 필요한가**
+- `useRootNavigator` 없이 호출하면 시트가 ShellRoute 의 shellNavigator 위에 push 되어, `_GlassmorphicNavBar`(높이 `72 + viewPadding.bottom`) 가 시트 하단·키보드 위 액션 영역을 시각적·터치적으로 가린다.
+- `useSafeArea` 가 빠지면 홈 인디케이터 영역까지 시트가 침범한다. `RecordFormSheet` 의 padding 은 `viewInsets.bottom + 16` (키보드 회피)만 처리하므로 이 옵션이 보완해 준다.
+
+**z-order 호환성** (RestTimerBar 와의 관계)
+- `RestTimerBar` 는 `MaterialApp.router.builder` 의 `_RootTimerOverlay` 를 통해 root Navigator **외부** Stack 에 그려진다 (`§1` 참조). 따라서 시트가 root Navigator 로 올라와도 `RestTimerBar` 가 항상 위에 표시된다.
+- `openSheet()` 경유 시트는 `activeSheetProvider` 를 세팅하므로 `RestTimerBar` 의 위치 계산이 자동으로 키보드/홈인디케이터 위로 점프한다. `openSheet` 미경유 시트(예: `coach_chat_sheet`)는 `activeSheetProvider` 를 건드리지 않으므로, 시트가 떠 있어도 `RestTimerBar` 는 NavBar 위 기본 위치에 머문다 — 이는 의도된 동작.
+
+**선례**
+- `lib/features/summary/presentation/widgets/coach_chat_sheet.dart:14-26` 가 동일 패턴을 적용해 가림 문제를 해결한 최초 사례.
+- `lib/core/providers/sheet_state_provider.dart` 의 공통 `openSheet()` 도 동일 옵션을 사용해 식단/운동 입력 시트 전체에 일괄 적용.
+
+**예외**
+- 다이얼로그(`showDialog`) 는 본 규칙 비대상. `RoutinePresetSheet` 내부의 `showDialog<_LoadAction>` 같은 사례는 NavBar 위 다이얼로그 동작이 정상.
+
 ---
 
 ## 4. 폼 구조
