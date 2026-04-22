@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 /// 운동/식단 템플릿을 선택하는 공통 BottomSheet 피커.
 ///
 /// - 기본 상태에서는 폼에 노출되지 않고, 입력 필드의 suffixIcon을 통해서만 호출됩니다.
 /// - [groupKeyOf]가 주어지면 상단에 그룹 ChoiceChip 필터가 표시됩니다 (운동 부위).
 /// - [subtitleOf]가 주어지면 아이템 하위 텍스트로 표시됩니다 (식단 영양 요약).
+/// - [templatesListenable] 로 Provider 를 넘기면 시트가 열린 동안 외부 상태 변경이
+///   `ref.watch` 로 즉시 반영되고, 카드 등장 시 staggered fade-in 이 적용됩니다.
 Future<T?> showTemplatePickerSheet<T>({
   required BuildContext context,
   required String title,
-  required List<T> templates,
+  required ProviderListenable<List<T>> templatesListenable,
   required String Function(T) labelOf,
   String Function(T)? subtitleOf,
   String Function(T)? groupKeyOf,
@@ -29,7 +33,7 @@ Future<T?> showTemplatePickerSheet<T>({
     useSafeArea: true,
     builder: (_) => _TemplatePickerSheet<T>(
       title: title,
-      templates: templates,
+      templatesListenable: templatesListenable,
       labelOf: labelOf,
       subtitleOf: subtitleOf,
       groupKeyOf: groupKeyOf,
@@ -43,9 +47,9 @@ Future<T?> showTemplatePickerSheet<T>({
   );
 }
 
-class _TemplatePickerSheet<T> extends StatefulWidget {
+class _TemplatePickerSheet<T> extends ConsumerStatefulWidget {
   final String title;
-  final List<T> templates;
+  final ProviderListenable<List<T>> templatesListenable;
   final String Function(T) labelOf;
   final String Function(T)? subtitleOf;
   final String Function(T)? groupKeyOf;
@@ -58,7 +62,7 @@ class _TemplatePickerSheet<T> extends StatefulWidget {
 
   const _TemplatePickerSheet({
     required this.title,
-    required this.templates,
+    required this.templatesListenable,
     required this.labelOf,
     this.subtitleOf,
     this.groupKeyOf,
@@ -71,13 +75,18 @@ class _TemplatePickerSheet<T> extends StatefulWidget {
   });
 
   @override
-  State<_TemplatePickerSheet<T>> createState() => _TemplatePickerSheetState<T>();
+  ConsumerState<_TemplatePickerSheet<T>> createState() =>
+      _TemplatePickerSheetState<T>();
 }
 
-class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
+class _TemplatePickerSheetState<T>
+    extends ConsumerState<_TemplatePickerSheet<T>> {
   final _searchController = TextEditingController();
   String? _selectedGroup;
   String _query = '';
+  // 시트가 열린 직후 한 번만 staggered 등장 애니메이션을 재생한다.
+  // 검색어 입력/지우기로 인한 재빌드에서는 애니메이션이 다시 튀지 않도록 이 플래그를 false 로 내림.
+  bool _animateOnFirstBuild = true;
 
   @override
   void initState() {
@@ -94,18 +103,18 @@ class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
     super.dispose();
   }
 
-  List<String> _groupKeys() {
+  List<String> _groupKeys(List<T> templates) {
     if (widget.groupKeyOf == null) return const [];
     final set = <String>{};
-    for (final t in widget.templates) {
+    for (final t in templates) {
       final k = widget.groupKeyOf!(t);
       if (k.isNotEmpty) set.add(k);
     }
     return set.toList()..sort();
   }
 
-  List<T> _filtered() {
-    return widget.templates.where((t) {
+  List<T> _filtered(List<T> templates) {
+    return templates.where((t) {
       if (widget.groupKeyOf != null && _selectedGroup != null) {
         if (widget.groupKeyOf!(t) != _selectedGroup) return false;
       }
@@ -120,8 +129,18 @@ class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final groups = _groupKeys();
-    final items = _filtered();
+    final templates = ref.watch(widget.templatesListenable);
+    final groups = _groupKeys(templates);
+    final items = _filtered(templates);
+    // 카드 등장 애니메이션은 시트가 열린 후 첫 렌더에서만 실행.
+    // 검색·필터 조작이나 외부 state 변경으로 인한 재빌드에서는 카드가 다시 튀지 않도록 한다.
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final shouldAnimate = _animateOnFirstBuild && !reduceMotion;
+    if (shouldAnimate) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _animateOnFirstBuild = false;
+      });
+    }
 
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
@@ -240,38 +259,19 @@ class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
                 Expanded(
                   child: items.isEmpty
                       ? _EmptyState(
-                          hint: widget.templates.isEmpty
+                          hint: templates.isEmpty
                               ? widget.emptyHint
                               : '검색 결과가 없습니다.',
                           actionLabel:
-                              widget.templates.isEmpty ? widget.onEmptyActionLabel : null,
-                          onAction: widget.templates.isEmpty ? widget.onEmptyAction : null,
+                              templates.isEmpty ? widget.onEmptyActionLabel : null,
+                          onAction: templates.isEmpty ? widget.onEmptyAction : null,
                         )
-                      : ListView.separated(
-                          controller: scrollController,
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => Divider(
-                            height: 1,
-                            color: cs.outlineVariant.withValues(alpha: 0.4),
-                          ),
-                          itemBuilder: (context, i) {
-                            final t = items[i];
-                            return ListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                              title: Text(widget.labelOf(t)),
-                              subtitle: widget.subtitleOf == null
-                                  ? null
-                                  : Text(
-                                      widget.subtitleOf!(t),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                              onTap: () => Navigator.pop(context, t),
-                            );
-                          },
+                      : _TemplateList<T>(
+                          items: items,
+                          scrollController: scrollController,
+                          labelOf: widget.labelOf,
+                          subtitleOf: widget.subtitleOf,
+                          animate: shouldAnimate,
                         ),
                 ),
               ],
@@ -279,6 +279,75 @@ class _TemplatePickerSheetState<T> extends State<_TemplatePickerSheet<T>> {
           ),
         );
       },
+    );
+  }
+}
+
+class _TemplateList<T> extends StatelessWidget {
+  final List<T> items;
+  final ScrollController scrollController;
+  final String Function(T) labelOf;
+  final String Function(T)? subtitleOf;
+  final bool animate;
+
+  const _TemplateList({
+    required this.items,
+    required this.scrollController,
+    required this.labelOf,
+    required this.subtitleOf,
+    required this.animate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget tileFor(int i) {
+      final t = items[i];
+      return ListTile(
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        title: Text(labelOf(t)),
+        subtitle: subtitleOf == null
+            ? null
+            : Text(
+                subtitleOf!(t),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+        onTap: () => Navigator.pop(context, t),
+      );
+    }
+
+    final separator = Divider(
+      height: 1,
+      color: cs.outlineVariant.withValues(alpha: 0.4),
+    );
+
+    if (!animate) {
+      return ListView.separated(
+        controller: scrollController,
+        itemCount: items.length,
+        separatorBuilder: (_, _) => separator,
+        itemBuilder: (context, i) => tileFor(i),
+      );
+    }
+
+    return AnimationLimiter(
+      child: ListView.separated(
+        controller: scrollController,
+        itemCount: items.length,
+        separatorBuilder: (_, _) => separator,
+        itemBuilder: (context, i) => AnimationConfiguration.staggeredList(
+          position: i,
+          duration: const Duration(milliseconds: 320),
+          child: SlideAnimation(
+            verticalOffset: 16,
+            child: FadeInAnimation(child: tileFor(i)),
+          ),
+        ),
+      ),
     );
   }
 }

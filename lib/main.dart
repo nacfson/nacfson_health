@@ -17,8 +17,11 @@ import 'features/exercise/data/rest_notification_service_ios.dart';
 import 'shared/providers/user_profile_provider.dart';
 import 'features/settings/data/default_exercise_templates.dart';
 import 'features/settings/data/repositories/sqlite_exercise_template_repository.dart';
+import 'features/settings/data/repositories/sqlite_food_template_repository.dart';
 import 'features/settings/domain/entities/exercise_template.dart';
+import 'features/settings/domain/entities/food_template.dart';
 import 'features/settings/presentation/providers/exercise_template_provider.dart';
+import 'features/settings/presentation/providers/food_template_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +44,9 @@ void main() async {
   final foodVisionCounts = await FoodVisionCallCountNotifier.load();
 
   // SharedPreferences 템플릿 → SQLite 1회 마이그레이션 (Web 환경 제외)
+  // 및 시트 오픈 플리커 방지를 위한 템플릿 사전 로드.
+  List<ExerciseTemplate> initialExerciseTemplates = const [];
+  List<FoodTemplate> initialFoodTemplates = const [];
   if (!kIsWeb) {
     final legacyTemplates = syncPrefs.exerciseTemplates;
     if (legacyTemplates.isNotEmpty) {
@@ -65,6 +71,12 @@ void main() async {
       await repo.seedDefaults(kDefaultExerciseTemplates);
       await prefs.setBool(ExerciseTemplateNotifier.seedFlagKey, true);
     }
+
+    // 운동/식단 템플릿 사전 로드 — 시트 첫 오픈 시 빈 리스트 플리커 제거.
+    // Provider 는 withInitial 생성자로 이 값을 직접 주입받아 _bootstrap/_load 를 생략한다.
+    initialExerciseTemplates =
+        await SqliteExerciseTemplateRepository().getAll();
+    initialFoodTemplates = await SqliteFoodTemplateRepository().getAll();
   }
 
   final restService = _createRestNotificationService();
@@ -81,6 +93,18 @@ void main() async {
           (ref) => FoodVisionCallCountNotifier(foodVisionCounts),
         ),
         restNotificationServiceProvider.overrideWithValue(restService),
+        // 사전 로드된 템플릿 리스트를 Notifier 에 직접 주입 → 시트 첫 프레임부터 리스트 표시.
+        exerciseTemplatesProvider.overrideWith((ref) =>
+            ExerciseTemplateNotifier.withInitial(
+              ref.watch(exerciseTemplateRepositoryProvider),
+              ref.watch(sharedPreferencesProvider),
+              initialExerciseTemplates,
+            )),
+        foodTemplatesProvider.overrideWith((ref) =>
+            FoodTemplateNotifier.withInitial(
+              ref.watch(foodTemplateRepositoryProvider),
+              initialFoodTemplates,
+            )),
       ],
       child: const NacfsonHealthAppWithSync(),
     ),

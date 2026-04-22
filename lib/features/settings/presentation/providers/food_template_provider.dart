@@ -21,6 +21,13 @@ class FoodTemplateNotifier extends StateNotifier<List<FoodTemplate>> {
     _load();
   }
 
+  /// main.dart 에서 SQLite `getAll()` 결과를 사전 로드한 뒤 주입하는 생성자.
+  /// `_load()` 을 호출하지 않으므로 첫 프레임부터 최신 상태를 가진다.
+  FoodTemplateNotifier.withInitial(
+    this._repository,
+    List<FoodTemplate> initial,
+  ) : super(initial);
+
   Future<void> _load() async {
     state = await _repository.getAll();
   }

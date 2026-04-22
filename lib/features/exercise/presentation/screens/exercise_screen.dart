@@ -45,14 +45,13 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   }
 
   Future<void> _openTemplatePickerForRoutine() async {
-    final templates = ref.read(exerciseTemplatesProvider);
     // 다른 시트/피커와 FAB 숨김 규칙을 통일 (activeSheetProvider 경유)
     ref.read(activeSheetProvider.notifier).state = SheetType.exercise;
     try {
       final picked = await showTemplatePickerSheet<ExerciseTemplate>(
         context: context,
         title: '오늘 루틴에 추가',
-        templates: templates,
+        templatesListenable: exerciseTemplatesProvider,
         labelOf: (t) => t.name,
         groupKeyOf: (t) => t.exerciseType,
         emptyHint: '등록된 운동 템플릿이 없습니다.\n"직접 입력"으로 운동을 바로 추가하거나,\n설정에서 템플릿을 관리할 수 있습니다.',

@@ -218,11 +218,10 @@ class _DietFormState extends ConsumerState<DietForm> {
   }
 
   Future<void> _openTemplatePicker() async {
-    final templates = ref.read(foodTemplatesProvider);
     final picked = await showTemplatePickerSheet<FoodTemplate>(
       context: context,
       title: '음식 템플릿 선택',
-      templates: templates,
+      templatesListenable: foodTemplatesProvider,
       labelOf: (t) => t.name,
       subtitleOf: (t) {
         String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
