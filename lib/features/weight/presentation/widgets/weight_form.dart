@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../shared/widgets/record_form_sheet.dart';
 import '../../domain/entities/weight_record.dart';
 import '../providers/weight_provider.dart';
 
@@ -137,12 +136,11 @@ class _WeightFormState extends ConsumerState<WeightForm> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDateChanged = _selectedDate != _originalDate;
-    return RecordFormSheet(
-      title: widget.initialRecord != null ? '체중 수정' : '체중 기록',
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
             GestureDetector(
               onTap: _pickDate,
               child: Container(
@@ -213,7 +211,6 @@ class _WeightFormState extends ConsumerState<WeightForm> {
             const SizedBox(height: 16),
           ],
         ),
-      ),
-    );
+      );
   }
 }

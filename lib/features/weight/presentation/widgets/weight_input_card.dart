@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../shared/widgets/record_form_sheet.dart';
 import '../providers/weight_provider.dart';
 import 'weight_form.dart';
 
@@ -24,7 +25,10 @@ class WeightInputCard extends ConsumerWidget {
             // BottomNavShell 의 glassmorphic 하단 탭 바가 시트를 가리지 않는다.
             useRootNavigator: true,
             useSafeArea: true,
-            builder: (context) => WeightForm(initialRecord: todayWeight),
+            builder: (context) => RecordFormSheet(
+              title: '체중 수정',
+              child: WeightForm(initialRecord: todayWeight),
+            ),
           );
         },
         borderRadius: BorderRadius.circular(12),

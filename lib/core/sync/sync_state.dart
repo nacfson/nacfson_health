@@ -338,8 +338,8 @@ Future<SyncResult> _syncAll(
     if (pendingWeight.isNotEmpty) {
       await supabaseService.batchPushWeightRecords(pendingWeight);
       final uuidsToMark = pendingWeight
-          .where((r) => r.syncStatus.value != 3)
-          .map<String>((r) => r.uuid)
+          .where((r) => r.syncStatus != SyncStatus.deleted)
+          .map((r) => r.uuid)
           .toList();
       if (uuidsToMark.isNotEmpty) {
         await weightRepo.markAsSynced(uuidsToMark);
