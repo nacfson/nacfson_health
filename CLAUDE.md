@@ -17,6 +17,7 @@
 
 - **아키텍처, 데이터 흐름, 동기화 로직 수정 시**: `docs/architecture.md`
 - **DB 테이블/컬럼 변경, 마이그레이션 작성 시**: `docs/db-schema.md`
+- **Supabase 서버 스키마/트리거 수정, 신규 sync 테이블 추가 시**: `docs/db-schema.md` 의 "Supabase 서버 스키마 관리" 섹션 및 `supabase/migrations/` 확인
 - **UI 위젯/레이아웃/네비게이션 수정 시**: `docs/ui-architecture.md`
 - **도메인 모듈(exercise/diet/weight/sync/settings) 수정 시**: `docs/domains.md`
 - **에러 처리, try/catch 패턴 작성 시**: `docs/error-handling.md`

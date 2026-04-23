@@ -221,6 +221,26 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 
 ---
 
+## Supabase 서버 스키마 관리
+
+- Supabase 쪽 스키마·인덱스·트리거는 `supabase/migrations/` 하위에 SQL 파일로 버전 관리한다.
+- 새 sync 대상 테이블을 추가할 때는 반드시 `set_updated_at` 트리거(`extensions.moddatetime(updated_at)`)를 함께 만든다.
+  - 이 트리거가 없으면 외부 SQL 경로(Supabase Studio, 관리 스크립트, Edge Function 등)로 UPDATE 된 row 가 delta pull(`updated_at > lastSync`)에 걸리지 않아 다른 기기로 변경이 전파되지 않는 silent drift 가 발생한다.
+  - delta pull 은 `lib/core/sync/base_supabase_sync_service.dart` 의 `readDelta` 가 담당.
+- `updated_at` 컬럼은 `TIMESTAMPTZ` 타입이어야 `extensions.moddatetime` 이 동작한다. 새 테이블을 설계할 때 타입 정합을 확인할 것.
+- 현재 sync 대상 테이블: `exercise_records`, `diet_records`, `weight_records`, `exercise_templates`, `food_templates`, `workout_routines`.
+- 트리거 적용 확인 쿼리:
+  ```sql
+  SELECT event_object_table, trigger_name, action_statement
+  FROM information_schema.triggers
+  WHERE event_object_schema = 'public'
+    AND event_manipulation = 'UPDATE'
+  ORDER BY event_object_table;
+  ```
+- 스키마 변경 후에는 이 문서의 테이블 섹션도 함께 갱신한다.
+
+---
+
 ## 공통 규칙
 
 - **UUID 자동 생성**: `uuid: ''` (빈 문자열) 전달 시 SQLite 구현체에서 UUID v4 자동 할당
