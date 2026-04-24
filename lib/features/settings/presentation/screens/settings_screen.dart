@@ -23,39 +23,9 @@ class SettingsScreen extends StatelessWidget {
         children: [
           const DietTargetCard(),
           const SizedBox(height: 16),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            margin: EdgeInsets.zero,
-            child: Theme(
-              data: Theme.of(context)
-                  .copyWith(dividerColor: Colors.transparent),
-              child: const ExpansionTile(
-                leading: Icon(Icons.fitness_center_outlined),
-                title: Text('운동 템플릿'),
-                initiallyExpanded: false,
-                tilePadding: EdgeInsets.symmetric(horizontal: 16),
-                childrenPadding: EdgeInsets.zero,
-                children: [ExerciseTemplateCard()],
-              ),
-            ),
-          ),
+          const ExerciseTemplateCard(),
           const SizedBox(height: 16),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            margin: EdgeInsets.zero,
-            child: Theme(
-              data: Theme.of(context)
-                  .copyWith(dividerColor: Colors.transparent),
-              child: const ExpansionTile(
-                leading: Icon(Icons.restaurant_outlined),
-                title: Text('음식 템플릿'),
-                initiallyExpanded: false,
-                tilePadding: EdgeInsets.symmetric(horizontal: 16),
-                childrenPadding: EdgeInsets.zero,
-                children: [FoodTemplateCard()],
-              ),
-            ),
-          ),
+          const FoodTemplateCard(),
           const SizedBox(height: 16),
           const GoogleSignInCard(),
           const SizedBox(height: 16),

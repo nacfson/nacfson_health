@@ -27,7 +27,6 @@ struct RestActivityWidget: Widget {
         ActivityConfiguration(for: LiveActivitiesAppAttributes.self) { context in
             RestLockScreenView(context: context)
                 .padding()
-                .activityBackgroundTint(Color(.systemBackground))
         } dynamicIsland: { context in
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {

@@ -17,13 +17,12 @@ class RestNotificationServiceAndroid implements RestNotificationService {
 
   static const _notificationId = 9001;
   static const _preAlertId = 9101;
-  static const _completionAlertId = 9102;
   static const _channelId = 'rest_timer_channel';
   static const _channelName = '휴식 타이머';
   static const _channelDescription = '운동 세트 사이 휴식 카운트다운';
   static const _alertChannelId = 'rest_timer_alert_channel';
   static const _alertChannelName = '휴식 종료 알림';
-  static const _alertChannelDescription = '휴식 종료 5초 전 및 완료 알림';
+  static const _alertChannelDescription = '휴식 종료 5초 전 알림';
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -193,29 +192,12 @@ class RestNotificationServiceAndroid implements RestNotificationService {
         debugPrint('[RestNotif] schedulePreAlert 5s FAILED: $e\n$s');
       }
     }
-    if (endAt.isAfter(now)) {
-      try {
-        await _plugin.zonedSchedule(
-          _completionAlertId,
-          '휴식 완료!',
-          '다음 세트를 시작하세요 💪',
-          tz.TZDateTime.from(endAt, tz.local),
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      } catch (e, s) {
-        debugPrint('[RestNotif] scheduleCompletion FAILED: $e\n$s');
-      }
-    }
   }
 
   @override
   Future<void> cancelPreAlert() async {
     if (!_initialized) return;
     await _plugin.cancel(_preAlertId);
-    await _plugin.cancel(_completionAlertId);
   }
 
   String _bodyText(bool paused) =>

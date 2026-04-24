@@ -28,7 +28,7 @@ final exerciseTemplatesProvider =
 class ExerciseTemplateNotifier
     extends StateNotifier<List<ExerciseTemplate>> {
   /// main.dart 의 사전 시드 루틴과 공유하는 SharedPreferences 키.
-  static const seedFlagKey = 'exercise_templates_default_seeded_v1';
+  static const seedFlagKey = 'exercise_templates_default_seeded_v2';
 
   final ExerciseTemplateRepository _repository;
   final SharedPreferences _prefs;

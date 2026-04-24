@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/sheet_state_provider.dart';
+import '../../../../core/sync/sync_state.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
 import '../../../../shared/widgets/bottom_nav_shell.dart';
@@ -111,6 +112,7 @@ class _DietScreenState extends ConsumerState<DietScreen> {
   Widget build(BuildContext context) {
     final grouped      = ref.watch(selectedDateDietGroupedProvider);
     final summary      = ref.watch(selectedDateDietSummaryProvider);
+    final targets      = ref.watch(nutritionTargetsProvider);
     final selectedDate = ref.watch(selectedDateProvider);
     final isToday      = ref.watch(isSelectedDateTodayProvider);
     final isEmpty      = grouped.isEmpty;
@@ -125,6 +127,7 @@ class _DietScreenState extends ConsumerState<DietScreen> {
             child: _DietSummaryCard(
               date: selectedDate,
               summary: summary,
+              targets: targets,
               isToday: isToday,
             ),
           ),
@@ -173,10 +176,12 @@ class _DietScreenState extends ConsumerState<DietScreen> {
 class _DietSummaryCard extends StatelessWidget {
   final DateTime date;
   final ({int kcal, double carbs, double protein, double fat}) summary;
+  final NutritionTargets targets;
   final bool isToday;
   const _DietSummaryCard({
     required this.date,
     required this.summary,
+    required this.targets,
     required this.isToday,
   });
 
@@ -184,6 +189,10 @@ class _DietSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
     final dateStr = '${date.month}월 ${date.day}일 (${weekdays[date.weekday - 1]})';
+    final calorieRatio =
+        targets.calories > 0 ? summary.kcal / targets.calories : 0.0;
+    final caloriePct = (calorieRatio * 100).round();
+    final calorieColor = _progressColor(calorieRatio);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 8, 20, 4),
@@ -243,56 +252,69 @@ class _DietSummaryCard extends StatelessWidget {
                   ),
                   Text(
                     summary.kcal == 0 ? '—' : '${summary.kcal} kcal',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'Pretendard',
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.colorCatDiet,
+                      color: calorieColor,
                       letterSpacing: -0.8,
                     ),
                   ),
+                  if (targets.calories > 0)
+                    Text(
+                      '/ ${targets.calories} kcal · $caloriePct%',
+                      style: const TextStyle(
+                        fontFamily: 'Pretendard',
+                        fontSize: 11,
+                        color: AppTheme.colorTextDim,
+                      ),
+                    ),
                 ],
               ),
             ],
           ),
-          if (summary.kcal > 0) ...[
-            const SizedBox(height: 16),
-            _MacroBarsRow(summary: summary),
-          ],
+          const SizedBox(height: 16),
+          _MacroBarsRow(summary: summary, targets: targets),
         ],
       ),
     );
   }
 }
 
+Color _progressColor(double ratio) {
+  if (ratio >= 1.05) return AppTheme.colorCoral;
+  if (ratio >= 0.90) return AppTheme.colorMint;
+  return AppTheme.colorCatDiet;
+}
+
 class _MacroBarsRow extends StatelessWidget {
   final ({int kcal, double carbs, double protein, double fat}) summary;
-  const _MacroBarsRow({required this.summary});
+  final NutritionTargets targets;
+  const _MacroBarsRow({required this.summary, required this.targets});
 
   @override
   Widget build(BuildContext context) {
-    final total = summary.kcal.toDouble();
     return Row(
       children: [
         _MacroBar(
           label: '탄',
-          value: total > 0 ? (summary.carbs * 4) / total : 0,
-          amount: '${summary.carbs.toStringAsFixed(0)}g',
-          color: AppTheme.colorCatDiet,
+          consumed: summary.carbs,
+          target: targets.carbs,
+          baseColor: AppTheme.colorCatDiet,
         ),
         const SizedBox(width: 8),
         _MacroBar(
           label: '단',
-          value: total > 0 ? (summary.protein * 4) / total : 0,
-          amount: '${summary.protein.toStringAsFixed(0)}g',
-          color: AppTheme.colorMint,
+          consumed: summary.protein,
+          target: targets.protein,
+          baseColor: AppTheme.colorMint,
         ),
         const SizedBox(width: 8),
         _MacroBar(
           label: '지',
-          value: total > 0 ? (summary.fat * 9) / total : 0,
-          amount: '${summary.fat.toStringAsFixed(0)}g',
-          color: AppTheme.colorCoral,
+          consumed: summary.fat,
+          target: targets.fat,
+          baseColor: AppTheme.colorCoral,
         ),
       ],
     );
@@ -301,18 +323,25 @@ class _MacroBarsRow extends StatelessWidget {
 
 class _MacroBar extends StatelessWidget {
   final String label;
-  final double value;
-  final String amount;
-  final Color color;
+  final double consumed;
+  final double target;
+  final Color baseColor;
   const _MacroBar({
     required this.label,
-    required this.value,
-    required this.amount,
-    required this.color,
+    required this.consumed,
+    required this.target,
+    required this.baseColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final ratio = target > 0 ? consumed / target : 0.0;
+    final isOver = ratio >= 1.05;
+    final barColor = isOver ? AppTheme.colorCoral : baseColor;
+    final amount = target > 0
+        ? '${consumed.toStringAsFixed(0)}g / ${target.toStringAsFixed(0)}g'
+        : '${consumed.toStringAsFixed(0)}g';
+
     return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,7 +354,7 @@ class _MacroBar extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'Pretendard',
                   fontSize: 11,
-                  color: color,
+                  color: barColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -343,10 +372,10 @@ class _MacroBar extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: value.clamp(0.0, 1.0),
+              value: ratio.clamp(0.0, 1.0),
               minHeight: 5,
               backgroundColor: Colors.white.withOpacity(0.15),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
             ),
           ),
         ],

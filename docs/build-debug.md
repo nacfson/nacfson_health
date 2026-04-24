@@ -50,7 +50,35 @@ VS Code 에서는 F5 → "iPhone (Release)" 가 기본 엔트리. Debug 가 필�
 - Personal Apple ID 팀 서명은 유효기간 7일 — 튕김이 다시 시작되면 모드 문제가 아니라 **서명 만료**일 수 있다. 같은 `make install-ios` 로 재설치.
 
 **금지**:
-- Xcode scheme 의 Run Build Configuration 을 Release 로 바꾸는 방식으로 이 문제를 해결하려 하지 말 것. `flutter run` 은 CLI 플래그로 컨피그를 결정하므로 scheme 기본값은 반영되지 않는다 (Xcode 에서 직접 Run 할 때만 의미가 있음).
+- `flutter run` 의 단독 실행 실패(아이콘 탭 시 튕김)를 scheme 의 Run Build Configuration 변경으로 해결하려 하지 말 것. `flutter run` 은 `-configuration` 플래그를 명시해 컨피그를 결정하므로 scheme 기본값은 반영되지 않는다. 이 경우는 `make install-ios` (Release) 로 해결한다.
+- 단, **Xcode GUI Run 버튼**으로 직접 실행하는 경우는 별개 이슈이며 `§1-2` 의 방식으로 해결한다.
+
+---
+
+## 1-2. Xcode GUI Run 버튼 — LaunchAction = Profile 로 고정
+
+**증상**: Xcode 에서 Runner scheme 선택 후 ⌘R(또는 Run 버튼) 실행 시 아래 로그와 함께 앱이 즉시 종료.
+
+```
+-- LLDB integration loaded --
+error: attach by pid 'N' failed -- no such process
+In iOS 14+, debug mode Flutter apps can only be launched from Flutter tooling,
+IDEs with Flutter plugins or from Xcode.
+Alternatively, build in profile or release modes to enable launching from the home screen.
+```
+
+**원인**: `flutter run` 과 달리 Xcode GUI 의 Run 버튼은 scheme 의 `LaunchAction.buildConfiguration` 을 그대로 따른다. 이 값이 **Debug** 로 남아 있으면 JIT 기반 Flutter Debug 런타임이 DDS(Dart Development Service) 미연결 상태로 startup 에서 abort → 프로세스가 방금 죽은 상태에서 LLDB 가 attach 를 시도해 `attach by pid failed`. `customLLDBInitFile` 은 `flutter_lldb_helper.py` 심볼 헬퍼만 import 하므로 이 crash 와 무관.
+
+**해결**: `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme` 의 `<LaunchAction buildConfiguration = "Profile">` 로 고정.
+
+- Profile 은 AOT 컴파일 + DDS 불필요 → Xcode Run 단독 실행 가능.
+- Release 대신 Profile 을 택하는 이유: `kProfileMode == true` 로 개발 기호·observatory 가 남아 네이티브 디버깅(Swift 위젯, Podfile 검증) 에 유용. Release 는 `make install-ios` / `make build-ipa` 전용.
+- `flutter run --debug` 는 CLI 에서 `-configuration Debug` 를 명시해 넘기므로 scheme 기본값 변경 영향 없음.
+
+**규칙**:
+- Xcode GUI Run = Profile (hot reload 포기). Hot reload 가 필요하면 `flutter run` / `make run-ios-dev` / VS Code F5 사용.
+- ArchiveAction 은 Release, TestAction 은 Debug 로 유지 (배포/테스트 흐름 보존).
+- Runner scheme 의 LaunchAction 을 Debug 로 되돌리지 말 것. 누군가 "디버그로 바꿔야 하는 것 아닌가" 리뷰에서 제기하면 이 섹션을 가리킬 것.
 
 ---
 

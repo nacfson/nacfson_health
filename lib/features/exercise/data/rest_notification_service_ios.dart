@@ -30,7 +30,6 @@ class RestNotificationServiceIOS implements RestNotificationService {
   static const _defaultAppGroupId = 'group.com.nacfson.nacfsonHealth';
   static const _bridgeChannel = MethodChannel('nacfson/rest_activity');
   static const _preAlertId = 9101;
-  static const _completionAlertId = 9102;
 
   /// 실제 타이머 종료 후 iOS 가 위젯을 자동 dismiss 하기까지의 grace. 이 간격 안에
   /// 위젯은 "휴식 완료" 상태로 남음. 사용자가 +15초 연타해서 newEndAt 이 초기
@@ -261,29 +260,11 @@ class RestNotificationServiceIOS implements RestNotificationService {
         debugPrint('[LiveActivity] schedulePreAlert 5s FAILED: $e\n$s');
       }
     }
-
-    if (endAt.isAfter(now)) {
-      try {
-        await _notifications.zonedSchedule(
-          _completionAlertId,
-          '휴식 완료!',
-          '다음 세트를 시작하세요 💪',
-          tz.TZDateTime.from(endAt, tz.local),
-          details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-          uiLocalNotificationDateInterpretation:
-              UILocalNotificationDateInterpretation.absoluteTime,
-        );
-      } catch (e, s) {
-        debugPrint('[LiveActivity] scheduleCompletion FAILED: $e\n$s');
-      }
-    }
   }
 
   @override
   Future<void> cancelPreAlert() async {
     if (!_notificationsInitialized) return;
     await _notifications.cancel(_preAlertId);
-    await _notifications.cancel(_completionAlertId);
   }
 }

@@ -20,17 +20,22 @@ class ExerciseTemplateCard extends ConsumerStatefulWidget {
 
 class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
   late final TextEditingController _templateNameCtrl;
-  String? _selectedExerciseType;
+  late final TextEditingController _searchCtrl;
+  String _searchQuery = '';
+  String? _selectedFilterType; // null = 전체
+  String? _selectedExerciseTypeForAdd;
 
   @override
   void initState() {
     super.initState();
     _templateNameCtrl = TextEditingController();
+    _searchCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
     _templateNameCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -40,7 +45,8 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
       ErrorOverlay.show(title: '입력 오류', message: '운동 이름을 입력해주세요.');
       return;
     }
-    if (_selectedExerciseType == null) {
+    final type = _selectedExerciseTypeForAdd ?? _selectedFilterType;
+    if (type == null) {
       ErrorOverlay.show(title: '입력 오류', message: '운동 유형을 선택해주세요.');
       return;
     }
@@ -54,7 +60,7 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     try {
       await ref
           .read(exerciseTemplatesProvider.notifier)
-          .addTemplate(name, _selectedExerciseType!);
+          .addTemplate(name, type);
       _templateNameCtrl.clear();
     } catch (e) {
       debugPrint('ExerciseTemplateCard._addTemplate error: $e');
@@ -80,6 +86,8 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
+      // BottomNavShell glassmorphic 탭바 위로 시트를 올린다.
+      useRootNavigator: true,
       builder: (_) => _RestOverrideSheet(template: template),
     );
     if (result == null) return;
@@ -95,18 +103,36 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     }
   }
 
+  bool _matchesSearch(ExerciseTemplate t) {
+    if (_searchQuery.isEmpty) return true;
+    return t.name.toLowerCase().contains(_searchQuery.toLowerCase());
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final templates = ref.watch(exerciseTemplatesProvider);
 
-    // 유형별 그룹화 (typeOrder 순서 유지)
+    // 부위 필터 + 검색어 적용
+    final filtered = templates.where((t) {
+      if (_selectedFilterType != null &&
+          t.exerciseType != _selectedFilterType) {
+        return false;
+      }
+      return _matchesSearch(t);
+    }).toList();
+
+    // 전체 필터일 때만 부위별로 그룹 헤더 표시
     final grouped = <String, List<ExerciseTemplate>>{};
-    for (final type in _exerciseTypes) {
-      final items =
-          templates.where((t) => t.exerciseType == type).toList();
-      if (items.isNotEmpty) grouped[type] = items;
+    if (_selectedFilterType == null) {
+      for (final type in _exerciseTypes) {
+        final items = filtered.where((t) => t.exerciseType == type).toList();
+        if (items.isNotEmpty) grouped[type] = items;
+      }
     }
+
+    final addType = _selectedExerciseTypeForAdd ?? _selectedFilterType;
 
     return Card(
       child: Padding(
@@ -116,25 +142,82 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.fitness_center, color: theme.colorScheme.primary),
+                Icon(Icons.fitness_center, color: cs.primary),
                 const SizedBox(width: 8),
                 Text('운동 템플릿', style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 4),
             Text(
-              '자주 사용하는 운동 이름을 미리 등록하세요. 칩을 탭하면 휴식 시간을 조정할 수 있습니다.',
+              '자주 사용하는 운동을 미리 등록하세요. 칩을 탭하면 휴식 시간을 조정할 수 있습니다.',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.outline,
+                color: cs.outline,
               ),
             ),
-            if (grouped.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: '이름으로 검색',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onChanged: (v) => setState(() => _searchQuery = v.trim()),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _exerciseTypes.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    final isAll = _selectedFilterType == null;
+                    return ChoiceChip(
+                      label: const Text('전체'),
+                      selected: isAll,
+                      onSelected: (v) {
+                        if (v) setState(() => _selectedFilterType = null);
+                      },
+                    );
+                  }
+                  final type = _exerciseTypes[index - 1];
+                  final selected = _selectedFilterType == type;
+                  return ChoiceChip(
+                    label: Text('$type · ${_restBadgeForType(type)}'),
+                    selected: selected,
+                    onSelected: (v) {
+                      setState(() =>
+                          _selectedFilterType = v ? type : null);
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  templates.isEmpty
+                      ? '등록된 운동 템플릿이 없습니다. 아래에서 추가하세요.'
+                      : '검색 결과가 없습니다.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else if (_selectedFilterType == null)
               for (final entry in grouped.entries) ...[
                 Text(
                   '[${entry.key}]  ${_restBadgeForType(entry.key)}',
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.primary,
+                    color: cs.primary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -153,28 +236,46 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
                   ],
                 ),
                 const SizedBox(height: 8),
-              ],
-            ],
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: '운동 유형',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+              ]
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  for (final t in filtered)
+                    InputChip(
+                      label: Text(_chipLabel(t)),
+                      onPressed: () => _editRestOverride(t),
+                      onDeleted: () => _deleteTemplate(t.uuid),
+                      deleteIcon: const Icon(Icons.close, size: 18),
+                    ),
+                ],
               ),
-              initialValue: _selectedExerciseType,
-              items: _exerciseTypes
-                  .map((t) => DropdownMenuItem(
-                        value: t,
-                        child: Text('$t  ${_restBadgeForType(t)}'),
-                      ))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedExerciseType = v),
+            const SizedBox(height: 16),
+            Divider(color: cs.outlineVariant),
+            const SizedBox(height: 8),
+            Text(
+              '운동 유형 선택',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final type in _exerciseTypes)
+                  ChoiceChip(
+                    label: Text(type),
+                    selected: addType == type,
+                    onSelected: (v) {
+                      setState(() {
+                        _selectedExerciseTypeForAdd = v ? type : null;
+                      });
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Row(
@@ -321,8 +422,10 @@ class _RestOverrideSheetState extends State<_RestOverrideSheet> {
                   onChanged: (v) => _setSeconds(v.round()),
                 ),
               ),
+              // 숫자 3자리(예: 120) 가 잘리지 않도록 72 → 96 으로 확장하고,
+              // 단위 "초" 는 suffixText 대신 외부 Text 위젯으로 분리.
               SizedBox(
-                width: 72,
+                width: 96,
                 child: TextField(
                   controller: _textCtrl,
                   textAlign: TextAlign.center,
@@ -331,16 +434,15 @@ class _RestOverrideSheetState extends State<_RestOverrideSheet> {
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
                     LengthLimitingTextInputFormatter(3),
                   ],
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    suffixText: '초',
-                  ),
+                  decoration: const InputDecoration(isDense: true),
                   onSubmitted: (v) {
                     final parsed = int.tryParse(v);
                     if (parsed != null) _setSeconds(parsed);
                   },
                 ),
               ),
+              const SizedBox(width: 6),
+              Text('초', style: theme.textTheme.bodyMedium),
             ],
           ),
           const SizedBox(height: 4),

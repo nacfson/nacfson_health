@@ -13,6 +13,7 @@
 - [x] 체중 기록 CRUD (`WeightRecord` — 체중)
 - [x] 운동 기록 날짜·부위별 그룹핑 뷰 (`todayExerciseGroupedProvider`)
 - [x] 식단 기록 식사유형별 그룹핑 뷰 (`todayDietGroupedProvider`)
+- [x] 식단 탭 헤더 목표 대비 진행률 표시 — 칼로리 `소비/목표·%`, 탄·단·지 막대를 `소비/목표` 비율로 변경 + 100% 초과 시 coral 색 강조 (`_DietSummaryCard`, `_MacroBarsRow`)
 
 ### 요약/시각화
 - [x] 일일 요약 화면 (`SummaryScreen` — fl_chart 기반)
@@ -22,8 +23,8 @@
 
 ### 설정 화면
 - [x] 영양 목표값 설정 (`DietTargetCard` — 칼로리/탄단지 목표)
-- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제, 종목별 휴식 시간 오버라이드 v11)
-- [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)
+- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제, 종목별 휴식 시간 오버라이드 v11)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 UX 개편 — `ExpansionTile` 제거(설정 진입 즉시 노출), 부위별 ChoiceChip 필터 + 이름 검색, 추가 폼 드롭다운 → ChoiceChip 인라인, 휴식 편집 시트 BottomNav 겹침·세자리 수 표시 잘림 버그 수정, 기본 템플릿 16 → 56종 확장(시드 플래그 v2)
+- [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 — `ExpansionTile` 제거로 설정 진입 즉시 입력/검색 가능
 - [x] Google 로그인/로그아웃 (`GoogleSignInCard`)
 - [x] 스프레드시트 상태 + 수동 동기화 (`SpreadsheetStatusCard`)
 - [x] 테마 전환 — 시스템/라이트/다크 (`ThemeModeCard` + `themeModeProvider`, shared_preferences 영구 저장)
