@@ -294,7 +294,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
             ..._buildCardSlivers(cards!)
           else
             ..._buildPastSlivers(pastGrouped!),
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: bottomNavFabInset(context)),
+          ),
         ],
       ),
     );
