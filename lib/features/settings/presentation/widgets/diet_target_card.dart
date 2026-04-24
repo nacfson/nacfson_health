@@ -62,14 +62,18 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
 
     final goal = FitnessGoalX.fromPrefsKey(prefs.fitnessGoalRaw);
     final gender = UserGenderX.fromPrefsKey(prefs.userGenderRaw);
-    final ageGroup = AgeGroupX.fromPrefsKey(prefs.userAgeGroupRaw);
+    final activity = ActivityLevelX.fromPrefsKey(prefs.activityLevelRaw);
+    final intensity =
+        TrainingIntensityX.fromPrefsKey(prefs.trainingIntensityRaw);
 
     final targets = calculateTargets(NutritionCalculationInput(
       heightCm: heightM * 100,
       weightKg: latestWeight.weight,
       gender: gender,
-      ageGroup: ageGroup,
+      age: prefs.userAge,
       goal: goal,
+      activityLevel: activity,
+      intensity: intensity,
     ));
 
     setState(() {
@@ -80,14 +84,15 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
     });
   }
 
-  Future<void> _openGoalPicker() async {
-    final prefs = ref.read(syncPreferencesProvider);
-    final current = FitnessGoalX.fromPrefsKey(prefs.fitnessGoalRaw);
-
-    final picked = await showModalBottomSheet<FitnessGoal>(
+  Future<T?> _openPicker<T>({
+    required String title,
+    required List<T> values,
+    required T current,
+    required String Function(T) labelBuilder,
+    String Function(T)? subtitleBuilder,
+  }) {
+    return showModalBottomSheet<T>(
       context: context,
-      // ShellRoute 의 shellNavigator 위가 아니라 rootNavigator 위로 push 해야
-      // BottomNavShell 의 glassmorphic 하단 탭 바가 시트를 가리지 않는다.
       useRootNavigator: true,
       useSafeArea: true,
       builder: (ctx) {
@@ -96,18 +101,21 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              Text('목표 선택', style: Theme.of(ctx).textTheme.titleMedium),
+              Text(title, style: Theme.of(ctx).textTheme.titleMedium),
               const SizedBox(height: 8),
-              for (final goal in FitnessGoal.values)
+              for (final v in values)
                 ListTile(
                   leading: Icon(
-                    goal == current
+                    v == current
                         ? Icons.radio_button_checked
                         : Icons.radio_button_unchecked,
                     color: Theme.of(ctx).colorScheme.primary,
                   ),
-                  title: Text(goal.label),
-                  onTap: () => Navigator.of(ctx).pop(goal),
+                  title: Text(labelBuilder(v)),
+                  subtitle: subtitleBuilder != null
+                      ? Text(subtitleBuilder(v))
+                      : null,
+                  onTap: () => Navigator.of(ctx).pop(v),
                 ),
               const SizedBox(height: 8),
             ],
@@ -115,11 +123,60 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
         );
       },
     );
+  }
 
+  Future<void> _openGoalPicker() async {
+    final prefs = ref.read(syncPreferencesProvider);
+    final current = FitnessGoalX.fromPrefsKey(prefs.fitnessGoalRaw);
+
+    final picked = await _openPicker<FitnessGoal>(
+      title: '목표 선택',
+      values: FitnessGoal.values,
+      current: current,
+      labelBuilder: (g) => g.label,
+      subtitleBuilder: (g) => g.description,
+    );
     if (picked == null) return;
     await prefs.setFitnessGoalRaw(picked.prefsKey);
     if (!mounted) return;
-    setState(() {}); // 현재 목표 라벨 갱신
+    setState(() {});
+    await _recalculateFromGoal();
+  }
+
+  Future<void> _openActivityPicker() async {
+    final prefs = ref.read(syncPreferencesProvider);
+    final current = ActivityLevelX.fromPrefsKey(prefs.activityLevelRaw);
+
+    final picked = await _openPicker<ActivityLevel>(
+      title: '활동 수준',
+      values: ActivityLevel.values,
+      current: current,
+      labelBuilder: (a) => '${a.label} (×${a.multiplier})',
+      subtitleBuilder: (a) => a.description,
+    );
+    if (picked == null) return;
+    await prefs.setActivityLevelRaw(picked.prefsKey);
+    if (!mounted) return;
+    setState(() {});
+    await _recalculateFromGoal();
+  }
+
+  Future<void> _openIntensityPicker() async {
+    final prefs = ref.read(syncPreferencesProvider);
+    final current = TrainingIntensityX.fromPrefsKey(prefs.trainingIntensityRaw);
+
+    final picked = await _openPicker<TrainingIntensity>(
+      title: '운동 강도 (단백질 기준)',
+      values: TrainingIntensity.values,
+      current: current,
+      labelBuilder: (x) =>
+          '${x.label} (${x.proteinGPerKg.toStringAsFixed(1)}g/kg)',
+      subtitleBuilder: (x) => x.description,
+    );
+    if (picked == null) return;
+    await prefs.setTrainingIntensityRaw(picked.prefsKey);
+    if (!mounted) return;
+    setState(() {});
     await _recalculateFromGoal();
   }
 
@@ -156,6 +213,12 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final prefs = ref.watch(syncPreferencesProvider);
+    final goalLabel = FitnessGoalX.fromPrefsKey(prefs.fitnessGoalRaw).label;
+    final activityLabel =
+        ActivityLevelX.fromPrefsKey(prefs.activityLevelRaw).label;
+    final intensityLabel =
+        TrainingIntensityX.fromPrefsKey(prefs.trainingIntensityRaw).label;
 
     return Card(
       child: Padding(
@@ -179,12 +242,26 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
                     ?.copyWith(color: theme.colorScheme.outline),
               ),
               const SizedBox(height: 12),
-              _GoalRecalculateRow(
-                currentGoalLabel: FitnessGoalX.fromPrefsKey(
-                  ref.watch(syncPreferencesProvider).fitnessGoalRaw,
-                ).label,
-                onChangeGoal: _openGoalPicker,
-                onRecalculate: _recalculateFromGoal,
+              _ProfileChip(label: '목표: $goalLabel', onTap: _openGoalPicker),
+              const SizedBox(height: 6),
+              _ProfileChip(
+                  label: '활동: $activityLabel', onTap: _openActivityPicker),
+              const SizedBox(height: 6),
+              _ProfileChip(
+                  label: '강도: $intensityLabel', onTap: _openIntensityPicker),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: _recalculateFromGoal,
+                  icon: const Icon(Icons.calculate_outlined, size: 16),
+                  label: const Text('프로필 기반 재계산'),
+                  style: OutlinedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: theme.textTheme.bodySmall,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -253,58 +330,38 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
   }
 }
 
-class _GoalRecalculateRow extends StatelessWidget {
-  final String currentGoalLabel;
-  final VoidCallback onChangeGoal;
-  final VoidCallback onRecalculate;
+class _ProfileChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
 
-  const _GoalRecalculateRow({
-    required this.currentGoalLabel,
-    required this.onChangeGoal,
-    required this.onRecalculate,
-  });
+  const _ProfileChip({required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        InkWell(
-          onTap: onChangeGoal,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '현재: $currentGoalLabel',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.arrow_drop_down,
-                  size: 18,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: theme.colorScheme.onSurface,
+            ),
+          ],
         ),
-        const Spacer(),
-        OutlinedButton.icon(
-          onPressed: onRecalculate,
-          icon: const Icon(Icons.calculate_outlined, size: 16),
-          label: const Text('목표 기반 재계산'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            textStyle: theme.textTheme.bodySmall,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

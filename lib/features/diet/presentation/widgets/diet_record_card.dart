@@ -1,25 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../settings/presentation/providers/food_template_provider.dart';
 import '../../domain/entities/diet_record.dart';
 
-class DietRecordCard extends StatelessWidget {
+class DietRecordCard extends ConsumerWidget {
   final DietRecord record;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final VoidCallback? onSaveAsTemplate;
 
   const DietRecordCard({
     super.key,
     required this.record,
     this.onTap,
     this.onDelete,
+    this.onSaveAsTemplate,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final mealColor = _mealTypeColor(record.mealType, theme.brightness);
     final timeStr = _formatTime(record.timestamp);
+    final templates = ref.watch(foodTemplatesProvider);
+    final alreadyTemplated =
+        templates.any((t) => t.name == record.foodName.trim());
 
     return Dismissible(
       key: ValueKey(record.uuid),
@@ -60,6 +67,27 @@ class DietRecordCard extends StatelessWidget {
                         ],
                       ),
                     ),
+                    IconButton(
+                      tooltip: alreadyTemplated ? '이미 템플릿에 있음' : '템플릿에 등록',
+                      icon: Icon(
+                        alreadyTemplated
+                            ? Icons.bookmark
+                            : Icons.bookmark_add_outlined,
+                        size: 20,
+                        color: alreadyTemplated
+                            ? AppTheme.catDiet(context)
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      onPressed:
+                          alreadyTemplated ? null : onSaveAsTemplate,
+                    ),
+                    const SizedBox(width: 4),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [

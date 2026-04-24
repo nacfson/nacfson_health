@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
@@ -7,6 +8,8 @@ import '../../../../shared/widgets/bottom_nav_shell.dart';
 import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/widgets/record_form_sheet.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../settings/domain/entities/food_template.dart';
+import '../../../settings/presentation/providers/food_template_provider.dart';
 import '../../domain/entities/diet_record.dart';
 import '../providers/diet_provider.dart';
 import '../widgets/diet_form.dart';
@@ -62,6 +65,48 @@ class _DietScreenState extends ConsumerState<DietScreen> {
     );
   }
 
+  Future<void> _saveAsTemplate(DietRecord r) async {
+    final name = r.foodName.trim();
+    if (name.isEmpty) return;
+
+    final templates = ref.read(foodTemplatesProvider);
+    if (templates.any((t) => t.name == name)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"$name"은(는) 이미 템플릿에 있습니다'),
+          duration: const Duration(seconds: 1),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    final template = FoodTemplate(
+      uuid: '',
+      name: name,
+      calories: r.totalCalories,
+      carbs: r.carbs,
+      protein: r.protein,
+      fat: r.fat,
+      updatedAt: now,
+    );
+    await ref.read(foodTemplatesProvider.notifier).addTemplate(template);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('템플릿에 등록됨 · $name'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: '설정',
+          onPressed: () => context.push('/settings'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final grouped      = ref.watch(selectedDateDietGroupedProvider);
@@ -107,6 +152,7 @@ class _DietScreenState extends ConsumerState<DietScreen> {
                       onDelete: () => ref
                           .read(dietRecordsProvider.notifier)
                           .deleteRecord(record.uuid),
+                      onSaveAsTemplate: () => _saveAsTemplate(record),
                     );
                   },
                   childCount: entry.value.length,

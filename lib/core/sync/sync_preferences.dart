@@ -8,7 +8,10 @@ class SyncPreferences {
   static const _keyTargetProtein = 'target_protein';
   static const _keyTargetFat = 'target_fat';
   static const _keyUserGender = 'user_gender';
-  static const _keyUserAgeGroup = 'user_age_group';
+  static const _keyUserAgeGroup = 'user_age_group'; // deprecated, 마이그레이션 대상
+  static const _keyUserAge = 'user_age';
+  static const _keyActivityLevel = 'activity_level';
+  static const _keyTrainingIntensity = 'training_intensity';
   static const _keyFitnessGoal = 'fitness_goal';
   static const _keyThemeMode = 'theme_mode';
 
@@ -67,17 +70,58 @@ class SyncPreferences {
   Future<void> setUserGenderRaw(String v) async =>
       _prefs.setString(_keyUserGender, v);
 
-  /// '20s' | '30s' | '40s' | '50s+'
-  String get userAgeGroupRaw => _prefs.getString(_keyUserAgeGroup) ?? '30s';
+  /// 만 나이 (int). 미저장 시 기본 30.
+  int get userAge => _prefs.getInt(_keyUserAge) ?? 30;
 
-  Future<void> setUserAgeGroupRaw(String v) async =>
-      _prefs.setString(_keyUserAgeGroup, v);
+  Future<void> setUserAge(int v) async => _prefs.setInt(_keyUserAge, v);
 
-  /// 'diet' | 'lean_mass' | 'bulk_up'
-  String get fitnessGoalRaw => _prefs.getString(_keyFitnessGoal) ?? 'lean_mass';
+  /// 활동 수준 prefsKey — 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+  String get activityLevelRaw =>
+      _prefs.getString(_keyActivityLevel) ?? 'moderate';
+
+  Future<void> setActivityLevelRaw(String v) async =>
+      _prefs.setString(_keyActivityLevel, v);
+
+  /// 운동 강도 prefsKey — 'low' | 'moderate' | 'high' | 'very_high'
+  String get trainingIntensityRaw =>
+      _prefs.getString(_keyTrainingIntensity) ?? 'moderate';
+
+  Future<void> setTrainingIntensityRaw(String v) async =>
+      _prefs.setString(_keyTrainingIntensity, v);
+
+  /// 'diet' | 'lean_cut' | 'lean_gain' | 'bulk_up' (구버전: 'lean_mass')
+  String get fitnessGoalRaw => _prefs.getString(_keyFitnessGoal) ?? 'lean_gain';
 
   Future<void> setFitnessGoalRaw(String v) async =>
       _prefs.setString(_keyFitnessGoal, v);
+
+  // ── 레거시 프로필 마이그레이션 ────────────────────────────────────────────────
+
+  /// 구버전 키 → 신규 키 1회 이관. 앱 진입 시 한 번 호출한다.
+  /// - `user_age_group` (20s/30s/40s/50s+) → `user_age` (25/35/45/55)
+  /// - `fitness_goal == 'lean_mass'` → `'lean_gain'` 으로 재작성
+  Future<void> migrateLegacyProfile() async {
+    // age_group → age
+    final legacyAgeGroup = _prefs.getString(_keyUserAgeGroup);
+    if (legacyAgeGroup != null && !_prefs.containsKey(_keyUserAge)) {
+      const midpoints = {
+        '20s': 25,
+        '30s': 35,
+        '40s': 45,
+        '50s+': 55,
+      };
+      final age = midpoints[legacyAgeGroup] ?? 30;
+      await _prefs.setInt(_keyUserAge, age);
+    }
+    if (legacyAgeGroup != null) {
+      await _prefs.remove(_keyUserAgeGroup);
+    }
+
+    // fitness_goal: 'lean_mass' → 'lean_gain'
+    if (_prefs.getString(_keyFitnessGoal) == 'lean_mass') {
+      await _prefs.setString(_keyFitnessGoal, 'lean_gain');
+    }
+  }
 
   // ── 테마 모드 ────────────────────────────────────────────────────────────────
 

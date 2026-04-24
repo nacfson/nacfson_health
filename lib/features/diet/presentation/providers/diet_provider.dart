@@ -132,6 +132,33 @@ final selectedDateDietSummaryProvider =
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 최근 고유 음식 (입력 단축 — 시트 상단 "최근 식사에서 다시 추가" 섹션에서 사용)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 최근 7일 내 고유 음식(foodName) 기록 — 같은 이름은 가장 최근 것만 남김, 최대 10개
+final recentUniqueDietRecordsProvider = Provider<List<DietRecord>>((ref) {
+  final all = ref.watch(dietRecordsProvider);
+  final cutoff = DateTime.now().subtract(const Duration(days: 7));
+  final sorted = all
+      .where((r) =>
+          r.syncStatus != SyncStatus.deleted &&
+          r.timestamp.isAfter(cutoff))
+      .toList()
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+  final seen = <String>{};
+  final result = <DietRecord>[];
+  for (final r in sorted) {
+    final key = r.foodName.trim();
+    if (key.isEmpty || seen.contains(key)) continue;
+    seen.add(key);
+    result.add(r);
+    if (result.length >= 10) break;
+  }
+  return result;
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 칼로리 추세 차트 데이터 (Strategy 패턴 — ChartViewType으로 기간 전략 전환)
 // ─────────────────────────────────────────────────────────────────────────────
 

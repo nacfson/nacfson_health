@@ -6,9 +6,11 @@ class UserProfile {
   final int? id;
   final String uuid;
   final String gender;
-  final String ageGroup;
+  final int age;
   final double height;
   final String goal;
+  final String activityLevel;
+  final String trainingIntensity;
   final int targetCalories;
   final DateTime updatedAt;
   final SyncStatus syncStatus;
@@ -17,9 +19,11 @@ class UserProfile {
     this.id,
     this.uuid = '',
     required this.gender,
-    required this.ageGroup,
+    required this.age,
     required this.height,
     required this.goal,
+    required this.activityLevel,
+    required this.trainingIntensity,
     required this.targetCalories,
     required this.updatedAt,
     this.syncStatus = SyncStatus.created,
@@ -29,9 +33,11 @@ class UserProfile {
     int? id,
     String? uuid,
     String? gender,
-    String? ageGroup,
+    int? age,
     double? height,
     String? goal,
+    String? activityLevel,
+    String? trainingIntensity,
     int? targetCalories,
     DateTime? updatedAt,
     SyncStatus? syncStatus,
@@ -40,9 +46,11 @@ class UserProfile {
       id: id ?? this.id,
       uuid: uuid ?? this.uuid,
       gender: gender ?? this.gender,
-      ageGroup: ageGroup ?? this.ageGroup,
+      age: age ?? this.age,
       height: height ?? this.height,
       goal: goal ?? this.goal,
+      activityLevel: activityLevel ?? this.activityLevel,
+      trainingIntensity: trainingIntensity ?? this.trainingIntensity,
       targetCalories: targetCalories ?? this.targetCalories,
       updatedAt: updatedAt ?? this.updatedAt,
       syncStatus: syncStatus ?? this.syncStatus,

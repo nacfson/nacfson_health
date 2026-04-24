@@ -22,10 +22,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _heightCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
+  final _ageCtrl = TextEditingController();
   final _weightFocus = FocusNode();
+  final _ageFocus = FocusNode();
   UserGender _gender = UserGender.male;
-  AgeGroup _ageGroup = AgeGroup.thirties;
-  FitnessGoal _goal = FitnessGoal.leanMass;
+  ActivityLevel _activity = ActivityLevel.moderate;
+  TrainingIntensity _intensity = TrainingIntensity.moderate;
+  FitnessGoal _goal = FitnessGoal.leanMassGain;
   bool _isLoading = false;
 
   @override
@@ -33,15 +36,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.initState();
     _heightCtrl.addListener(_refreshPreview);
     _weightCtrl.addListener(_refreshPreview);
+    _ageCtrl.addListener(_refreshPreview);
   }
 
   @override
   void dispose() {
     _heightCtrl.removeListener(_refreshPreview);
     _weightCtrl.removeListener(_refreshPreview);
+    _ageCtrl.removeListener(_refreshPreview);
     _heightCtrl.dispose();
     _weightCtrl.dispose();
+    _ageCtrl.dispose();
     _weightFocus.dispose();
+    _ageFocus.dispose();
     super.dispose();
   }
 
@@ -52,14 +59,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   NutritionTargets? _previewTargets() {
     final h = double.tryParse(_heightCtrl.text.trim());
     final w = double.tryParse(_weightCtrl.text.trim());
+    final age = int.tryParse(_ageCtrl.text.trim());
     if (h == null || h < 100 || h > 250) return null;
     if (w == null || w < 20 || w > 300) return null;
+    if (age == null || age < 14 || age > 90) return null;
     return calculateTargets(NutritionCalculationInput(
       heightCm: h,
       weightKg: w,
       gender: _gender,
-      ageGroup: _ageGroup,
+      age: age,
       goal: _goal,
+      activityLevel: _activity,
+      intensity: _intensity,
     ));
   }
 
@@ -69,6 +80,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     final heightCm = double.parse(_heightCtrl.text.trim());
     final weightKg = double.parse(_weightCtrl.text.trim());
+    final age = int.parse(_ageCtrl.text.trim());
 
     // 키 저장 (m 단위)
     await ref.read(heightMProvider.notifier).setHeight(heightCm / 100);
@@ -84,10 +96,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ),
         );
 
-    // 사용자 프로필 (성별/나이대/목표) 저장
+    // 사용자 프로필 저장
     final prefs = ref.read(syncPreferencesProvider);
     await prefs.setUserGenderRaw(_gender.prefsKey);
-    await prefs.setUserAgeGroupRaw(_ageGroup.prefsKey);
+    await prefs.setUserAge(age);
+    await prefs.setActivityLevelRaw(_activity.prefsKey);
+    await prefs.setTrainingIntensityRaw(_intensity.prefsKey);
     await prefs.setFitnessGoalRaw(_goal.prefsKey);
 
     // 목표 기반 영양 목표 계산 및 저장
@@ -95,8 +109,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       heightCm: heightCm,
       weightKg: weightKg,
       gender: _gender,
-      ageGroup: _ageGroup,
+      age: age,
       goal: _goal,
+      activityLevel: _activity,
+      intensity: _intensity,
     ));
     await ref.read(nutritionTargetsProvider.notifier).update(
           calories: targets.calories,
@@ -127,7 +143,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
-                // 로고 / 일러스트
                 Center(
                   child: Container(
                     width: 80,
@@ -166,7 +181,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // ── 키 입력 ──
                 _FieldLabel(label: '키 (cm)'),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -189,7 +203,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── 체중 입력 ──
                 _FieldLabel(label: '체중 (kg)'),
                 const SizedBox(height: 8),
                 TextFormField(
@@ -200,7 +213,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
-                  textInputAction: TextInputAction.done,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) =>
+                      FocusScope.of(context).requestFocus(_ageFocus),
                   decoration: _inputDeco(hint: '예) 70.5'),
                   validator: (v) {
                     if (v == null || v.isEmpty) return '체중을 입력해주세요';
@@ -211,7 +226,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── 성별 ──
+                _FieldLabel(label: '만 나이'),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _ageCtrl,
+                  focusNode: _ageFocus,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  textInputAction: TextInputAction.done,
+                  decoration: _inputDeco(hint: '예) 31'),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return '나이를 입력해주세요';
+                    final n = int.tryParse(v);
+                    if (n == null || n < 14 || n > 90) return '14~90 사이 값을 입력해주세요';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+
                 _FieldLabel(label: '성별'),
                 const SizedBox(height: 8),
                 SegmentedButton<UserGender>(
@@ -227,45 +259,84 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── 나이대 ──
-                _FieldLabel(label: '나이대'),
+                _FieldLabel(label: '활동 수준'),
+                const SizedBox(height: 4),
+                Text(
+                  _activity.description,
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
-                  children: AgeGroup.values.map((a) {
+                  runSpacing: 8,
+                  children: ActivityLevel.values.map((a) {
                     return ChoiceChip(
                       label: Text(a.label),
-                      selected: _ageGroup == a,
-                      onSelected: (_) => setState(() => _ageGroup = a),
+                      selected: _activity == a,
+                      onSelected: (_) => setState(() => _activity = a),
                     );
                   }).toList(),
                 ),
                 const SizedBox(height: 20),
 
-                // ── 목표 ──
-                _FieldLabel(label: '목표'),
+                _FieldLabel(label: '운동 강도 (단백질 기준)'),
+                const SizedBox(height: 4),
+                Text(
+                  '${_intensity.description} · 단백질 ${_intensity.proteinGPerKg.toStringAsFixed(1)}g/kg',
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 8),
-                SegmentedButton<FitnessGoal>(
-                  segments: FitnessGoal.values
-                      .map((g) => ButtonSegment<FitnessGoal>(
-                            value: g,
-                            label: Text(g.label),
-                          ))
-                      .toList(),
-                  selected: {_goal},
-                  onSelectionChanged: (s) =>
-                      setState(() => _goal = s.first),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: TrainingIntensity.values.map((x) {
+                    return ChoiceChip(
+                      label: Text(x.label),
+                      selected: _intensity == x,
+                      onSelected: (_) => setState(() => _intensity = x),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+
+                _FieldLabel(label: '목표'),
+                const SizedBox(height: 4),
+                Text(
+                  _goal.description,
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: FitnessGoal.values.map((g) {
+                    return ChoiceChip(
+                      label: Text(g.label),
+                      selected: _goal == g,
+                      onSelected: (_) => setState(() => _goal = g),
+                    );
+                  }).toList(),
                 ),
                 const SizedBox(height: 24),
 
-                // ── 영양 목표 프리뷰 ──
                 _NutritionPreview(
                   targets: _previewTargets(),
                   tint: mintTint,
                 ),
                 const SizedBox(height: 32),
 
-                // ── 시작 버튼 ──
                 SizedBox(
                   width: double.infinity,
                   height: 54,
@@ -410,7 +481,7 @@ class _NutritionPreview extends StatelessWidget {
           const SizedBox(height: 10),
           if (t == null)
             Text(
-              '키/체중을 입력하면 자동으로 계산돼요',
+              '키/체중/나이를 입력하면 자동으로 계산돼요',
               style: TextStyle(
                 fontFamily: 'Pretendard',
                 fontSize: 13,

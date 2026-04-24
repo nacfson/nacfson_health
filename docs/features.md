@@ -78,6 +78,8 @@
 - [x] `DietForm` — 음식 템플릿 드롭다운 + 자동 채움 (칼로리/탄단지 전체)
 - [x] `ExerciseForm` — 운동 템플릿 드롭다운 + 종목명 자동 채움
 - [x] `TemplatePickerSheet` 도입 — 운동·식단 이름 필드 suffixIcon 명시적 트리거 BottomSheet, 기본 상태 템플릿 노출 제거(넛지 최소화), 검색 + 운동 부위 필터 + 빈 상태 설정 화면 이동
+- [x] `DietForm` 상단 "최근 식사에서 다시 추가" 가로 칩 (`recentUniqueDietRecordsProvider` — 최근 7일 고유 foodName, 최대 10개) — 칩 탭 시 폼 필드 자동 채움 + timestamp 현재 시각 갱신
+- [x] `DietRecordCard` 북마크 버튼 — 식단 카드에서 원탭으로 `FoodTemplate` 등록 (중복 이름 방어, 이미 등록된 음식은 filled bookmark로 시각화)
 - [x] `WeightScreen` — 체중 탭 (입력/차트 시각화)
 - [x] `WeightForm` — 날짜 선택 기능 (`showDatePicker`, 과거 날짜 소급 입력 지원)
 - [x] `DateNavigationBar` — 운동/식단/요약 탭 날짜 탐색 (좌우 이동 + DatePicker)
@@ -97,14 +99,14 @@
 - [x] 다크모드 2차 전수 감사 — 운동 세트 칩(`_StatItem` kg/횟수/RPE), 매크로 게이지 단/지, 섹션 헤더(운동/식단), 칼로리 추세 차트 막대, 체중 차트 그리드 라인, 설정 경고 카드(Google 미로그인), SnackBar 오류 배경, FAB 아이콘 → 모두 `ColorScheme` 기반 동적 색상으로 전환 (brightness-aware 헬퍼 추가: `AppTheme.catDiet/catSleep/lunchTint/snackTint/warnBg/warnFg`)
 
 ### 온보딩 & 사용자 프로필
-- [x] 첫 실행 온보딩 화면 (`OnboardingScreen` — 키/체중/성별/나이대/목표 입력, SharedPreferences 플래그)
+- [x] 첫 실행 온보딩 화면 (`OnboardingScreen` — 키/체중/만 나이/성별/활동 수준/운동 강도/목표 입력, SharedPreferences 플래그)
 - [x] `HeightNotifier` — SharedPreferences 기반 키(m) 영구 저장 (`user_height_m`)
 - [x] `OnboardingNotifier` — 온보딩 완료 플래그 (`onboarding_done`)
 - [x] GoRouter 온보딩 리다이렉트 (`RouterNotifier` + `refreshListenable` 패턴)
 - [x] 온보딩 체중 입력 → `WeightRecord` 오늘 날짜로 자동 저장
-- [x] 온보딩 목표(다이어트/린매스업/벌크업) + 성별/나이대 입력 → Mifflin-St Jeor 기반 영양 목표 자동 계산 (`lib/core/nutrition/nutrition_calculator.dart`)
-- [x] `SyncPreferences` 사용자 프로필 저장 — `user_gender` / `user_age_group` / `fitness_goal`
-- [x] 설정 화면 '영양 목표' 카드 — 목표 선택 bottom sheet + '목표 기반 재계산' 버튼
+- [x] **영양 목표 공식 v2 (2026-04)** — 목표 4분할 (다이어트 / 린매스(감량) / 린매스(증량) / 벌크업), TDEE 조정 −500 / −200 / +200 / +500, 활동 수준 5단계 (1.2/1.375/1.55/1.725/1.9), 운동 강도 4단계로 단백질 1.8~2.4 g/kg, 만 나이 직접 입력 (`lib/core/nutrition/nutrition_calculator.dart`)
+- [x] `SyncPreferences` 사용자 프로필 저장 — `user_gender` / `user_age` / `activity_level` / `training_intensity` / `fitness_goal`. 레거시 `user_age_group` · `fitness_goal=lean_mass` 는 `migrateLegacyProfile()` 로 1회 재작성
+- [x] 설정 화면 '영양 목표' 카드 — 목표 · 활동 수준 · 운동 강도 bottom sheet picker + '프로필 기반 재계산' 버튼
 
 ### AI 건강 인사이트 & 코치 챗봇
 - [x] `GeminiService` — `gemini-2.5-flash-lite` 기반 한국어 건강 조언 생성 (`.env` API 키)

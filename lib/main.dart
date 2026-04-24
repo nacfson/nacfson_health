@@ -36,6 +36,9 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final syncPrefs = SyncPreferences(prefs);
 
+  // v2.5 이전 사용자 프로필 키 (user_age_group, fitness_goal='lean_mass')를 신규 스키마로 1회 이관
+  await syncPrefs.migrateLegacyProfile();
+
   // 사용자 프로필 미리 로드 (router가 즉시 올바른 초기값을 사용하도록)
   final onboardingDone = prefs.getBool('onboarding_done') ?? false;
   final heightM = prefs.getDouble('user_height_m') ?? 1.70;

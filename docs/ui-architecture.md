@@ -186,7 +186,10 @@ showModalBottomSheet(
 | `DateNavigationBar` | `lib/shared/widgets/date_navigation_bar.dart` | 운동/식단/요약 공통 날짜 탐색 (좌우 chevron + DatePicker + Today 버튼). 미래 날짜는 forward 비활성화 (`isSelectedDateTodayProvider`) |
 | `VolumeTrendChart` | `lib/features/exercise/presentation/widgets/volume_trend_chart.dart` | 운동 볼륨 주간/월간 LineChart (mint, k-notation) |
 | `CalorieTrendChart` | `lib/features/diet/presentation/widgets/calorie_trend_chart.dart` | 식단 칼로리 주간/월간 BarChart + 빨간 점선 목표선, 105% 초과 시 코랄 |
-| `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg)/성별/나이대/목표(다이어트/린매스업/벌크업) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 + `calculateTargets(...)` 결과를 `nutritionTargetsProvider`에 seed. 실시간 프리뷰(`_NutritionPreview`) 포함 |
+| `OnboardingScreen` | `lib/features/onboarding/presentation/screens/onboarding_screen.dart` | 첫 실행 키(cm)/체중(kg)/만 나이/성별/활동 수준(5단계)/운동 강도(4단계)/목표(다이어트·린매스(감량)·린매스(증량)·벌크업) 입력 → `setHeight`/`complete()` + `WeightRecord` 자동 생성 + `calculateTargets(...)` 결과를 `nutritionTargetsProvider`에 seed. 실시간 프리뷰(`_NutritionPreview`) 포함 |
+| `DietTargetCard` _(v10 확장)_ | `lib/features/settings/presentation/widgets/diet_target_card.dart` | 설정 탭 영양 목표 카드. 목표·활동 수준·운동 강도를 각각 BottomSheet picker 로 변경하고 '프로필 기반 재계산' 버튼으로 `calculateTargets` 재실행. 칼로리/탄단지 직접 편집 저장도 지원 |
+| `_RecentMealsRow` | `lib/features/diet/presentation/widgets/diet_form.dart` (private) | 식단 폼 상단 "최근 식사에서 다시 추가" 가로 chip 리스트. `recentUniqueDietRecordsProvider` 기반, 탭 시 폼 필드 자동 채움 + 현재 시각 타임스탬프 |
+| `DietRecordCard` 북마크 | `lib/features/diet/presentation/widgets/diet_record_card.dart` | 식단 카드 우측 북마크 아이콘. 원탭으로 `FoodTemplate` 등록. 중복 방어(이미 등록된 이름은 filled 아이콘 + 버튼 비활성) |
 | `ThemeModeCard` | `lib/features/settings/presentation/widgets/theme_mode_card.dart` | SegmentedButton 3-way 테마 전환 |
 | `_AiInsightCard` | `lib/features/summary/presentation/screens/summary_screen.dart` 내 private | Gemini 인사이트 카드 (loading/error/data + 새로고침) |
 | `ExerciseGroupCard` _(v8 · v9+ 메뉴 라벨/동작 변경)_ | `lib/features/exercise/presentation/widgets/exercise_group_card.dart` | 운동 카드. `editable=true`(오늘)면 `+ 세트 추가` 버튼·인라인 입력·"운동 제거" 메뉴 노출. "운동 제거"는 루틴 항목과 선택 날짜의 해당 운동 기록을 함께 soft delete (기록이 있으면 확인 다이얼로그). `editable=false`(과거)면 읽기 전용 |

@@ -4,18 +4,33 @@ import 'nutrition_targets.dart';
 
 export 'nutrition_targets.dart' show NutritionTargets;
 
-/// 피트니스 목표
-enum FitnessGoal { diet, leanMass, bulkUp }
+/// 피트니스 목표 (4단계)
+enum FitnessGoal { diet, leanMassCut, leanMassGain, bulkUp }
 
 extension FitnessGoalX on FitnessGoal {
   String get label {
     switch (this) {
       case FitnessGoal.diet:
         return '다이어트';
-      case FitnessGoal.leanMass:
-        return '린매스업';
+      case FitnessGoal.leanMassCut:
+        return '린매스(감량)';
+      case FitnessGoal.leanMassGain:
+        return '린매스(증량)';
       case FitnessGoal.bulkUp:
         return '벌크업';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case FitnessGoal.diet:
+        return '체중 감량 중심';
+      case FitnessGoal.leanMassCut:
+        return '체중 소폭 감량·근육 유지';
+      case FitnessGoal.leanMassGain:
+        return '근육 소폭 증가·지방 최소';
+      case FitnessGoal.bulkUp:
+        return '적극적 근육 증가';
     }
   }
 
@@ -23,8 +38,10 @@ extension FitnessGoalX on FitnessGoal {
     switch (this) {
       case FitnessGoal.diet:
         return 'diet';
-      case FitnessGoal.leanMass:
-        return 'lean_mass';
+      case FitnessGoal.leanMassCut:
+        return 'lean_cut';
+      case FitnessGoal.leanMassGain:
+        return 'lean_gain';
       case FitnessGoal.bulkUp:
         return 'bulk_up';
     }
@@ -32,13 +49,16 @@ extension FitnessGoalX on FitnessGoal {
 
   static FitnessGoal fromPrefsKey(
     String? key, {
-    FitnessGoal fallback = FitnessGoal.leanMass,
+    FitnessGoal fallback = FitnessGoal.leanMassGain,
   }) {
     switch (key) {
       case 'diet':
         return FitnessGoal.diet;
-      case 'lean_mass':
-        return FitnessGoal.leanMass;
+      case 'lean_cut':
+        return FitnessGoal.leanMassCut;
+      case 'lean_gain':
+      case 'lean_mass': // 구버전 호환: 기존 '린매스업' → '린매스(증량)' 으로 매핑
+        return FitnessGoal.leanMassGain;
       case 'bulk_up':
         return FitnessGoal.bulkUp;
       default:
@@ -84,62 +104,160 @@ extension UserGenderX on UserGender {
   }
 }
 
-/// 나이대 (BMR 계산용 — 중앙값 연령 사용)
-enum AgeGroup { twenties, thirties, forties, fiftiesPlus }
+/// 활동 수준 (5단계) — TDEE = BMR × multiplier
+enum ActivityLevel { sedentary, light, moderate, active, veryActive }
 
-extension AgeGroupX on AgeGroup {
+extension ActivityLevelX on ActivityLevel {
+  double get multiplier {
+    switch (this) {
+      case ActivityLevel.sedentary:
+        return 1.2;
+      case ActivityLevel.light:
+        return 1.375;
+      case ActivityLevel.moderate:
+        return 1.55;
+      case ActivityLevel.active:
+        return 1.725;
+      case ActivityLevel.veryActive:
+        return 1.9;
+    }
+  }
+
   String get label {
     switch (this) {
-      case AgeGroup.twenties:
-        return '20대';
-      case AgeGroup.thirties:
-        return '30대';
-      case AgeGroup.forties:
-        return '40대';
-      case AgeGroup.fiftiesPlus:
-        return '50대 이상';
+      case ActivityLevel.sedentary:
+        return '좌식';
+      case ActivityLevel.light:
+        return '가벼움';
+      case ActivityLevel.moderate:
+        return '보통';
+      case ActivityLevel.active:
+        return '활발';
+      case ActivityLevel.veryActive:
+        return '매우 활발';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ActivityLevel.sedentary:
+        return '거의 운동하지 않음';
+      case ActivityLevel.light:
+        return '주 1~3회 가벼운 운동';
+      case ActivityLevel.moderate:
+        return '주 3~5회 중간 강도 운동';
+      case ActivityLevel.active:
+        return '주 6~7회 강도 있는 운동';
+      case ActivityLevel.veryActive:
+        return '매일 고강도 + 육체 노동';
     }
   }
 
   String get prefsKey {
     switch (this) {
-      case AgeGroup.twenties:
-        return '20s';
-      case AgeGroup.thirties:
-        return '30s';
-      case AgeGroup.forties:
-        return '40s';
-      case AgeGroup.fiftiesPlus:
-        return '50s+';
+      case ActivityLevel.sedentary:
+        return 'sedentary';
+      case ActivityLevel.light:
+        return 'light';
+      case ActivityLevel.moderate:
+        return 'moderate';
+      case ActivityLevel.active:
+        return 'active';
+      case ActivityLevel.veryActive:
+        return 'very_active';
     }
   }
 
-  int get midpointAge {
-    switch (this) {
-      case AgeGroup.twenties:
-        return 25;
-      case AgeGroup.thirties:
-        return 35;
-      case AgeGroup.forties:
-        return 45;
-      case AgeGroup.fiftiesPlus:
-        return 55;
-    }
-  }
-
-  static AgeGroup fromPrefsKey(
+  static ActivityLevel fromPrefsKey(
     String? key, {
-    AgeGroup fallback = AgeGroup.thirties,
+    ActivityLevel fallback = ActivityLevel.moderate,
   }) {
     switch (key) {
-      case '20s':
-        return AgeGroup.twenties;
-      case '30s':
-        return AgeGroup.thirties;
-      case '40s':
-        return AgeGroup.forties;
-      case '50s+':
-        return AgeGroup.fiftiesPlus;
+      case 'sedentary':
+        return ActivityLevel.sedentary;
+      case 'light':
+        return ActivityLevel.light;
+      case 'moderate':
+        return ActivityLevel.moderate;
+      case 'active':
+        return ActivityLevel.active;
+      case 'very_active':
+        return ActivityLevel.veryActive;
+      default:
+        return fallback;
+    }
+  }
+}
+
+/// 운동 강도 (4단계) — 단백질 g/kg 결정
+enum TrainingIntensity { low, moderate, high, veryHigh }
+
+extension TrainingIntensityX on TrainingIntensity {
+  double get proteinGPerKg {
+    switch (this) {
+      case TrainingIntensity.low:
+        return 1.8;
+      case TrainingIntensity.moderate:
+        return 2.0;
+      case TrainingIntensity.high:
+        return 2.2;
+      case TrainingIntensity.veryHigh:
+        return 2.4;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case TrainingIntensity.low:
+        return '낮음';
+      case TrainingIntensity.moderate:
+        return '보통';
+      case TrainingIntensity.high:
+        return '높음';
+      case TrainingIntensity.veryHigh:
+        return '매우 높음';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case TrainingIntensity.low:
+        return '가벼운 유산소 위주';
+      case TrainingIntensity.moderate:
+        return '중간 강도 근력 운동';
+      case TrainingIntensity.high:
+        return '주 4회 이상 근력 훈련';
+      case TrainingIntensity.veryHigh:
+        return '고강도 웨이트 트레이닝';
+    }
+  }
+
+  String get prefsKey {
+    switch (this) {
+      case TrainingIntensity.low:
+        return 'low';
+      case TrainingIntensity.moderate:
+        return 'moderate';
+      case TrainingIntensity.high:
+        return 'high';
+      case TrainingIntensity.veryHigh:
+        return 'very_high';
+    }
+  }
+
+  static TrainingIntensity fromPrefsKey(
+    String? key, {
+    TrainingIntensity fallback = TrainingIntensity.moderate,
+  }) {
+    switch (key) {
+      case 'low':
+        return TrainingIntensity.low;
+      case 'moderate':
+        return TrainingIntensity.moderate;
+      case 'high':
+        return TrainingIntensity.high;
+      case 'very_high':
+        return TrainingIntensity.veryHigh;
       default:
         return fallback;
     }
@@ -150,20 +268,21 @@ class NutritionCalculationInput {
   final double heightCm;
   final double weightKg;
   final UserGender gender;
-  final AgeGroup ageGroup;
+  final int age;
   final FitnessGoal goal;
+  final ActivityLevel activityLevel;
+  final TrainingIntensity intensity;
 
   const NutritionCalculationInput({
     required this.heightCm,
     required this.weightKg,
     required this.gender,
-    required this.ageGroup,
+    required this.age,
     required this.goal,
+    this.activityLevel = ActivityLevel.moderate,
+    this.intensity = TrainingIntensity.moderate,
   });
 }
-
-/// 활동계수 (중간 활동, 1.55)
-const double _activityFactor = 1.55;
 
 /// Mifflin-St Jeor 공식 기반 BMR (kcal/day)
 double _calculateBmr({
@@ -187,10 +306,12 @@ double _applyGoalAdjustment({
       final adjusted = tdee - 500;
       final floor = math.max(1200.0, weightKg * 22);
       return math.max(floor, adjusted);
-    case FitnessGoal.leanMass:
+    case FitnessGoal.leanMassCut:
+      return tdee - 200;
+    case FitnessGoal.leanMassGain:
       return tdee + 200;
     case FitnessGoal.bulkUp:
-      return tdee + 400;
+      return tdee + 500;
   }
 }
 
@@ -202,14 +323,17 @@ NutritionTargets calculateTargets(NutritionCalculationInput input) {
   if (input.heightCm <= 0) {
     throw ArgumentError.value(input.heightCm, 'heightCm', '0보다 커야 합니다');
   }
+  if (input.age <= 0) {
+    throw ArgumentError.value(input.age, 'age', '0보다 커야 합니다');
+  }
 
   final bmr = _calculateBmr(
     weightKg: input.weightKg,
     heightCm: input.heightCm,
-    age: input.ageGroup.midpointAge,
+    age: input.age,
     gender: input.gender,
   );
-  final tdee = bmr * _activityFactor;
+  final tdee = bmr * input.activityLevel.multiplier;
   final targetKcal = _applyGoalAdjustment(
     tdee: tdee,
     weightKg: input.weightKg,
@@ -219,8 +343,8 @@ NutritionTargets calculateTargets(NutritionCalculationInput input) {
   // 칼로리: 10 단위 반올림
   final kcalRounded = (targetKcal / 10).round() * 10;
 
-  // 단백질: 체중 × 1.8 g/kg
-  final proteinG = input.weightKg * 1.8;
+  // 단백질: 체중 × 강도별 g/kg
+  final proteinG = input.weightKg * input.intensity.proteinGPerKg;
 
   // 지방: 총 칼로리의 22.5%
   final fatG = kcalRounded * 0.225 / 9;

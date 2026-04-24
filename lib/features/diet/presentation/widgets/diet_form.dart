@@ -34,6 +34,9 @@ class _DietFormState extends ConsumerState<DietForm> {
   int _satisfaction = 3;
   late DateTime _timestamp;
   bool _isLoading = false;
+  // 최근 기록 칩 탭 시 DropdownButtonFormField 를 강제로 다시 빌드해
+  // initialValue 가 새 mealType 으로 반영되도록 버전 카운터를 둔다.
+  int _mealDropdownVersion = 0;
   FoodAnalysisResult? _analyzedResult;
   Uint8List? _analyzedThumbnail;
 
@@ -186,6 +189,21 @@ class _DietFormState extends ConsumerState<DietForm> {
     }
   }
 
+  void _applyRecord(DietRecord r) {
+    String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
+    setState(() {
+      _mealTypeController.text = r.mealType;
+      _mealDropdownVersion++;
+      _foodNameController.text = r.foodName;
+      _caloriesController.text = r.totalCalories.toString();
+      _carbsController.text = fmt(r.carbs);
+      _proteinController.text = fmt(r.protein);
+      _fatController.text = fmt(r.fat);
+      _memoController.text = r.memo ?? '';
+      _timestamp = DateTime.now();
+    });
+  }
+
   static final _aiTagPattern = RegExp(r'\s*\[AI 분석 \d+g\]');
 
   void _applyAnalysis(FoodAnalysisResult r, Uint8List thumbnail) {
@@ -256,7 +274,9 @@ class _DietFormState extends ConsumerState<DietForm> {
               existingThumbnail: _analyzedThumbnail,
               onClear: _clearAnalysis,
             ),
+          if (!_isEditMode) _RecentMealsRow(onPick: _applyRecord),
           DropdownButtonFormField<String>(
+            key: ValueKey('meal-$_mealDropdownVersion'),
             decoration: const InputDecoration(labelText: '식사 유형'),
             initialValue: _mealTypeController.text.isEmpty
                 ? null
@@ -399,6 +419,59 @@ class _DietFormState extends ConsumerState<DietForm> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentMealsRow extends ConsumerWidget {
+  final void Function(DietRecord) onPick;
+  const _RecentMealsRow({required this.onPick});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recents = ref.watch(recentUniqueDietRecordsProvider);
+    if (recents.isEmpty) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.history, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                '최근 식사에서 다시 추가',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: recents.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final r = recents[i];
+                return ActionChip(
+                  label: Text(r.foodName),
+                  onPressed: () => onPick(r),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 4),
         ],
       ),
     );

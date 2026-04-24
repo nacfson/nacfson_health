@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -107,9 +107,12 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         uuid TEXT UNIQUE NOT NULL,
         gender TEXT NOT NULL,
-        age_group TEXT NOT NULL,
+        age_group TEXT,
+        age INTEGER NOT NULL DEFAULT 30,
         height REAL NOT NULL,
         goal TEXT NOT NULL,
+        activity_level TEXT NOT NULL DEFAULT 'moderate',
+        training_intensity TEXT NOT NULL DEFAULT 'moderate',
         target_calories INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         sync_status INTEGER DEFAULT 1
@@ -240,6 +243,42 @@ class DatabaseHelper {
       } catch (e) {
         // 컬럼이 이미 존재하는 경우 무시
       }
+    }
+    if (oldVersion < 10) {
+      // v10: user_profiles 에 age / activity_level / training_intensity 컬럼 추가.
+      // 기존 age_group 은 NULL 허용으로 남겨두고 신규 컬럼으로 이관 (SQLite DROP COLUMN 회피).
+      try {
+        await db.execute('''
+          ALTER TABLE user_profiles
+          ADD COLUMN age INTEGER NOT NULL DEFAULT 30
+        ''');
+      } catch (_) {
+        // 이미 존재
+      }
+      try {
+        await db.execute('''
+          ALTER TABLE user_profiles
+          ADD COLUMN activity_level TEXT NOT NULL DEFAULT 'moderate'
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          ALTER TABLE user_profiles
+          ADD COLUMN training_intensity TEXT NOT NULL DEFAULT 'moderate'
+        ''');
+      } catch (_) {}
+      // age_group → age 값 백필 (중앙값). age 가 여전히 기본값 30 인 레코드에만 덮어쓴다.
+      const midpoints = {'20s': 25, '30s': 35, '40s': 45, '50s+': 55};
+      for (final entry in midpoints.entries) {
+        await db.rawUpdate(
+          'UPDATE user_profiles SET age = ? WHERE age_group = ? AND age = 30',
+          [entry.value, entry.key],
+        );
+      }
+      // 레거시 goal 문자열 정리: 'lean_mass' → 'lean_gain'
+      await db.rawUpdate(
+        "UPDATE user_profiles SET goal = 'lean_gain' WHERE goal = 'lean_mass'",
+      );
     }
   }
 

@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v9  
+> **현재 버전**: v10  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -19,6 +19,26 @@
 | v7 | `user_profiles` 신규 + Google Sheets 동기화 제거(Supabase 전환) | 온보딩/AI 인사이트 (2026-04) |
 | v8 | `workout_routines`(루틴 프리셋) + `daily_routine`(오늘 루틴) 신규 | 루틴 플래너 + 인라인 세트 입력 (2026-04) |
 | v9 | `exercise_records.set_type` 컬럼 추가 (`warmup`/`work`/`drop`/`failure`) | 세트 타입 구분 + 본세트 기준 볼륨 집계 (2026-04) |
+| v10 | `user_profiles` 에 `age` / `activity_level` / `training_intensity` 컬럼 추가 + `age_group` NOT NULL 해제 | 만 나이 직접 입력, 활동계수 5단계, 운동 강도 4단계 (2026-04) |
+
+### v10 마이그레이션 (`user_profiles` 프로필 정교화)
+
+```sql
+ALTER TABLE user_profiles ADD COLUMN age INTEGER NOT NULL DEFAULT 30;
+ALTER TABLE user_profiles ADD COLUMN activity_level TEXT NOT NULL DEFAULT 'moderate';
+ALTER TABLE user_profiles ADD COLUMN training_intensity TEXT NOT NULL DEFAULT 'moderate';
+-- age_group 중앙값으로 age 백필 (20s=25/30s=35/40s=45/50s+=55)
+UPDATE user_profiles SET age = 25 WHERE age_group = '20s'  AND age = 30;
+UPDATE user_profiles SET age = 35 WHERE age_group = '30s'  AND age = 30;
+UPDATE user_profiles SET age = 45 WHERE age_group = '40s'  AND age = 30;
+UPDATE user_profiles SET age = 55 WHERE age_group = '50s+' AND age = 30;
+-- 레거시 goal 정리
+UPDATE user_profiles SET goal = 'lean_gain' WHERE goal = 'lean_mass';
+```
+
+- `age_group` 컬럼은 SQLite `DROP COLUMN` 회피를 위해 남겨두고 `NULL` 허용으로 변경 (deprecated — 신규 코드 참조 금지).
+- Supabase 원격 DB 는 `supabase/migrations/20260424_0001_user_profiles_age_activity_intensity.sql` 로 동일 변경. `CREATE EXTENSION IF NOT EXISTS moddatetime` 트리거와는 별도.
+- SharedPreferences 마이그레이션(`SyncPreferences.migrateLegacyProfile()`): `user_age_group` → `user_age`, `fitness_goal='lean_mass'` → `'lean_gain'` 으로 1회 재작성. `lib/main.dart` 진입 시 자동 호출.
 
 ### v9 마이그레이션 (`exercise_records.set_type`)
 
@@ -144,16 +164,19 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 
 ---
 
-### 6. `user_profiles` _(v7 신규)_
+### 6. `user_profiles` _(v7 신규, v10 확장)_
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | `id` | INTEGER PK | 로컬 자동증가 (시트 연동 금지) |
 | `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
-| `gender` | TEXT | 성별 (male/female/etc) |
-| `age_group` | TEXT | 연령대 (예: 20s, 30s) |
+| `gender` | TEXT | 성별 (`male`/`female`) |
+| `age_group` | TEXT (nullable) | _deprecated (v10)_ — `age` 컬럼으로 이관 |
+| `age` | INTEGER | 만 나이 (기본 30). BMR 계산에 직접 사용 |
 | `height` | REAL | 키 (m) |
-| `goal` | TEXT | 목표 (lose/maintain/gain) |
+| `goal` | TEXT | 목표 (`diet` / `lean_cut` / `lean_gain` / `bulk_up`) |
+| `activity_level` | TEXT | 활동 수준 (`sedentary` / `light` / `moderate` / `active` / `very_active`) — TDEE 배수 결정 |
+| `training_intensity` | TEXT | 운동 강도 (`low` / `moderate` / `high` / `very_high`) — 단백질 g/kg 결정 |
 | `target_calories` | INTEGER | 일일 목표 칼로리 (kcal) |
 | `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
 | `sync_status` | INTEGER | SyncStatus 값 |
