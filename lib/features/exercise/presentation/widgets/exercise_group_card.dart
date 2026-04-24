@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
 import './exercise_progression_sheet.dart';
@@ -8,7 +10,7 @@ import './inline_set_input.dart';
 /// 카드 하단의 인라인 입력 모드. `add` = 신규 세트, `edit` = 특정 세트 수정.
 enum _InputMode { none, add, edit }
 
-class ExerciseGroupCard extends StatefulWidget {
+class ExerciseGroupCard extends ConsumerStatefulWidget {
   final String exerciseName;
   final String exerciseType;
   final List<ExerciseRecord> records;
@@ -31,10 +33,10 @@ class ExerciseGroupCard extends StatefulWidget {
   });
 
   @override
-  State<ExerciseGroupCard> createState() => _ExerciseGroupCardState();
+  ConsumerState<ExerciseGroupCard> createState() => _ExerciseGroupCardState();
 }
 
-class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
+class _ExerciseGroupCardState extends ConsumerState<ExerciseGroupCard> {
   _InputMode _mode = _InputMode.none;
   String? _editingUuid;
 
@@ -44,6 +46,38 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
 
   bool get _hasExcludedSets =>
       widget.records.any((r) => !r.countsTowardVolume);
+
+  /// 인라인 편집 모드 전이. 전역 `activeInlineEditProvider` 에 현재 카드 키를
+  /// 반영해 FAB 가 겹치지 않도록 한다. (카드 식별자는 exerciseName, 운동명 단위로 그룹화되므로 고유)
+  void _setMode(_InputMode next, {String? editingUuid}) {
+    setState(() {
+      _mode = next;
+      _editingUuid = next == _InputMode.edit ? editingUuid : null;
+    });
+    final notifier = ref.read(activeInlineEditProvider.notifier);
+    final key = widget.exerciseName;
+    final current = notifier.state;
+    if (next == _InputMode.none) {
+      if (current.contains(key)) {
+        notifier.state = {...current}..remove(key);
+      }
+    } else {
+      if (!current.contains(key)) {
+        notifier.state = {...current, key};
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // 카드가 언마운트될 때(스크롤 아웃/리빌드) 점유한 키 해제 누락 방지
+    final notifier = ref.read(activeInlineEditProvider.notifier);
+    final key = widget.exerciseName;
+    if (notifier.state.contains(key)) {
+      notifier.state = {...notifier.state}..remove(key);
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -168,10 +202,7 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
                     exerciseType: widget.exerciseType,
                     exerciseName: widget.exerciseName,
                     editing: record,
-                    onClose: () => setState(() {
-                      _mode = _InputMode.none;
-                      _editingUuid = null;
-                    }),
+                    onClose: () => _setMode(_InputMode.none),
                   );
                 }
                 return _SetRow(
@@ -179,10 +210,7 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
                   editable: widget.editable,
                   onTap: () {
                     if (widget.editable) {
-                      setState(() {
-                        _mode = _InputMode.edit;
-                        _editingUuid = record.uuid;
-                      });
+                      _setMode(_InputMode.edit, editingUuid: record.uuid);
                     } else if (widget.onEdit != null) {
                       widget.onEdit!(record);
                     }
@@ -199,16 +227,13 @@ class _ExerciseGroupCardState extends State<ExerciseGroupCard> {
               InlineSetInput(
                 exerciseType: widget.exerciseType,
                 exerciseName: widget.exerciseName,
-                onClose: () => setState(() => _mode = _InputMode.none),
+                onClose: () => _setMode(_InputMode.none),
               )
             else
               SizedBox(
                 width: double.infinity,
                 child: TextButton.icon(
-                  onPressed: () => setState(() {
-                    _mode = _InputMode.add;
-                    _editingUuid = null;
-                  }),
+                  onPressed: () => _setMode(_InputMode.add),
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('세트 추가'),
                 ),

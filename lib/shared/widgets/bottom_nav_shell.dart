@@ -10,6 +10,26 @@ import '../providers/selected_date_provider.dart';
 
 final fabActionProvider = StateProvider<VoidCallback?>((ref) => null);
 
+/// Glass bottom nav bar 의 본체 높이(safe area 제외).
+const double kGlassNavBarHeight = 72.0;
+
+/// centerFloat FAB 의 크기.
+const double kMintFabSize = 56.0;
+
+/// FAB 와 카드 사이 추가 간격 (시각적 호흡).
+const double _kFabContentGap = 8.0;
+
+/// 스크롤 영역이 FAB + 하단 탭바에 가려지지 않도록 마지막에 덧붙여야 하는 높이.
+/// viewPadding.bottom(safe area) + 탭바 높이 + FAB 기본 마진(16) + FAB + 보너스 간격.
+double bottomNavFabInset(BuildContext context) {
+  final bottom = MediaQuery.viewPaddingOf(context).bottom;
+  return bottom +
+      kGlassNavBarHeight +
+      kFloatingActionButtonMargin +
+      kMintFabSize +
+      _kFabContentGap;
+}
+
 class BottomNavShell extends ConsumerWidget {
   final Widget child;
   const BottomNavShell({super.key, required this.child});
@@ -24,8 +44,16 @@ class BottomNavShell extends ConsumerWidget {
     return 0;
   }
 
-  bool _showFab(int tabIndex, bool isToday, SheetType? activeSheet) =>
-      isToday && (tabIndex == 0 || tabIndex == 1) && activeSheet == null;
+  bool _showFab(
+    int tabIndex,
+    bool isToday,
+    SheetType? activeSheet, {
+    required bool hasInlineEdit,
+  }) =>
+      isToday &&
+      (tabIndex == 0 || tabIndex == 1) &&
+      activeSheet == null &&
+      !hasInlineEdit;
 
   void _onItemTapped(int index, BuildContext context) {
     shellNavigatorKey.currentState?.popUntil((route) => route.isFirst);
@@ -46,7 +74,13 @@ class BottomNavShell extends ConsumerWidget {
     final isToday       = ref.watch(isSelectedDateTodayProvider);
     final fabAction     = ref.watch(fabActionProvider);
     final activeSheet   = ref.watch(activeSheetProvider);
-    final showFab       = _showFab(selectedIndex, isToday, activeSheet);
+    final hasInlineEdit = ref.watch(activeInlineEditProvider).isNotEmpty;
+    final showFab = _showFab(
+      selectedIndex,
+      isToday,
+      activeSheet,
+      hasInlineEdit: hasInlineEdit,
+    );
 
     return Scaffold(
       extendBody: true,
@@ -71,8 +105,8 @@ class _MintFab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 56,
-        height: 56,
+        width: kMintFabSize,
+        height: kMintFabSize,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [AppTheme.colorMint, AppTheme.colorMintDeep],
@@ -118,7 +152,7 @@ class _GlassmorphicNavBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgOpacity = isDark ? 0.62 : 0.55;
-    final height = 72 + MediaQuery.viewPaddingOf(context).bottom;
+    final height = kGlassNavBarHeight + MediaQuery.viewPaddingOf(context).bottom;
     final useNativeGlass = NativeLiquidGlassUtils.supportsLiquidGlass;
 
     final stackChildren = <Widget>[

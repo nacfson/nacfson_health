@@ -159,7 +159,9 @@ class _DietScreenState extends ConsumerState<DietScreen> {
                 ),
               ),
             ],
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
+          SliverToBoxAdapter(
+            child: SizedBox(height: bottomNavFabInset(context)),
+          ),
         ],
       ),
     );
