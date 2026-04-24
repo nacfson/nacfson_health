@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -72,6 +72,7 @@ class DatabaseHelper {
         uuid TEXT UNIQUE NOT NULL,
         name TEXT UNIQUE NOT NULL,
         exercise_type TEXT NOT NULL DEFAULT '',
+        rest_seconds_override INTEGER,
         updated_at INTEGER NOT NULL,
         sync_status INTEGER DEFAULT 1
       )
@@ -279,6 +280,19 @@ class DatabaseHelper {
       await db.rawUpdate(
         "UPDATE user_profiles SET goal = 'lean_gain' WHERE goal = 'lean_mass'",
       );
+    }
+    if (oldVersion < 11) {
+      // v11: exercise_templates 에 rest_seconds_override 컬럼 추가.
+      // 종목별 휴식 시간 오버라이드(초). NULL 이면 부위 기본값 사용.
+      // 기존 레코드는 NULL 상태로 두어 부위 기본값이 자동 적용되도록 한다.
+      try {
+        await db.execute('''
+          ALTER TABLE exercise_templates
+          ADD COLUMN rest_seconds_override INTEGER
+        ''');
+      } catch (_) {
+        // 이미 존재
+      }
     }
   }
 

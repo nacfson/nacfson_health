@@ -6,7 +6,7 @@
 
 - **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
 - **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
-- **DB 버전**: v10 (테이블 8개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine. v10: `user_profiles` 에 `age` / `activity_level` / `training_intensity` 컬럼 추가 — 영양 목표 공식 v2)
+- **DB 버전**: v11 (테이블 8개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine. v11: `exercise_templates.rest_seconds_override` 컬럼 추가 — 종목별 휴식 시간 오버라이드 + 부위별 기본값 체계)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화
 - **데이터 흐름**: UI → Provider(StateNotifier) → Repository(Interface) → SQLite(구현체) ↔ SupabaseService ↔ Supabase API

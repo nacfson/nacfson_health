@@ -146,11 +146,8 @@ class SyncPreferences {
       _prefs.remove(_keyExerciseTemplates);
 
   // ── 휴식 타이머 ──────────────────────────────────────────────────────────────
-
-  static const _keyDefaultRestSeconds = 'default_rest_seconds';
-
-  int get defaultRestSeconds => _prefs.getInt(_keyDefaultRestSeconds) ?? 90;
-
-  Future<void> setDefaultRestSeconds(int seconds) async =>
-      _prefs.setInt(_keyDefaultRestSeconds, seconds);
+  //
+  // v11 이전에는 `default_rest_seconds` 전역값을 SharedPreferences 에 저장했으나,
+  // 부위별 기본값 + 템플릿 오버라이드 체계로 교체되면서 전역값 개념을 제거했다.
+  // 레거시 SharedPreferences 키는 자연 소멸 — 신규 코드는 읽지 않는다.
 }

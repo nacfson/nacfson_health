@@ -1,6 +1,6 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v10  
+> **현재 버전**: v11  
 > **DB 파일명**: `nacfson_health.db`  
 > **마지막 업데이트**: 2026-04
 
@@ -20,6 +20,20 @@
 | v8 | `workout_routines`(루틴 프리셋) + `daily_routine`(오늘 루틴) 신규 | 루틴 플래너 + 인라인 세트 입력 (2026-04) |
 | v9 | `exercise_records.set_type` 컬럼 추가 (`warmup`/`work`/`drop`/`failure`) | 세트 타입 구분 + 본세트 기준 볼륨 집계 (2026-04) |
 | v10 | `user_profiles` 에 `age` / `activity_level` / `training_intensity` 컬럼 추가 + `age_group` NOT NULL 해제 | 만 나이 직접 입력, 활동계수 5단계, 운동 강도 4단계 (2026-04) |
+| v11 | `exercise_templates.rest_seconds_override INTEGER` 컬럼 추가 | 종목별 휴식 시간 오버라이드. NULL=부위 기본값 (2026-04) |
+
+### v11 마이그레이션 (`exercise_templates.rest_seconds_override`)
+
+```sql
+ALTER TABLE exercise_templates ADD COLUMN rest_seconds_override INTEGER;
+```
+
+- 종목별 휴식 시간 오버라이드(초). `NULL` 이면 클라이언트에서 부위 기본값을 해석한다.
+- 유효 입력 범위: 60~300 (`kMinRestSeconds`/`kMaxRestSeconds` in `lib/features/exercise/domain/body_part_rest_defaults.dart`).
+- 기존 템플릿은 NULL 상태로 시작 — 자연스럽게 부위 기본값으로 동작.
+- Supabase 원격 DB: `supabase/migrations/20260424_0002_exercise_templates_rest_override.sql` 로 동일 컬럼 추가. 클라이언트 v11 배포 **이전** 서버 마이그레이션 먼저 적용.
+- 부위별 기본값(근비대 기준, 코드 상수): 하체 180s · 등 150s · 가슴 120s · 어깨 90s · 팔 60s · 코어 60s · 기타 90s · 유산소 `null`(타이머 미사용).
+- 전역 `default_rest_seconds` SharedPreferences 키는 v11 이후 참조되지 않음 (레거시 키 자연 소멸).
 
 ### v10 마이그레이션 (`user_profiles` 프로필 정교화)
 
@@ -116,13 +130,14 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 | `id` | INTEGER PK | 로컬 자동증가 (시트 연동 금지) |
 | `uuid` | TEXT UNIQUE | 글로벌 PK (UUID v4) |
 | `name` | TEXT UNIQUE | 종목명 |
-| `exercise_type` | TEXT | 부위 (가슴/등/팔/하체/어깨/코어) — v5 추가, default `''` |
+| `exercise_type` | TEXT | 부위 (가슴/등/팔/하체/어깨/코어/유산소/기타) — v5 추가, default `''` |
+| `rest_seconds_override` | INTEGER NULL | 종목별 휴식 시간 오버라이드 (60~300s). NULL 이면 부위 기본값 사용 — v11 추가 |
 | `updated_at` | INTEGER | 마지막 수정 시각 (ms since epoch) |
 | `sync_status` | INTEGER | TemplateSyncStatus 값 |
 
 **TemplateSyncStatus**: `synced(0)` / `created(1)` / `deleted(3)` — `modified(2)` **미사용**  
-**지원 연산**: Create · Delete (수정 없음)  
-**Pull 병합 전략**: insert-or-skip (uuid 기준, LWW 불필요)  
+**지원 연산**: Create · Delete · 휴식 override 수정(v11 — `sync_status=created` 로 재마킹, Supabase upsert 로 전파)  
+**Pull 병합 전략**: insert-or-skip (uuid 기준, LWW 불필요). 클라이언트 측 override 변경은 push 전용 — 원격에서 덮어써도 로컬은 건드리지 않음.  
 **v6 정리**: `exercise_type=''`인 행은 마이그레이션 시 일괄 삭제됨
 
 ---

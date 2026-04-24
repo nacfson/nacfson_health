@@ -5,7 +5,7 @@
 
 | 도메인 | 핵심 기능 | 관련 Provider |
 |--------|----------|---------------|
-| **exercise** | 운동 기록 (가슴/등... 순서 고정), 볼륨 계산(weight × reps), 루틴 플래너(오늘+프리셋), 인라인 세트 입력, 휴식 타이머 (인앱 + iOS Live Activity + Android 알림) | `todayExerciseGroupedProvider`, `todayExerciseCardsProvider`, `todayTotalVolumeProvider`, `routinePlannerProvider`, `workoutRoutinesProvider`, `latestSetOfTodayProvider`, `restTimerProvider`, `defaultRestSecondsProvider`, `restNotificationServiceProvider` |
+| **exercise** | 운동 기록 (가슴/등... 순서 고정), 볼륨 계산(weight × reps), 루틴 플래너(오늘+프리셋), 인라인 세트 입력, 휴식 타이머 (인앱 + iOS Live Activity + Android 알림), 부위별 기본 휴식 + 종목 override (v11) | `todayExerciseGroupedProvider`, `todayExerciseCardsProvider`, `todayTotalVolumeProvider`, `routinePlannerProvider`, `workoutRoutinesProvider`, `latestSetOfTodayProvider`, `restTimerProvider`, `restNotificationServiceProvider` |
 | **diet** | 식단 기록, 매크로(탄/단/지) 관리, 최근 기록 재추가 · 카드→템플릿 원탭 등록 | `todayDietGroupedProvider`, `todayDietSummaryProvider`, `recentUniqueDietRecordsProvider` |
 | **weight** | 체중 기록, 추세 시각화 (주/월/년 필터) | `latestWeightProvider`, `weightChartDataProvider`, `todayWeightProvider`, `chartViewTypeProvider` |
 | **summary** | 일일 요약 (fl_chart 시각화) | `dailySummaryProvider` (목표치 참조) |

@@ -19,6 +19,7 @@ class SqliteExerciseTemplateRepository
     String? uuid,
     TemplateSyncStatus? syncStatus,
   }) =>
+      // restSecondsOverride 는 copyWith sentinel 을 건드리지 않도록 생략.
       entity.copyWith(uuid: uuid, syncStatus: syncStatus);
 
   @override
@@ -39,6 +40,8 @@ class SqliteExerciseTemplateRepository
           'uuid': uuid,
           'name': s.name,
           'exercise_type': s.exerciseType,
+          // rest_seconds_override: NULL 로 두어 부위 기본값이 fallback 되도록 한다.
+          'rest_seconds_override': null,
           'updated_at': now.millisecondsSinceEpoch,
           'sync_status': TemplateSyncStatus.created.value,
         },
@@ -50,10 +53,27 @@ class SqliteExerciseTemplateRepository
   }
 
   @override
+  Future<void> updateRestOverride(String uuid, int? seconds) async {
+    final db = await DatabaseHelper.instance.database;
+    await db.update(
+      tableName,
+      {
+        'rest_seconds_override': seconds,
+        'updated_at': DateTime.now().millisecondsSinceEpoch,
+        // upsert 대상으로 마킹 — 다음 sync 에서 Supabase 로 push.
+        'sync_status': TemplateSyncStatus.created.value,
+      },
+      where: 'uuid = ?',
+      whereArgs: [uuid],
+    );
+  }
+
+  @override
   Map<String, dynamic> toMap(ExerciseTemplate t) => {
         'uuid': t.uuid,
         'name': t.name,
         'exercise_type': t.exerciseType,
+        'rest_seconds_override': t.restSecondsOverride,
         'updated_at': t.updatedAt.millisecondsSinceEpoch,
         'sync_status': t.syncStatus.value,
       };
@@ -64,6 +84,7 @@ class SqliteExerciseTemplateRepository
         uuid: map['uuid'] as String,
         name: map['name'] as String,
         exerciseType: map['exercise_type'] as String? ?? '',
+        restSecondsOverride: map['rest_seconds_override'] as int?,
         updatedAt:
             DateTime.fromMillisecondsSinceEpoch(map['updated_at'] as int),
         syncStatus: TemplateSyncStatus.fromInt(map['sync_status'] as int),

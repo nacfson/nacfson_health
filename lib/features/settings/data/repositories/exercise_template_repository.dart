@@ -11,6 +11,12 @@ abstract class ExerciseTemplateRepository {
   /// Soft delete (sync_status = deleted)
   Future<void> delete(String uuid);
 
+  /// 종목별 휴식 시간 오버라이드 업데이트(초).
+  ///
+  /// [seconds] 가 `null` 이면 오버라이드를 제거해 부위 기본값으로 되돌린다.
+  /// 내부적으로 `sync_status` 를 `created` 로 표시해 다음 동기화에서 upsert 된다.
+  Future<void> updateRestOverride(String uuid, int? seconds);
+
   /// 기본 템플릿 시드. 결정론적 UUID v5로 name UNIQUE 충돌 시 자연 dedup.
   /// 반환값은 실제 삽입된 건수.
   Future<int> seedDefaults(List<DefaultExerciseTemplateSeed> seeds);

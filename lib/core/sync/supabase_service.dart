@@ -124,6 +124,7 @@ class _ExerciseTemplateSync extends BaseSupabaseSyncService<ExerciseTemplate> {
         'user_id': userId,
         'name': t.name,
         'exercise_type': t.exerciseType,
+        'rest_seconds_override': t.restSecondsOverride,
         'updated_at': t.updatedAt.toUtc().toIso8601String(),
         'is_deleted': t.syncStatus == TemplateSyncStatus.deleted,
       };
@@ -133,6 +134,7 @@ class _ExerciseTemplateSync extends BaseSupabaseSyncService<ExerciseTemplate> {
         uuid: row['uuid'] as String,
         name: row['name'] as String,
         exerciseType: (row['exercise_type'] as String?) ?? '',
+        restSecondsOverride: row['rest_seconds_override'] as int?,
         updatedAt: DateTime.parse(row['updated_at'] as String).toLocal(),
         syncStatus: TemplateSyncStatus.synced,
       );

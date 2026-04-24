@@ -22,12 +22,13 @@
 
 ### 설정 화면
 - [x] 영양 목표값 설정 (`DietTargetCard` — 칼로리/탄단지 목표)
-- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제)
+- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제, 종목별 휴식 시간 오버라이드 v11)
 - [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)
 - [x] Google 로그인/로그아웃 (`GoogleSignInCard`)
 - [x] 스프레드시트 상태 + 수동 동기화 (`SpreadsheetStatusCard`)
 - [x] 테마 전환 — 시스템/라이트/다크 (`ThemeModeCard` + `themeModeProvider`, shared_preferences 영구 저장)
-- [x] 기본 휴식 시간 설정 (`RestTimerSettingsCard` — 60/90/120/180초, `defaultRestSecondsProvider`)
+- [x] 부위별 기본 휴식 시간 (v11 — 근비대 기준 코드 상수, 사용자 수정 불가)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;가슴 120s · 등 150s · 하체 180s · 어깨 90s · 팔 60s · 코어 60s · 기타 90s · 유산소 휴식 없음<br/>   &nbsp;&nbsp;&nbsp;&nbsp;종목별 오버라이드 → `ExerciseTemplateCard` 칩 탭(설정 탭)에서만 편집. 세션 중 ±15초 조정은 해당 세션에만 일시 적용
+- [x] ~~기본 휴식 시간 설정 (`RestTimerSettingsCard` — 60/90/120/180초)~~ v11 에서 제거 — 부위별 기본값 + 종목 오버라이드 체계로 전환
 
 ### 운동 루틴 플래너 + 인라인 세트 입력 (v8)
 - [x] DB v8 — `workout_routines` (Supabase 동기화) + `daily_routine` (로컬 전용) 테이블
@@ -49,7 +50,7 @@
 
 ### 휴식 타이머 (v7.1)
 - [x] **인앱 sticky 미니바** (`RestTimerBar` — BottomNavShell 오버레이, 모든 탭에서 가시성 유지)
-- [x] 운동 세트 신규 저장 시 자동 시작 (`InlineSetInput._submit` → `restTimerProvider.start`)
+- [x] 운동 세트 신규 저장 시 자동 시작 (`InlineSetInput._submit` → `restTimerProvider.start`, 부위 기본값/종목 override 해석)
 - [x] ±15초 빠른 조정 (`RestTimerBar` 인라인 버튼 + 알림 액션) / 일시정지·재개 / 수동 종료
 - [x] 백그라운드 복귀 정확성 (`endAt` 기반 계산, Timer.periodic은 UI 갱신 전용)
 - [x] 5초 전 햅틱 1회 + 0초 도달 시 강한 햅틱 (`HapticFeedback`)

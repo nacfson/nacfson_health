@@ -4,8 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/sync/sync_preferences.dart';
-import '../../../../core/sync/sync_state.dart';
 import '../../data/rest_notification_service.dart';
 
 /// 휴식 타이머의 권위 있는 상태.
@@ -263,20 +261,3 @@ final restTimerProvider =
     StateNotifierProvider<RestTimerNotifier, RestTimerState>(
   (ref) => RestTimerNotifier(ref.watch(restNotificationServiceProvider)),
 );
-
-/// 글로벌 기본 휴식 시간(초). SharedPreferences에 영속됩니다.
-final defaultRestSecondsProvider = StateNotifierProvider<
-    DefaultRestSecondsNotifier, int>((ref) {
-  return DefaultRestSecondsNotifier(ref.read(syncPreferencesProvider));
-});
-
-class DefaultRestSecondsNotifier extends StateNotifier<int> {
-  DefaultRestSecondsNotifier(this._prefs) : super(_prefs.defaultRestSeconds);
-
-  final SyncPreferences _prefs;
-
-  Future<void> set(int seconds) async {
-    await _prefs.setDefaultRestSeconds(seconds);
-    state = seconds;
-  }
-}

@@ -4,7 +4,6 @@ import '../widgets/diet_target_card.dart';
 import '../widgets/exercise_template_card.dart';
 import '../widgets/food_template_card.dart';
 import '../widgets/google_sign_in_card.dart';
-import '../widgets/rest_timer_settings_card.dart';
 import '../widgets/spreadsheet_status_card.dart';
 import '../widgets/theme_mode_card.dart';
 
@@ -57,8 +56,6 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          const RestTimerSettingsCard(),
           const SizedBox(height: 16),
           const GoogleSignInCard(),
           const SizedBox(height: 16),

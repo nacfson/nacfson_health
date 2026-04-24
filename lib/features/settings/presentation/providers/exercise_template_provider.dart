@@ -78,4 +78,10 @@ class ExerciseTemplateNotifier
     await _repository.delete(uuid);
     state = await _repository.getAll();
   }
+
+  /// 종목별 휴식 시간 오버라이드 업데이트. [seconds] 가 null 이면 부위 기본값으로 복귀.
+  Future<void> updateRestOverride(String uuid, int? seconds) async {
+    await _repository.updateRestOverride(uuid, seconds);
+    state = await _repository.getAll();
+  }
 }

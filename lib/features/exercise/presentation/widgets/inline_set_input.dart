@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../settings/presentation/providers/exercise_template_provider.dart';
+import '../../domain/body_part_rest_defaults.dart';
 import '../../domain/entities/exercise_record.dart';
 import '../../domain/entities/routine_item.dart';
 import '../providers/exercise_provider.dart';
@@ -129,11 +131,23 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
                 exerciseName: widget.exerciseName,
               ),
             );
-        // 휴식 타이머 자동 시작
-        final defaultSec = ref.read(defaultRestSecondsProvider);
-        ref
-            .read(restTimerProvider.notifier)
-            .start(defaultSec, exerciseName: widget.exerciseName);
+        // 휴식 타이머 자동 시작.
+        // 종목 템플릿의 override > 부위 기본값 > "기타" 폴백 순서로 해석.
+        // 유산소는 `null` 을 돌려주므로 타이머 시작 자체를 건너뛴다.
+        final matches = ref
+            .read(exerciseTemplatesProvider)
+            .where((t) => t.name == widget.exerciseName)
+            .toList();
+        final matched = matches.isEmpty ? null : matches.first;
+        final int? restSec = matched != null
+            ? resolveRestSeconds(matched)
+            // 템플릿이 없는 즉흥 종목: 운동 유형 문자열만으로 부위 기본값 해석.
+            : defaultRestForBodyPart(widget.exerciseType);
+        if (restSec != null) {
+          ref
+              .read(restTimerProvider.notifier)
+              .start(restSec, exerciseName: widget.exerciseName);
+        }
         // 연속 입력: 필드 유지 + 중량 포커스 복귀
         // 연속 입력 시 타입은 직전 선택을 유지(웜업 3개 연속 입력 패턴 지원).
         if (mounted) {
