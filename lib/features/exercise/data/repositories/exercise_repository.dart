@@ -3,8 +3,8 @@ import '../../domain/entities/exercise_record.dart';
 abstract class ExerciseRepository {
   Future<List<ExerciseRecord>> getAll();
   Future<List<ExerciseRecord>> getByDate(DateTime date);
-  Future<void> add(ExerciseRecord record);
-  Future<void> update(ExerciseRecord record);
+  Future<ExerciseRecord> add(ExerciseRecord record);
+  Future<ExerciseRecord> update(ExerciseRecord record);
   Future<void> delete(String uuid);
 
   /// 선택된 날짜의 특정 운동명 레코드를 모두 soft delete 한다.

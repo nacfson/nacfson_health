@@ -64,7 +64,9 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
     return result.map(fromMap).toList();
   }
 
-  Future<void> add(T record) async {
+  /// 새 레코드를 insert 하고 stamp 된 normalized 본문을 반환한다.
+  /// 호출자(Notifier)는 반환값으로 in-memory state 를 갱신해 `getAll()` 재쿼리를 피한다.
+  Future<T> add(T record) async {
     final db = await _dbHelper.database;
     final now = DateTime.now();
     final newRecord = copyWithSync(
@@ -74,9 +76,11 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
       syncStatus: SyncStatus.created,
     );
     await db.insert(tableName, toMap(newRecord));
+    return newRecord;
   }
 
-  Future<void> update(T record) async {
+  /// update 후 stamp 된 normalized 본문을 반환한다.
+  Future<T> update(T record) async {
     final db = await _dbHelper.database;
     final updated = copyWithSync(
       record,
@@ -89,6 +93,7 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
       where: 'uuid = ?',
       whereArgs: [record.uuid],
     );
+    return updated;
   }
 
   Future<void> delete(String uuid) async {
@@ -134,28 +139,52 @@ abstract class BaseSyncableSqliteRepository<T extends SyncableEntity> {
   /// Insert 경로는 `add()` 를 재사용하지 않는다 — `add()` 는 `updatedAt` 을 현재 시간으로 덮고
   /// `syncStatus` 를 `created` 로 강제하므로, remote 메타데이터가 왜곡되어 다음 push 때
   /// 서버의 `updated_at` 을 과거 값으로 되돌릴 위험이 있다.
+  ///
+  /// 동작: 원격 목록의 uuid 들을 한 번(혹은 청크 단위)에 SELECT 해 로컬 맵을 만들고,
+  /// 단일 트랜잭션 안에서 insert/update 를 수행한다. (이전 N+1 패턴 제거)
   Future<void> mergeRemoteRecords(List<T> remote) async {
-    for (final remoteRecord in remote) {
-      final existing = await findByUuid(remoteRecord.uuid);
-      if (existing == null) {
-        await _insertFromRemote(remoteRecord);
-      } else {
-        final remoteTime = remoteRecord.updatedAt.millisecondsSinceEpoch;
-        final localTime = existing.updatedAt.millisecondsSinceEpoch;
-        if (remoteTime > localTime) {
-          await hardUpdate(remoteRecord);
+    if (remote.isEmpty) return;
+    final localByUuid =
+        await _findExistingByUuids(remote.map((r) => r.uuid).toList());
+    final db = await _dbHelper.database;
+    await db.transaction((txn) async {
+      for (final r in remote) {
+        final existing = localByUuid[r.uuid];
+        if (existing == null) {
+          await txn.insert(
+            tableName,
+            toMap(copyWithSync(r, syncStatus: SyncStatus.synced)),
+          );
+        } else if (r.updatedAt.isAfter(existing.updatedAt)) {
+          await txn.update(
+            tableName,
+            toMap(r),
+            where: 'uuid = ?',
+            whereArgs: [r.uuid],
+          );
         }
       }
-    }
+    });
   }
 
-  Future<void> _insertFromRemote(T remoteRecord) async {
+  Future<Map<String, T>> _findExistingByUuids(List<String> uuids) async {
+    if (uuids.isEmpty) return const {};
     final db = await _dbHelper.database;
-    final synced = copyWithSync(
-      remoteRecord,
-      syncStatus: SyncStatus.synced,
-    );
-    await db.insert(tableName, toMap(synced));
+    final result = <String, T>{};
+    for (var i = 0; i < uuids.length; i += _maxBindsPerQuery) {
+      final end = i + _maxBindsPerQuery;
+      final chunk = uuids.sublist(i, end > uuids.length ? uuids.length : end);
+      final rows = await db.query(
+        tableName,
+        where: 'uuid IN (${chunk.map((_) => '?').join(',')})',
+        whereArgs: chunk,
+      );
+      for (final row in rows) {
+        final entity = fromMap(row);
+        result[entity.uuid] = entity;
+      }
+    }
+    return result;
   }
 
   Future<void> hardDeleteSyncedDeleted() async {

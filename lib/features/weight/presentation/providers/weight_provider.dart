@@ -27,26 +27,34 @@ class WeightNotifier extends StateNotifier<List<WeightRecord>> {
   Future<void> addRecord(WeightRecord record) async {
     final existing = await _repository.getByDate(record.timestamp);
     if (existing != null) {
-      final updated = existing.copyWith(
+      final saved = await _repository.update(existing.copyWith(
         weight: record.weight,
         updatedAt: DateTime.now(),
-      );
-      await _repository.update(updated);
+      ));
+      state = _sortDesc([
+        for (final r in state) r.uuid == saved.uuid ? saved : r,
+      ]);
     } else {
-      await _repository.add(record);
+      final saved = await _repository.add(record);
+      state = _sortDesc([...state, saved]);
     }
-    state = await _repository.getAll();
   }
 
   Future<void> updateRecord(WeightRecord record) async {
-    await _repository.update(record);
-    await refresh();
+    final saved = await _repository.update(record);
+    state = _sortDesc([
+      for (final r in state) r.uuid == saved.uuid ? saved : r,
+    ]);
   }
 
   Future<void> deleteRecord(String uuid) async {
     await _repository.delete(uuid);
-    await refresh();
+    state = state.where((r) => r.uuid != uuid).toList();
   }
+
+  /// `getAll()` 의 정렬 규약(timestamp DESC) 을 in-memory 갱신에서도 유지.
+  static List<WeightRecord> _sortDesc(List<WeightRecord> list) =>
+      list..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
   List<WeightRecord> getByDateRange(DateTime start, DateTime end) {
     return state

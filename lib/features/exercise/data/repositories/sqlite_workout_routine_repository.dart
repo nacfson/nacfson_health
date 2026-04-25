@@ -91,22 +91,52 @@ class SqliteWorkoutRoutineRepository implements WorkoutRoutineRepository {
 
   @override
   Future<void> mergeRemoteRoutines(List<WorkoutRoutine> remote) async {
-    for (final r in remote) {
-      final existing = await _findByUuid(r.uuid);
-      if (existing == null) {
-        final db = await _dbHelper.database;
-        await db.insert(
-          'workout_routines',
-          _toMap(r.copyWith(syncStatus: SyncStatus.synced)),
-        );
-      } else {
-        final remoteTime = r.updatedAt.millisecondsSinceEpoch;
-        final localTime = existing.updatedAt.millisecondsSinceEpoch;
-        if (remoteTime > localTime) {
-          await _hardUpdate(r.copyWith(syncStatus: SyncStatus.synced));
+    if (remote.isEmpty) return;
+    final localByUuid =
+        await _findExistingByUuids(remote.map((r) => r.uuid).toList());
+    final db = await _dbHelper.database;
+    await db.transaction((txn) async {
+      for (final r in remote) {
+        final existing = localByUuid[r.uuid];
+        if (existing == null) {
+          await txn.insert(
+            'workout_routines',
+            _toMap(r.copyWith(syncStatus: SyncStatus.synced)),
+          );
+        } else if (r.updatedAt.isAfter(existing.updatedAt)) {
+          await txn.update(
+            'workout_routines',
+            _toMap(r.copyWith(syncStatus: SyncStatus.synced)),
+            where: 'uuid = ?',
+            whereArgs: [r.uuid],
+          );
         }
       }
+    });
+  }
+
+  /// SQLite SQLITE_MAX_VARIABLE_NUMBER(999) 대비 여유 마진.
+  static const int _maxBindsPerQuery = 900;
+
+  Future<Map<String, WorkoutRoutine>> _findExistingByUuids(
+      List<String> uuids) async {
+    if (uuids.isEmpty) return const {};
+    final db = await _dbHelper.database;
+    final result = <String, WorkoutRoutine>{};
+    for (var i = 0; i < uuids.length; i += _maxBindsPerQuery) {
+      final end = i + _maxBindsPerQuery;
+      final chunk = uuids.sublist(i, end > uuids.length ? uuids.length : end);
+      final rows = await db.query(
+        'workout_routines',
+        where: 'uuid IN (${chunk.map((_) => '?').join(',')})',
+        whereArgs: chunk,
+      );
+      for (final row in rows) {
+        final routine = _fromMap(row);
+        result[routine.uuid] = routine;
+      }
     }
+    return result;
   }
 
   @override
@@ -131,28 +161,6 @@ class SqliteWorkoutRoutineRepository implements WorkoutRoutineRepository {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
-
-  Future<WorkoutRoutine?> _findByUuid(String uuid) async {
-    final db = await _dbHelper.database;
-    final result = await db.query(
-      'workout_routines',
-      where: 'uuid = ?',
-      whereArgs: [uuid],
-      limit: 1,
-    );
-    if (result.isEmpty) return null;
-    return _fromMap(result.first);
-  }
-
-  Future<void> _hardUpdate(WorkoutRoutine r) async {
-    final db = await _dbHelper.database;
-    await db.update(
-      'workout_routines',
-      _toMap(r),
-      where: 'uuid = ?',
-      whereArgs: [r.uuid],
-    );
-  }
 
   Map<String, dynamic> _toMap(WorkoutRoutine r) => {
         'uuid': r.uuid,

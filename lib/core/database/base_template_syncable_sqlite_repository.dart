@@ -43,7 +43,10 @@ abstract class BaseTemplateSyncableSqliteRepository<
     return result.map(fromMap).toList();
   }
 
-  Future<void> add(T template) async {
+  /// stamp 된 normalized 본문을 반환한다. UNIQUE 충돌(이름 중복)로 무시된 경우에도
+  /// 이 객체를 그대로 사용하면 in-memory state 가 DB 와 어긋날 수 있다 — 호출자는
+  /// 충돌 가능성이 있으면 반환값 대신 `refresh()` 로 재조회하는 것이 안전하다.
+  Future<T> add(T template) async {
     final db = await _dbHelper.database;
     final record = copyWithSync(
       template,
@@ -55,6 +58,7 @@ abstract class BaseTemplateSyncableSqliteRepository<
       toMap(record),
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
+    return record;
   }
 
   Future<void> delete(String uuid) async {
