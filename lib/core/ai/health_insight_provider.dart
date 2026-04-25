@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/activity/presentation/providers/activity_provider.dart';
 import '../../features/summary/presentation/providers/summary_provider.dart';
 import '../../features/weight/presentation/providers/weight_provider.dart';
 import '../../shared/providers/selected_date_provider.dart';
@@ -51,12 +52,16 @@ final healthInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   final latestWeight  = ref.watch(latestWeightProvider);
   final recentWeights = ref.watch(weightChartDataProvider);
 
+  // 활동 데이터는 권한이 없거나 로딩 중이면 null 로 두고 인사이트 생성에 막지 않는다.
+  final activity = ref.watch(dailyActivityProvider).valueOrNull;
+
   final ctx = HealthContext(
     date: selectedDate,
     weightKg: latestWeight?.weight,
     heightM: heightM,
     summary: summary,
     recentWeights: recentWeights,
+    activity: activity,
   );
 
   final cacheKey = insightCacheKey(selectedDate, ctx);
@@ -68,6 +73,7 @@ final healthInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     heightM: ctx.heightM,
     summary: ctx.summary,
     recentWeights: ctx.recentWeights,
+    activity: ctx.activity,
   );
 
   ref

@@ -19,7 +19,8 @@
 - **DB 테이블/컬럼 변경, 마이그레이션 작성 시**: `docs/db-schema.md`
 - **Supabase 서버 스키마/트리거 수정, 신규 sync 테이블 추가 시**: `docs/db-schema.md` 의 "Supabase 서버 스키마 관리" 섹션 및 `supabase/migrations/` 확인
 - **UI 위젯/레이아웃/네비게이션 수정 시**: `docs/ui-architecture.md`
-- **도메인 모듈(exercise/diet/weight/sync/settings) 수정 시**: `docs/domains.md`
+- **도메인 모듈(exercise/diet/weight/sync/settings/activity) 수정 시**: `docs/domains.md`
+- **Apple Health / Android Health Connect 연동, 활동 데이터(걸음/심박/칼로리) 변경 시**: `docs/architecture.md` 의 "외부 활동 데이터 흐름" 섹션 + `docs/build-debug.md` 의 "Apple Health & Android Health Connect 디버깅" 섹션
 - **에러 처리, try/catch 패턴 작성 시**: `docs/error-handling.md`
 - **기능 완료/백로그 업데이트 시**: `docs/features.md`
 - **새 도메인/테이블 추가 시**: `docs/implementation-guide.md`

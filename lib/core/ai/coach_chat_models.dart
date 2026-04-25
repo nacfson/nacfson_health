@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
+import '../../features/activity/domain/entities/daily_activity.dart';
 import '../../features/summary/domain/entities/daily_summary.dart';
 import '../../features/weight/domain/entities/weight_record.dart';
 
@@ -36,12 +37,17 @@ class HealthContext {
   final DailySummary? summary;
   final List<WeightRecord> recentWeights;
 
+  /// Apple Health / Health Connect 에서 읽어 온 일일 활동 요약. 권한 미허용 또는
+  /// 데이터 없음이면 null. null 이면 프롬프트에서 "활동 데이터 없음" 으로 표기.
+  final DailyActivity? activity;
+
   const HealthContext({
     required this.date,
     required this.weightKg,
     required this.heightM,
     required this.summary,
     required this.recentWeights,
+    this.activity,
   });
 
   double? get bmi {
@@ -97,6 +103,18 @@ class HealthContext {
     } else {
       buffer.writeln('- 오늘 운동: 기록 없음');
     }
+    final a = activity;
+    if (a != null && !a.isEmpty) {
+      buffer.writeln(
+        '- 오늘 활동: ${a.steps}보, 활동 ${a.activeCaloriesKcal.round()}kcal + 기초 ${a.basalCaloriesKcal.round()}kcal 소모',
+      );
+      if (a.averageHeartRateBpm != null) {
+        buffer.writeln(
+          '- 평균 심박: ${a.averageHeartRateBpm}bpm'
+          '${a.restingHeartRateBpm != null ? " (안정 시 ${a.restingHeartRateBpm}bpm)" : ""}',
+        );
+      }
+    }
     return buffer.toString();
   }
 
@@ -121,6 +139,12 @@ class HealthContext {
       recentWeights.isNotEmpty
           ? recentWeights.last.weight.toStringAsFixed(1)
           : '-',
+      // 활동 데이터: 핵심 수치가 바뀌면 캐시 키도 바뀌어 새 인사이트 생성.
+      activity?.steps.toString() ?? '-',
+      activity?.activeCaloriesKcal.toStringAsFixed(0) ?? '-',
+      activity?.basalCaloriesKcal.toStringAsFixed(0) ?? '-',
+      activity?.averageHeartRateBpm?.toString() ?? '-',
+      activity?.restingHeartRateBpm?.toString() ?? '-',
     ];
     final digest = sha256.convert(utf8.encode(parts.join(':')));
     return digest.toString().substring(0, 8);

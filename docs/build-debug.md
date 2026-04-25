@@ -847,3 +847,38 @@ end
 - Push Notifications/aps-environment 서명 오류를 보면 먼저 서명 팀이 Personal 인지 확인한다.
 - Personal 팀을 유지하면서 Live Activity 를 쓰려면 반드시 v2.4.4+ + `iOSEnableRemoteUpdates: false` 조합을 사용한다.
 - v2.4.3 이하로 다운그레이드하면 이 해결책은 복원 불가 — 반드시 플러그인 버전을 먼저 확인한다.
+
+---
+
+## Apple Health & Android Health Connect 디버깅 (Phase 1, 2026-04)
+
+### iOS HealthKit — Personal Team 한계
+Apple은 HealthKit 을 무료(Personal) 팀에서도 개발 빌드까지 허용하지만, entitlement 검증 / 권한 시트 미동작 사례가 있다. 다음 순서로 디버깅:
+
+1. **빌드 자체가 실패**: Xcode → Runner 타겟 → Signing & Capabilities → "+ Capability" → HealthKit 추가. App ID에 capability가 없으면 자동으로 추가 시도하나, Personal 팀에선 일부 환경에서 막힌다.
+2. **빌드 성공인데 권한 시트가 안 뜸**: `flutter clean && cd ios && LANG=en_US.UTF-8 pod install && cd ..` 후 재빌드. Provisioning profile이 캐싱돼 entitlement 미반영 케이스.
+3. **시트는 뜨는데 read 시 항상 빈 데이터**: Apple은 보안상 read 거부를 앱에 알려주지 않는다 → `ActivitySummaryCard` 의 `_AmbiguousEmptyBody` 가 노출됨. iPhone 설정 → 개인정보 보호 → 건강 → Nacfson Health 에서 토글 확인.
+4. **시뮬레이터에선 조회 불가**: iOS 시뮬레이터엔 Health 앱이 없다. macOS Health.app(설치돼 있다면)과 sync하거나 실기기에서 Health 앱에 수동 입력 후 검증.
+
+> **트레이드오프**: Personal Team 으로 시트가 끝까지 안 뜨면 (a) 유료 Apple Developer Program(연 99달러) 가입 또는 (b) iOS는 정식 배포 단계까지 보류하고 Android만 진행. `ActivitySummaryCard` 는 권한 미허용 시 자동으로 권한 카드를 노출하므로 코드 변경 없이 둘 다 가능.
+
+### Android Health Connect — 패키지 가시성 + 권한 정책
+1. **`HealthConnectSdkStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED`**: Android 13 이전 디바이스는 Health Connect 앱을 Play Store에서 수동 설치해야 한다. `ActivityPermissionCard.needsHealthConnectInstall` 분기에서 안내.
+2. **권한 시트가 한 번만 뜨고 다시 안 뜸**: Health Connect 앱(설정 → 앱 → Health Connect → 권한)에서 직접 권한을 회수해야 시트가 다시 뜸.
+3. **Google Play 심사에서 반려**: `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE` 액션을 처리하는 Activity 가 개인정보 처리방침을 표시해야 한다. `PrivacyPolicyActivity.kt` 가 이 책임을 진다 — 정식 배포 전 placeholder 텍스트를 정책 URL로 교체할 것.
+4. **`<queries>` 누락 시 Health Connect 패키지 가시성 0**: Android 11+ package visibility 정책. AndroidManifest 의 `<queries>` 블록에 `<package android:name="com.google.android.apps.healthdata"/>` 가 반드시 있어야 `getHealthConnectSdkStatus` 가 정확한 값을 반환.
+
+### `health` 패키지 13.x API 변화
+- 11.x 이하의 `HealthFactory` 패턴 → 13.x는 싱글톤 `Health()` + `configure()` 호출.
+- `getHealthDataFromTypes` 가 named parameter (`startTime`/`endTime`/`types`) 로 바뀜.
+- `intl ^0.20` 과 호환되는 첫 메이저는 13.x. 12.x 이하로는 `intl` constraint 충돌로 pub get 실패.
+
+### CocoaPods 한국어 locale 인코딩 회귀
+`pod install` 시 `Unicode Normalization not appropriate for ASCII-8BIT (Encoding::CompatibilityError)` 발생하는 경우 — Ruby 4.0.2 + ko-KR 환경 조합 버그. 해결: `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install`.
+
+### 디버깅 체크리스트
+- [ ] `flutter pub get` 성공 (intl/health 충돌 없음)
+- [ ] iOS: `Runner.entitlements` 에 `com.apple.developer.healthkit = true`, Info.plist 에 `NSHealthShareUsageDescription`
+- [ ] Android: `minSdk = 26+`, Manifest 권한 5종 + `<queries>` Health Connect 패키지 + `PrivacyPolicyActivity` 등록
+- [ ] 실기기에서 다른 앱(삼성헬스/Google Fit/Apple Watch) 이 활동 데이터를 기록하고 있는지 확인 (빈 Health Connect/HealthKit 은 모든 값이 0이라 동작 검증 불가)
+- [ ] 앱 백그라운드 → resume 시 활동 카드가 자동 갱신되는지 (`AppLifecycleState.resumed` 핸들러)

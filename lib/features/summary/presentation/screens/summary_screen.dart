@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 
 import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
+import '../../../activity/presentation/widgets/activity_summary_card.dart';
 import '../../../exercise/presentation/widgets/volume_trend_chart.dart';
 import '../../../diet/presentation/widgets/calorie_trend_chart.dart';
 import '../../domain/entities/daily_summary.dart';
@@ -33,6 +34,7 @@ class SummaryScreen extends ConsumerWidget {
           const SliverToBoxAdapter(child: WorkoutHeatmapCard()),
           SliverToBoxAdapter(child: _DateHeader(date: summary.date)),
           const SliverToBoxAdapter(child: _AiInsightCard()),
+          const SliverToBoxAdapter(child: ActivitySummaryCard()),
           if (summary.dietNutrition != null) ...[
             SliverToBoxAdapter(
               child: _CalorieDonutCard(nutrition: summary.dietNutrition!),

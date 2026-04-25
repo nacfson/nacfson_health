@@ -130,6 +130,17 @@
 - [x] **요약 카드 "더 물어보기" CTA** (`_AiInsightCard` 하단 TextButton)
 - [x] `evaluateSuggestedPrompts` pure function — 테스트 용이성을 위해 Provider와 분리
 
+### Apple Health & Android Health Connect 연동 (Phase 1, 2026-04)
+- [x] `health: ^13.3.1` 패키지 통합 (iOS HealthKit + Android Health Connect 단일 API)
+- [x] iOS: `NSHealthShareUsageDescription` Info.plist + `com.apple.developer.healthkit` entitlement (Personal Team 환경에서는 시트 미동작 가능 — 유료 가입 필요할 수 있음)
+- [x] Android: Health Connect 5종 권한 (STEPS / ACTIVE_CALORIES_BURNED / BASAL_METABOLIC_RATE / HEART_RATE / RESTING_HEART_RATE), `<queries>` Health Connect 패키지 가시성, `PrivacyPolicyActivity` (Google Play 정책 강제), minSdk 26 상향
+- [x] `lib/features/activity/` 신규 도메인 — `DailyActivity` 엔티티, `HealthDataSource` 추상 + `HealthDataSourceImpl`, `HealthActivityRepository`
+- [x] Riverpod 인메모리 캐시 (Supabase 미동기화) + `AppLifecycleState.resumed` 시 자동 invalidate
+- [x] `ActivityPermissionCard` (notDetermined/denied/needsHealthConnectInstall) + `ActivitySummaryCard` (걸음/소모/심박)
+- [x] iOS read 권한 불투명성 양가적 안내 ("권한이 꺼져 있거나 데이터가 없거나")
+- [x] `HealthContext` + `GeminiService.getHealthInsight` + Gemini 프롬프트에 활동 라인 추가 — 1만보 걸은 날 vs 좌식 날 추천 차별화
+- [x] 단위 테스트 10개 (`test/features/activity/`) — 엔티티 invariants + 프롬프트 라인 + contentHash 안정성
+
 ---
 
 ## 구현 패턴 요약

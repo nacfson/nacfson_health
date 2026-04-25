@@ -24,7 +24,8 @@ android {
         applicationId = "com.nacfson.nacfson_health"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Health Connect 요구사항(minSdk 26+) 충족 — 이전 디바이스에선 활동 카드만 graceful fallback 처리.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

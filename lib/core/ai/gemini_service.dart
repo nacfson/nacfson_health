@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
+import '../../features/activity/domain/entities/daily_activity.dart';
 import '../../features/diet/domain/entities/food_analysis_result.dart';
 import '../../features/summary/domain/entities/daily_summary.dart';
 import '../../features/weight/domain/entities/weight_record.dart';
@@ -56,6 +57,7 @@ class GeminiService {
     required double heightM,
     required DailySummary? summary,
     required List<WeightRecord> recentWeights,
+    DailyActivity? activity,
   }) async {
     final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
     if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
@@ -67,6 +69,7 @@ class GeminiService {
       heightM: heightM,
       summary: summary,
       recentWeights: recentWeights,
+      activity: activity,
     );
 
     try {
@@ -84,6 +87,7 @@ class GeminiService {
     required double heightM,
     required DailySummary? summary,
     required List<WeightRecord> recentWeights,
+    DailyActivity? activity,
   }) {
     final buffer = StringBuffer();
     buffer.writeln('당신은 전문 건강 코치입니다. 아래 건강 데이터를 분석하여 간결하고 실용적인 한국어 조언을 제공해주세요.');
@@ -131,6 +135,21 @@ class GeminiService {
       }
     } else {
       buffer.writeln('\n• 오늘 운동 없음');
+    }
+
+    // 활동 정보 (Apple Health / Health Connect). 권한 거부/데이터 부재면 라인 생략.
+    if (activity != null && !activity.isEmpty) {
+      buffer.writeln('\n【오늘 활동】');
+      buffer.writeln('• 걸음: ${activity.steps}보');
+      buffer.writeln(
+        '• 소모 칼로리: 활동 ${activity.activeCaloriesKcal.round()}kcal + 기초 ${activity.basalCaloriesKcal.round()}kcal',
+      );
+      if (activity.averageHeartRateBpm != null) {
+        buffer.writeln('• 평균 심박: ${activity.averageHeartRateBpm}bpm');
+      }
+      if (activity.restingHeartRateBpm != null) {
+        buffer.writeln('• 안정 시 심박: ${activity.restingHeartRateBpm}bpm');
+      }
     }
 
     buffer.writeln('\n위 데이터를 바탕으로 오늘의 건강 상태와 개선 포인트를 150자 이내로 알려주세요.');

@@ -14,6 +14,7 @@
 | **theme** | 다크/라이트/시스템 모드 전환 (shared_preferences 영구 저장) | `themeModeProvider` (`ThemeModeNotifier`) |
 | **onboarding** | 첫 실행 키/체중/만 나이/활동 수준/운동 강도/목표 입력 + 라우팅 게이트 (`refreshListenable`) | `onboardingDoneProvider`, `heightMProvider` |
 | **ai** | Gemini 기반 건강 인사이트 + 코치 챗봇 (데이터 해시 캐시 + 60초 디바운스 + 세션 휘발 챗) | `healthInsightProvider`, `insightCacheProvider`, `insightLastRefreshAtProvider`, `insightCanRefreshProvider`, `suggestedPromptsProvider`, `coachChatProvider`, `coachChatCallCountProvider`, `foodVisionAnalysisProvider` |
+| **activity** | Apple Health(HealthKit) / Android Health Connect 활동 데이터(걸음/활동·기초대사 칼로리/평균·안정 시·최대 심박) 조회 — **로컬 캐시만**(Supabase 미동기화), 앱 resume 시 자동 invalidate, 권한 거부/iOS read 불투명성 양가적 안내 | `activityRepositoryProvider`, `healthDataSourceProvider`, `activityAuthStatusProvider`, `dailyActivityProvider` |
 
 ---
 

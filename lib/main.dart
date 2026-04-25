@@ -13,6 +13,7 @@ import 'core/ai/food_vision_provider.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
 import 'core/widget/home_widget_service.dart';
+import 'features/activity/presentation/providers/activity_provider.dart';
 import 'features/diet/presentation/providers/diet_provider.dart';
 import 'features/exercise/presentation/providers/exercise_provider.dart';
 import 'features/exercise/data/rest_notification_service.dart';
@@ -228,6 +229,11 @@ class _NacfsonHealthAppWithSyncState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _triggerSync();
+      // 외부 source of truth (Apple Health / Health Connect) 가 백그라운드 동안
+      // 갱신됐을 수 있으므로 활동 캐시를 invalidate. 권한 상태도 함께 재평가
+      // (사용자가 OS 설정에서 권한을 토글한 케이스 대응).
+      ref.invalidate(activityAuthStatusProvider);
+      ref.invalidate(dailyActivityProvider);
     }
   }
 

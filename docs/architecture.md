@@ -85,6 +85,7 @@
 │  • dailySummaryProvider                               │
 │  • heightMProvider                                    │
 │  • latestWeightProvider + weightChartDataProvider     │
+│  • dailyActivityProvider (Apple Health/HC, valueOrNull)│
 └─────────────────────┬────────────────────────────────┘
                       │
                       ▼  HealthContext 스냅샷 + contentHash
@@ -143,6 +144,51 @@ showCoachChatSheet (90% 하단 모달)
 
 **비용 방어 원칙**: 호출 직전 카운트 증가(increment-before) — 네트워크 실패/예외에도 카운트 소모.  
 **세션 히스토리**: SharedPreferences 영속 X — 매번 새 대화로 시작.
+
+---
+
+## 외부 활동 데이터 흐름 (Apple Health / Android Health Connect, 2026-04)
+
+`lib/features/activity/` 도메인은 **외부 source of truth (HealthKit / Health Connect)** 에서 활동 데이터를 읽어 오는 유일한 도메인이다. SQLite/Supabase 동기화 대상이 아니며, Riverpod 인메모리 캐시만으로 동작한다.
+
+### 흐름
+
+```
+[OS HealthKit / Health Connect]  ← source of truth
+                │
+                ▼
+HealthDataSource (health: ^13.3.1 래퍼)
+  ├─ checkAvailability()       — Health Connect 설치 여부 + 권한 보유 확인
+  ├─ requestAuthorization()    — OS 권한 시트 호출
+  └─ getDailyActivity(date)    — STEPS/ACTIVE/BASAL/HEART_RATE 집계
+                │
+                ▼
+HealthActivityRepository       — 외부 SDK 타입을 도메인 밖으로 노출 안 함
+                │
+                ▼
+Riverpod (autoDispose + keepAlive)
+  ├─ activityAuthStatusProvider  — UI 분기 (권한 카드 vs 활동 카드)
+  └─ dailyActivityProvider       — 활동 데이터 (권한 미허용 시 null)
+                │
+        ┌───────┼─────────────────────────┐
+        ▼       ▼                         ▼
+  ActivitySummaryCard    HealthContext.activity   (Gemini 프롬프트)
+  (요약 탭)              (AI 인사이트 캐시 키 + 프롬프트 라인)
+```
+
+### 캐시 무효화 트리거 (결정적)
+1. **`AppLifecycleState.resumed`**: `main.dart` 의 `_NacfsonHealthAppWithSyncState.didChangeAppLifecycleState` 가 `ref.invalidate(activityAuthStatusProvider)` + `ref.invalidate(dailyActivityProvider)` 호출. 백그라운드에서 OS 가 권한을 토글한 케이스도 함께 재평가.
+2. **명시적 권한 요청**: `requestActivityAuthorization(WidgetRef)` 호출 후 두 provider 모두 invalidate.
+3. **`selectedDateProvider` 변경**: `dailyActivityProvider` 가 watch 하므로 자동 재계산.
+
+### 권한 거부 처리
+- **Android**: `hasPermissions` 가 명확히 false 를 반환 → `ActivityAuthStatus.denied` → Health Connect 앱 deeplink 안내.
+- **iOS**: Apple은 read 권한 거부 여부를 앱에 알려주지 않음. `requestAuthorization` 이 항상 "허용" 반환 → 실제 read 결과로 추론 → `DailyActivity.isEmpty` 일 때 양가적 안내 ("권한 또는 데이터 부재").
+
+### Supabase 동기화 미적용 이유
+- HealthKit / Health Connect 가 이미 신뢰할 만한 source of truth 역할
+- 다기기 동기화 가치 < 별도 테이블 운영 비용 (Phase 1 기준)
+- Phase 2 에서 BMR 자동 계산 / Workout 세션 매핑 / 추세 차트 등이 추가될 때 재평가
 
 ---
 
