@@ -30,6 +30,7 @@
   - 브랜드 포인트 컬러(민트/산호/카테고리 등)가 필요할 때는 `AppTheme.catDiet(context)` / `catSleep(context)` / `lunchTint(context)` / `snackTint(context)` / `warnBg(context)` / `warnFg(context)` 헬퍼 사용 — 내부에서 brightness 분기 자동 처리
   - `Colors.white` / `Colors.red` 등 직접 참조는 **의도적 브랜드 유지**(navy 히어로 내부 텍스트 등)에 한해 허용. 일반 강조/오류 표시는 `cs.error`, `cs.onPrimary`, `cs.onInverseSurface` 사용
   - `const TextStyle(color: AppTheme.*)` 패턴은 금지 — `TextStyle`의 `const`를 제거하고 `cs.*`를 주입
+- **iOS 상태바 아이콘 색상**: `appBarTheme.systemOverlayStyle` 에서 라이트/다크별로 지정 — 라이트는 `SystemUiOverlayStyle.dark` (검은 아이콘), 다크는 `SystemUiOverlayStyle.light` (흰 아이콘). 개별 `AppBar` 위젯에 `systemOverlayStyle` 을 직접 박지 말 것 — 테마 토글 시 stale 됨. AppBar 가 투명 배경(`backgroundColor: Colors.transparent`)이라 자동 추정이 불가하므로 명시 지정이 필수.
 
 ---
 

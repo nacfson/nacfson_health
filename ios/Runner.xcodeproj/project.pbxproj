@@ -10,16 +10,21 @@
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		53A1773EEBF43002814B2E37 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BEBF71A4DBD07582B55BDE7F /* Assets.xcassets */; };
+		64EFF94511597BC6E64BBE1D /* NutritionWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D2CC5F0C7442AB5B100D0E8 /* NutritionWidget.swift */; };
 		6980ACB69E2DE10221F43FB9 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C6A8671BF1F26F64A597BF6D /* Pods_Runner.framework */; };
 		7131998C2F94BF4000379EFD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7131998B2F94BF4000379EFD /* WidgetKit.framework */; };
 		7131998E2F94BF4000379EFD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7131998D2F94BF4000379EFD /* SwiftUI.framework */; };
 		7131999F2F94BF4100379EFD /* RestActivityWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7131998A2F94BF4000379EFD /* RestActivityWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7884E8682EC3CC0700C636F2 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */; };
-		A1B2C3D4E5F6789012345679 /* RestActivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* RestActivityBridge.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
+		A1B2C3D4E5F6789012345679 /* RestActivityBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* RestActivityBridge.swift */; };
+		A2ADDFCDEE0DEDC201DE1108 /* NacfsonHealthWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 654E4D08E7E71328E7E53827 /* NacfsonHealthWidgetBundle.swift */; };
+		B0692E9146CA26CF2504FF4C /* NacfsonHealthWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0F3510954E2048C45E897D4A /* NacfsonHealthWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E502A8BC38F2CDDC37D6F638 /* WorkoutHeatmapWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC838772B3273BA6EEA9FF8A /* WorkoutHeatmapWidget.swift */; };
 		E5231628CAA0C29947B9D78B /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D30C1286724E7747B62AD88B /* Pods_RunnerTests.framework */; };
 /* End PBXBuildFile section */
 
@@ -38,6 +43,13 @@
 			remoteGlobalIDString = 713199892F94BF4000379EFD;
 			remoteInfo = RestActivityWidgetExtension;
 		};
+		B1566CAA63891E5B1889CA42 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 73A5BF25A0D97D9E1370F1B3;
+			remoteInfo = NacfsonHealthWidget;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,6 +60,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				7131999F2F94BF4100379EFD /* RestActivityWidgetExtension.appex in Embed Foundation Extensions */,
+				B0692E9146CA26CF2504FF4C /* NacfsonHealthWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -65,13 +78,16 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0F3510954E2048C45E897D4A /* NacfsonHealthWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NacfsonHealthWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		1A8DC3C7BA5A89EB2BDFDA4A /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
+		1EC0EC99F1899068AA027890 /* NacfsonHealthWidget.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = NacfsonHealthWidget.entitlements; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		3BE7EB008AD2FC9641367E4D /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		654E4D08E7E71328E7E53827 /* NacfsonHealthWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NacfsonHealthWidgetBundle.swift; sourceTree = "<group>"; };
 		7131998A2F94BF4000379EFD /* RestActivityWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RestActivityWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		7131998B2F94BF4000379EFD /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		7131998D2F94BF4000379EFD /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -80,9 +96,9 @@
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F6789012345678 /* RestActivityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestActivityBridge.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
 		7AFA3C8F1D35360C0083082E /* Profile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Profile.xcconfig; path = Flutter/Profile.xcconfig; sourceTree = "<group>"; };
+		8D2CC5F0C7442AB5B100D0E8 /* NutritionWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NutritionWidget.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -91,8 +107,12 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9DAFDC8DABE4593CDC2EBDD4 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
+		A1B2C3D4E5F6789012345678 /* RestActivityBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestActivityBridge.swift; sourceTree = "<group>"; };
+		BEBF71A4DBD07582B55BDE7F /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C6A8671BF1F26F64A597BF6D /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D30C1286724E7747B62AD88B /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		DC838772B3273BA6EEA9FF8A /* WorkoutHeatmapWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutHeatmapWidget.swift; sourceTree = "<group>"; };
+		DE09ABEFFDE71A2E44FC764E /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		E0FF25504049BE8506ECE553 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		E825D89DCAF00855F1492FDB /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		E8CD874FF4891A622C6269B6 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
@@ -141,6 +161,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F026D76C8828A3991FB9FF82 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F3A2F2703A22E30DDBBCE697 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -152,6 +179,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		053BC6603127AE72F940ADDF /* NacfsonHealthWidget */ = {
+			isa = PBXGroup;
+			children = (
+				8D2CC5F0C7442AB5B100D0E8 /* NutritionWidget.swift */,
+				654E4D08E7E71328E7E53827 /* NacfsonHealthWidgetBundle.swift */,
+				DC838772B3273BA6EEA9FF8A /* WorkoutHeatmapWidget.swift */,
+				DE09ABEFFDE71A2E44FC764E /* Info.plist */,
+				BEBF71A4DBD07582B55BDE7F /* Assets.xcassets */,
+			);
+			name = NacfsonHealthWidget;
+			path = NacfsonHealthWidget;
+			sourceTree = "<group>";
+		};
 		0A37CABAB314C97E661DAAD8 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -207,6 +247,8 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				8EE5964E042BC520F9C3F82A /* Pods */,
 				0A37CABAB314C97E661DAAD8 /* Frameworks */,
+				053BC6603127AE72F940ADDF /* NacfsonHealthWidget */,
+				1EC0EC99F1899068AA027890 /* NacfsonHealthWidget.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -216,6 +258,7 @@
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
 				7131998A2F94BF4000379EFD /* RestActivityWidgetExtension.appex */,
+				0F3510954E2048C45E897D4A /* NacfsonHealthWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -280,6 +323,23 @@
 			productReference = 7131998A2F94BF4000379EFD /* RestActivityWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		73A5BF25A0D97D9E1370F1B3 /* NacfsonHealthWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 80F8E524D978BF310B7A40F8 /* Build configuration list for PBXNativeTarget "NacfsonHealthWidget" */;
+			buildPhases = (
+				20B72F0BAA136AAB651A8F58 /* Sources */,
+				56AA4FFEA4B8547E4386EF45 /* Resources */,
+				F026D76C8828A3991FB9FF82 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NacfsonHealthWidget;
+			productName = NacfsonHealthWidget;
+			productReference = 0F3510954E2048C45E897D4A /* NacfsonHealthWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		97C146ED1CF9000F007C117D /* Runner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
@@ -299,6 +359,7 @@
 			);
 			dependencies = (
 				7131999E2F94BF4100379EFD /* PBXTargetDependency */,
+				D2D3BE32943D2896E3AB19B0 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -345,6 +406,7 @@
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
 				713199892F94BF4000379EFD /* RestActivityWidgetExtension */,
+				73A5BF25A0D97D9E1370F1B3 /* NacfsonHealthWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -354,6 +416,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		56AA4FFEA4B8547E4386EF45 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				53A1773EEBF43002814B2E37 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -490,6 +560,16 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		20B72F0BAA136AAB651A8F58 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				64EFF94511597BC6E64BBE1D /* NutritionWidget.swift in Sources */,
+				A2ADDFCDEE0DEDC201DE1108 /* NacfsonHealthWidgetBundle.swift in Sources */,
+				E502A8BC38F2CDDC37D6F638 /* WorkoutHeatmapWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		331C807D294A63A400263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -528,6 +608,12 @@
 			isa = PBXTargetDependency;
 			target = 713199892F94BF4000379EFD /* RestActivityWidgetExtension */;
 			targetProxy = 7131999D2F94BF4100379EFD /* PBXContainerItemProxy */;
+		};
+		D2D3BE32943D2896E3AB19B0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = NacfsonHealthWidget;
+			target = 73A5BF25A0D97D9E1370F1B3 /* NacfsonHealthWidget */;
+			targetProxy = B1566CAA63891E5B1889CA42 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -623,6 +709,50 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Profile;
+		};
+		2D98F36C55BBF8C2090021E5 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = AppIcon;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = NacfsonHealthWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CR75Y88295;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NacfsonHealthWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Nacfson Health";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nacfson.nacfsonHealth.NacfsonHealthWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Profile;
 		};
@@ -811,6 +941,97 @@
 			};
 			name = Profile;
 		};
+		79441CB9FE4B7E6EF995AAF9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = AppIcon;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = NacfsonHealthWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CR75Y88295;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NacfsonHealthWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Nacfson Health";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nacfson.nacfsonHealth.NacfsonHealthWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		8B351D767516FDE187632DE1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = AppIcon;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_ENTITLEMENTS = NacfsonHealthWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CR75Y88295;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NacfsonHealthWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Nacfson Health";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.nacfson.nacfsonHealth.NacfsonHealthWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		97C147031CF9000F007C117D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -988,6 +1209,16 @@
 				713199A12F94BF4100379EFD /* Debug */,
 				713199A22F94BF4100379EFD /* Release */,
 				713199A32F94BF4100379EFD /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		80F8E524D978BF310B7A40F8 /* Build configuration list for PBXNativeTarget "NacfsonHealthWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				79441CB9FE4B7E6EF995AAF9 /* Release */,
+				8B351D767516FDE187632DE1 /* Debug */,
+				2D98F36C55BBF8C2090021E5 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppTheme {
   // ── Light color tokens ───────────────────────────────────────────
@@ -130,6 +131,9 @@ class AppTheme {
       segmentBorder: colorHairBorder,
       bodySmallColor: colorTextSub,
       labelSmallColor: colorTextDim,
+      systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
     );
   }
 
@@ -181,6 +185,9 @@ class AppTheme {
       segmentBorder: colorHairBorderDark,
       bodySmallColor: colorTextSubDark,
       labelSmallColor: colorTextDimDark,
+      systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
     );
   }
 
@@ -207,6 +214,7 @@ class AppTheme {
     required Color segmentBorder,
     required Color bodySmallColor,
     required Color labelSmallColor,
+    required SystemUiOverlayStyle systemOverlayStyle,
   }) {
     return ThemeData(
       useMaterial3: true,
@@ -218,6 +226,7 @@ class AppTheme {
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: appBarFg,
+        systemOverlayStyle: systemOverlayStyle,
         titleTextStyle: TextStyle(
           fontFamily: 'Pretendard',
           color: appBarFg,

@@ -50,3 +50,8 @@
 | `docs/changelog-v5-1.md` | v5.1 변경 로그 (기존 데이터 정리 & 설정 UI 개선) |
 | `docs/changelog-v6.md` | v6 변경 로그 (DB v7, AI 인사이트, 온보딩, 다크 모드, Pretendard) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
+
+## Git 환경 설정
+
+- `extensions.worktreeConfig=false` (`~/.gitconfig` 전역 설정)
+  - 모든 git worktree가 공통 `.git/config`를 사용하도록 전역 강제

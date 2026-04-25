@@ -10,6 +10,12 @@ import '../providers/exercise_template_provider.dart';
 
 const _exerciseTypes = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
 
+enum _TemplateTab { search, add }
+
+/// 검색 / 추가 탭 분리 (SegmentedButton):
+///   - 검색 탭: 검색창에 입력해야만 매칭 칩 노출. 매칭 0 이면 "추가 탭으로 이동" 링크.
+///   - 추가 탭: 이름 입력 + 부위 ChoiceChip. 이미 보유한 이름이면 인라인 헬퍼 + 추가 버튼 disabled.
+///   - 두 탭 모두 펼침/드롭다운 없이 항상 본문이 노출됨.
 class ExerciseTemplateCard extends ConsumerStatefulWidget {
   const ExerciseTemplateCard({super.key});
 
@@ -19,33 +25,62 @@ class ExerciseTemplateCard extends ConsumerStatefulWidget {
 }
 
 class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
-  late final TextEditingController _templateNameCtrl;
+  _TemplateTab _tab = _TemplateTab.search;
+
+  // 검색 탭 state
   late final TextEditingController _searchCtrl;
+  late final FocusNode _searchFocusNode;
   String _searchQuery = '';
-  String? _selectedFilterType; // null = 전체
+  bool _searchFocused = false;
+
+  // 추가 탭 state
+  late final TextEditingController _addNameCtrl;
+  String _addName = '';
   String? _selectedExerciseTypeForAdd;
 
   @override
   void initState() {
     super.initState();
-    _templateNameCtrl = TextEditingController();
     _searchCtrl = TextEditingController();
+    _addNameCtrl = TextEditingController();
+    _searchFocusNode = FocusNode()..addListener(_handleSearchFocusChange);
   }
 
   @override
   void dispose() {
-    _templateNameCtrl.dispose();
+    _searchFocusNode.removeListener(_handleSearchFocusChange);
+    _searchFocusNode.dispose();
     _searchCtrl.dispose();
+    _addNameCtrl.dispose();
     super.dispose();
   }
 
+  void _handleSearchFocusChange() {
+    if (mounted) {
+      setState(() => _searchFocused = _searchFocusNode.hasFocus);
+    }
+  }
+
+  void _switchTab(_TemplateTab tab, {String? prefillName}) {
+    setState(() {
+      _tab = tab;
+      if (prefillName != null) {
+        _addNameCtrl.text = prefillName;
+        _addNameCtrl.selection = TextSelection.fromPosition(
+          TextPosition(offset: prefillName.length),
+        );
+        _addName = prefillName;
+      }
+    });
+  }
+
   Future<void> _addTemplate() async {
-    final name = _templateNameCtrl.text.trim();
+    final name = _addName.trim();
     if (name.isEmpty) {
       ErrorOverlay.show(title: '입력 오류', message: '운동 이름을 입력해주세요.');
       return;
     }
-    final type = _selectedExerciseTypeForAdd ?? _selectedFilterType;
+    final type = _selectedExerciseTypeForAdd;
     if (type == null) {
       ErrorOverlay.show(title: '입력 오류', message: '운동 유형을 선택해주세요.');
       return;
@@ -53,7 +88,8 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
 
     final templates = ref.read(exerciseTemplatesProvider);
     if (templates.any((t) => t.name == name)) {
-      ErrorOverlay.show(title: '중복 오류', message: '이미 있는 템플릿입니다.');
+      // 버튼 disabled 가드를 우회한 경우의 안전망.
+      ErrorOverlay.show(title: '중복 오류', message: '이미 보유한 템플릿입니다.');
       return;
     }
 
@@ -61,7 +97,13 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
       await ref
           .read(exerciseTemplatesProvider.notifier)
           .addTemplate(name, type);
-      _templateNameCtrl.clear();
+      _addNameCtrl.clear();
+      if (mounted) {
+        setState(() {
+          _addName = '';
+          _selectedExerciseTypeForAdd = null;
+        });
+      }
     } catch (e) {
       debugPrint('ExerciseTemplateCard._addTemplate error: $e');
       if (rootNavigatorKey.currentState?.overlay != null) {
@@ -103,36 +145,11 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     }
   }
 
-  bool _matchesSearch(ExerciseTemplate t) {
-    if (_searchQuery.isEmpty) return true;
-    return t.name.toLowerCase().contains(_searchQuery.toLowerCase());
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final templates = ref.watch(exerciseTemplatesProvider);
-
-    // 부위 필터 + 검색어 적용
-    final filtered = templates.where((t) {
-      if (_selectedFilterType != null &&
-          t.exerciseType != _selectedFilterType) {
-        return false;
-      }
-      return _matchesSearch(t);
-    }).toList();
-
-    // 전체 필터일 때만 부위별로 그룹 헤더 표시
-    final grouped = <String, List<ExerciseTemplate>>{};
-    if (_selectedFilterType == null) {
-      for (final type in _exerciseTypes) {
-        final items = filtered.where((t) => t.exerciseType == type).toList();
-        if (items.isNotEmpty) grouped[type] = items;
-      }
-    }
-
-    final addType = _selectedExerciseTypeForAdd ?? _selectedFilterType;
 
     return Card(
       child: Padding(
@@ -149,84 +166,97 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
             ),
             const SizedBox(height: 4),
             Text(
-              '자주 사용하는 운동을 미리 등록하세요. 칩을 탭하면 휴식 시간을 조정할 수 있습니다.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: cs.outline,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _searchCtrl,
-              decoration: InputDecoration(
-                hintText: '이름으로 검색',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onChanged: (v) => setState(() => _searchQuery = v.trim()),
+              '검색 탭에서 등록된 운동을 찾고, 추가 탭에서 새 템플릿을 등록합니다.',
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.outline),
             ),
             const SizedBox(height: 12),
             SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _exerciseTypes.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    final isAll = _selectedFilterType == null;
-                    return ChoiceChip(
-                      label: const Text('전체'),
-                      selected: isAll,
-                      onSelected: (v) {
-                        if (v) setState(() => _selectedFilterType = null);
-                      },
-                    );
-                  }
-                  final type = _exerciseTypes[index - 1];
-                  final selected = _selectedFilterType == type;
-                  return ChoiceChip(
-                    label: Text('$type · ${_restBadgeForType(type)}'),
-                    selected: selected,
-                    onSelected: (v) {
-                      setState(() =>
-                          _selectedFilterType = v ? type : null);
-                    },
-                  );
-                },
+              width: double.infinity,
+              child: SegmentedButton<_TemplateTab>(
+                segments: const [
+                  ButtonSegment(
+                    value: _TemplateTab.search,
+                    label: Text('검색'),
+                    icon: Icon(Icons.search, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: _TemplateTab.add,
+                    label: Text('추가'),
+                    icon: Icon(Icons.add, size: 18),
+                  ),
+                ],
+                selected: {_tab},
+                showSelectedIcon: false,
+                onSelectionChanged: (v) => _switchTab(v.first),
               ),
             ),
             const SizedBox(height: 12),
-            if (filtered.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  templates.isEmpty
-                      ? '등록된 운동 템플릿이 없습니다. 아래에서 추가하세요.'
-                      : '검색 결과가 없습니다.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              )
-            else if (_selectedFilterType == null)
-              for (final entry in grouped.entries) ...[
-                Text(
-                  '[${entry.key}]  ${_restBadgeForType(entry.key)}',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Wrap(
+            if (_tab == _TemplateTab.search)
+              _buildSearchTab(theme, templates)
+            else
+              _buildAddTab(theme, templates),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchTab(ThemeData theme, List<ExerciseTemplate> templates) {
+    final cs = theme.colorScheme;
+    final hasQuery = _searchQuery.isNotEmpty;
+    // 비어있으면 전체 노출, 검색어가 있으면 prefix(startsWith) 매칭만 노출.
+    final visible = hasQuery
+        ? templates
+            .where((t) =>
+                t.name.toLowerCase().startsWith(_searchQuery.toLowerCase()))
+            .toList()
+        : templates;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _searchCtrl,
+          focusNode: _searchFocusNode,
+          decoration: InputDecoration(
+            hintText: '운동 이름으로 시작 검색',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: hasQuery
+                ? IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: '검색어 지우기',
+                    onPressed: () {
+                      _searchCtrl.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onChanged: (v) => setState(() => _searchQuery = v.trim()),
+        ),
+        // 검색창 포커스 시에만 TextField 아래로 결과 영역 노출 (드롭다운).
+        // 결과는 maxHeight 안에서 스크롤(드래그) 가능.
+        if (_searchFocused) ...[
+          const SizedBox(height: 8),
+          if (visible.isNotEmpty)
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              constraints: const BoxConstraints(maxHeight: 280),
+              padding: const EdgeInsets.all(8),
+              child: SingleChildScrollView(
+                child: Wrap(
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    for (final t in entry.value)
+                    for (final t in visible)
                       InputChip(
                         label: Text(_chipLabel(t)),
                         onPressed: () => _editRestOverride(t),
@@ -235,93 +265,149 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
-              ]
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
+              ),
+            )
+          else if (hasQuery)
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final t in filtered)
-                    InputChip(
-                      label: Text(_chipLabel(t)),
-                      onPressed: () => _editRestOverride(t),
-                      onDeleted: () => _deleteTemplate(t.uuid),
-                      deleteIcon: const Icon(Icons.close, size: 18),
+                  Text(
+                    '검색 결과가 없습니다.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => _switchTab(_TemplateTab.add,
+                          prefillName: _searchQuery),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: Text("'$_searchQuery' 추가 탭으로 이동"),
+                    ),
+                  ),
                 ],
               ),
-            const SizedBox(height: 16),
-            Divider(color: cs.outlineVariant),
-            const SizedBox(height: 8),
-            Text(
-              '운동 유형 선택',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: cs.onSurfaceVariant,
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                '등록된 운동 템플릿이 없습니다. 추가 탭에서 등록하세요.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
             ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                for (final type in _exerciseTypes)
-                  ChoiceChip(
-                    label: Text(type),
-                    selected: addType == type,
-                    onSelected: (v) {
-                      setState(() {
-                        _selectedExerciseTypeForAdd = v ? type : null;
-                      });
-                    },
-                  ),
-              ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAddTab(ThemeData theme, List<ExerciseTemplate> templates) {
+    final cs = theme.colorScheme;
+    final trimmedName = _addName.trim();
+    final isNameEmpty = trimmedName.isEmpty;
+    final isDuplicate =
+        !isNameEmpty && templates.any((t) => t.name == trimmedName);
+    final isTypeEmpty = _selectedExerciseTypeForAdd == null;
+    final canSubmit = !isNameEmpty && !isDuplicate && !isTypeEmpty;
+
+    String? helperText;
+    Color? helperColor;
+    if (isDuplicate) {
+      helperText = '이미 보유한 템플릿입니다.';
+      helperColor = cs.error;
+    } else if (isNameEmpty) {
+      helperText = '운동 이름과 부위를 선택하세요.';
+      helperColor = cs.onSurfaceVariant;
+    } else if (isTypeEmpty) {
+      helperText = '부위를 선택하면 추가 버튼이 활성화됩니다.';
+      helperColor = cs.onSurfaceVariant;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _addNameCtrl,
+          decoration: InputDecoration(
+            hintText: '운동 이름 입력',
+            prefixIcon: const Icon(Icons.fitness_center, size: 20),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _templateNameCtrl,
-                    decoration: InputDecoration(
-                      hintText: '운동 이름 입력',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    onSubmitted: (_) => _addTemplate(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _addTemplate,
-                  icon: const Icon(Icons.add),
-                  tooltip: '템플릿 추가',
-                ),
-              ],
-            ),
+            errorText: isDuplicate ? '이미 보유한 템플릿입니다.' : null,
+          ),
+          onChanged: (v) => setState(() => _addName = v),
+          onSubmitted: (_) {
+            if (canSubmit) _addTemplate();
+          },
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '부위',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            for (final type in _exerciseTypes)
+              ChoiceChip(
+                label: Text(type),
+                selected: _selectedExerciseTypeForAdd == type,
+                onSelected: (v) {
+                  setState(() {
+                    _selectedExerciseTypeForAdd = v ? type : null;
+                  });
+                },
+              ),
           ],
         ),
-      ),
+        if (helperText != null && !isDuplicate) ...[
+          const SizedBox(height: 8),
+          Text(
+            helperText,
+            style: theme.textTheme.bodySmall?.copyWith(color: helperColor),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: canSubmit ? _addTemplate : null,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('추가'),
+          ),
+        ),
+      ],
     );
   }
 
   /// 칩 라벨 — 템플릿 이름 뒤에 실제 적용되는 휴식 시간 표시.
-  /// 유산소는 타이머를 사용하지 않으므로 "-" 로 표시.
+  /// 유산소는 타이머를 사용하지 않으므로 "휴식 없음" 으로 표시.
   String _chipLabel(ExerciseTemplate t) {
     final sec = resolveRestSeconds(t);
     if (sec == null) return '${t.name} · 휴식 없음';
     final tag = t.restSecondsOverride == null ? '기본' : '커스텀';
     return '${t.name} · ${_fmtRest(sec)} ($tag)';
-  }
-
-  String _restBadgeForType(String type) {
-    final sec = defaultRestForBodyPart(type);
-    return sec == null ? '휴식 없음' : '기본 ${_fmtRest(sec)}';
   }
 
   String _fmtRest(int seconds) {

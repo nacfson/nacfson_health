@@ -23,8 +23,8 @@
 
 ### 설정 화면
 - [x] 영양 목표값 설정 (`DietTargetCard` — 칼로리/탄단지 목표)
-- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제, 종목별 휴식 시간 오버라이드 v11)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 UX 개편 — `ExpansionTile` 제거(설정 진입 즉시 노출), 부위별 ChoiceChip 필터 + 이름 검색, 추가 폼 드롭다운 → ChoiceChip 인라인, 휴식 편집 시트 BottomNav 겹침·세자리 수 표시 잘림 버그 수정, 기본 템플릿 16 → 56종 확장(시드 플래그 v2)
-- [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 — `ExpansionTile` 제거로 설정 진입 즉시 입력/검색 가능
+- [x] 운동 템플릿 관리 (`ExerciseTemplateCard` — 종목 프리셋, 생성·삭제, 종목별 휴식 시간 오버라이드 v11)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 UX 개편 — `ExpansionTile` 제거(설정 진입 즉시 노출), **검색/추가 SegmentedButton 탭 분리**(검색 탭: 입력 시에만 매칭 칩 노출, 매칭 0 → "추가 탭으로 이동" 링크 / 추가 탭: 이름+부위 ChoiceChip, 이미 보유한 이름이면 인라인 헬퍼 + 추가 버튼 disabled), 휴식 편집 시트 BottomNav 겹침·세자리 수 표시 잘림 버그 수정, 기본 템플릿 16 → 56종 확장(시드 플래그 v2)
+- [x] 음식 템플릿 관리 (`FoodTemplateCard` — 음식 프리셋, 생성·삭제, v4)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;v11.1 — `ExpansionTile` 제거 + **검색/추가 SegmentedButton 탭 분리**(검색 탭: 입력 시에만 매칭 ListTile, 매칭 0 → "추가 탭으로 이동" 링크 / 추가 탭: 이름+매크로(칼로리/탄·단·지) 입력, 중복 시 추가 버튼 disabled)
 - [x] Google 로그인/로그아웃 (`GoogleSignInCard`)
 - [x] 스프레드시트 상태 + 수동 동기화 (`SpreadsheetStatusCard`)
 - [x] 테마 전환 — 시스템/라이트/다크 (`ThemeModeCard` + `themeModeProvider`, shared_preferences 영구 저장)
