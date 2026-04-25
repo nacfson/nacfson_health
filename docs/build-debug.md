@@ -5,6 +5,50 @@
 
 ---
 
+## 0. iOS 홈스크린 위젯 — `NacfsonHealthWidget` 타겟 설정
+
+영양 / 운동 잔디 두 위젯을 호스팅하는 Widget Extension 타겟 등록 절차.
+Live Activity 타겟(`RestActivityWidget`) 과 **별개의 타겟**임에 유의.
+
+### 절차
+
+1. `ios/Runner.xcworkspace` 를 Xcode 에서 열기.
+2. **File → New → Target → Widget Extension**
+   - Product Name: `NacfsonHealthWidget`
+   - Include Live Activity: **체크 해제**
+   - Include Configuration Intent: **체크 해제**
+3. Xcode 가 자동 생성한 임시 폴더의 Swift 파일은 삭제하고 **기존 `ios/NacfsonHealthWidget/`** 의 파일을 참조 추가:
+   - `NacfsonHealthWidgetBundle.swift`
+   - `NutritionWidget.swift`
+   - `WorkoutHeatmapWidget.swift`
+   - `Info.plist` (기존 유지)
+   - `Assets.xcassets` (기존 유지)
+4. **Signing & Capabilities → + Capability → App Groups** 추가 후 `group.com.nacfson.nacfsonHealth` 체크.
+5. Build Settings (`project_widget_target_settings.md` 와 동일):
+   - `ENABLE_APP_SANDBOX = NO`
+   - `MARKETING_VERSION` = pubspec.yaml 의 version 과 동기화
+   - `IPHONEOS_DEPLOYMENT_TARGET = 17.0`
+   - `CODE_SIGN_ENTITLEMENTS = NacfsonHealthWidget.entitlements`
+   - `PRODUCT_BUNDLE_IDENTIFIER = com.nacfson.nacfsonHealth.NacfsonHealthWidget`
+6. **Runner 타겟의 entitlements** 에도 같은 App Group 이 있어야 한다 (Live Activity 가 작동 중이라면 이미 등록됨).
+
+### 데이터 채널
+
+| 위젯 | iOS Widget kind | UserDefaults key | Flutter 진입점 |
+|---|---|---|---|
+| 영양 | `NacfsonHealthWidget` | `nutrition_widget_data` | `HomeWidgetService.update()` |
+| 운동 잔디 | `WorkoutHeatmapWidget` | `heatmap_widget_data` | `HomeWidgetService.updateHeatmap()` |
+
+`lib/main.dart` 의 `_registerHomeWidgetSync()` 에서 `todayDietSummaryProvider` / `nutritionTargetsProvider` / `heatmapDataProvider` 를 `ref.listenManual` 로 구독해 자동 갱신한다.
+
+### 디버깅 체크리스트
+
+- 위젯에 빈 데이터만 보임 → **Runner 타겟의 App Group 누락** 1순위.
+- 위젯이 갱신되지 않음 → WidgetKit 시스템 예산 제한. `HomeWidget.updateWidget` 은 즉시 반영 보장 X. Provider Timeline 의 1시간 fallback 후 보임.
+- 미리보기에서 더미 데이터가 안 나옴 → `HeatmapPayload.placeholder` / `NutritionEntry.placeholder` 점검.
+
+---
+
 ## 1. 빌드 타겟: iOS 시뮬레이터 미지원
 
 **증상**: `flutter run -d <simulator>` 실행 시 빌드 타겟 미발견 오류

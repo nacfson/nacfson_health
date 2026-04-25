@@ -60,6 +60,12 @@
 - [ ] iOS Live Activity App Intents 액션 (현재는 인앱/Android만 액션 처리) — 백로그
 - [ ] Android Foreground Service (앱 강제 종료 시에도 알림 유지) — 백로그
 
+### 홈스크린 위젯 (iOS)
+- [x] `NutritionWidget` — 오늘 칼로리·탄단지 진행률 (small / medium) — `ios/NacfsonHealthWidget/NutritionWidget.swift`, 데이터: `HomeWidgetService.update()`
+- [x] `WorkoutHeatmapWidget` — 최근 13주 운동 볼륨 잔디밭 (medium / large) — `ios/NacfsonHealthWidget/WorkoutHeatmapWidget.swift`, 데이터: `HomeWidgetService.updateHeatmap()` (요약 탭 `WorkoutHeatmapCard` 와 동일한 4분위 색상 로직)
+- [x] App Group `group.com.nacfson.nacfsonHealth` 공유 (Live Activity 와 통일) + `_registerHomeWidgetSync` 자동 갱신 (식단 합계 / 영양 목표 / 본세트 볼륨 변경 시)
+- [ ] Android App Widget — 백로그
+
 ### Supabase 동기화
 - [x] Supabase OAuth 로그인 · 세션 복원 (`GoogleAuthService` — Supabase OAuth 래퍼)
 - [x] 운동 기록 Push/Pull/HardDelete — `SupabaseService.batchPushExerciseRecords` / `readExerciseRecordsDelta`

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,9 @@ import 'app.dart';
 import 'core/ai/food_vision_provider.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
+import 'core/widget/home_widget_service.dart';
+import 'features/diet/presentation/providers/diet_provider.dart';
+import 'features/exercise/presentation/providers/exercise_provider.dart';
 import 'features/exercise/data/rest_notification_service.dart';
 import 'features/exercise/data/rest_notification_service_android.dart';
 import 'features/exercise/data/rest_notification_service_ios.dart';
@@ -84,6 +88,18 @@ void main() async {
 
   final restService = _createRestNotificationService();
 
+  // iOS 홈스크린 위젯용 App Group 등록 (영양/운동 잔디).
+  // 실패해도 앱 흐름에 영향 없으므로 fire-and-forget.
+  if (!kIsWeb) {
+    try {
+      if (Platform.isIOS) {
+        await HomeWidgetService.initialize();
+      }
+    } catch (_) {
+      // App Group 미등록 등 — 위젯만 비활성. 앱 동작은 유지.
+    }
+  }
+
   runApp(
     ProviderScope(
       overrides: [
@@ -142,6 +158,64 @@ class _NacfsonHealthAppWithSyncState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _registerHomeWidgetSync();
+  }
+
+  /// 홈스크린 위젯(영양 / 운동 잔디) 데이터 동기화 리스너 등록.
+  ///
+  /// - 식단 합계, 영양 목표, 운동 본세트 볼륨이 변할 때마다 App Group UserDefaults
+  ///   를 갱신하고 WidgetKit 에 reload 신호를 보낸다.
+  /// - iOS 외 플랫폼은 home_widget 패키지가 no-op 처리하지만 호출 자체를 막아 비용 절감.
+  /// - 호출 실패는 무시(fire-and-forget) — 위젯 미설치/엔타이틀먼트 누락 시도 앱 흐름 영향 없음.
+  void _registerHomeWidgetSync() {
+    if (kIsWeb) return;
+    try {
+      if (!Platform.isIOS) return;
+    } catch (_) {
+      return;
+    }
+
+    void pushNutrition() {
+      final s = ref.read(todayDietSummaryProvider);
+      final t = ref.read(nutritionTargetsProvider);
+      unawaited(
+        HomeWidgetService.update(
+          calories: s.kcal,
+          targetCalories: t.calories,
+          carbs: s.carbs,
+          targetCarbs: t.carbs,
+          protein: s.protein,
+          targetProtein: t.protein,
+          fat: s.fat,
+          targetFat: t.fat,
+        ).catchError((_) {}),
+      );
+    }
+
+    void pushHeatmap() {
+      final data = ref.read(heatmapDataProvider);
+      unawaited(
+        HomeWidgetService.updateHeatmap(volumeByDay: data).catchError((_) {}),
+      );
+    }
+
+    // 1. 영양: 합계 또는 목표 둘 중 하나라도 변하면 갱신
+    ref.listenManual(
+      todayDietSummaryProvider,
+      (_, __) => pushNutrition(),
+      fireImmediately: true,
+    );
+    ref.listenManual(
+      nutritionTargetsProvider,
+      (_, __) => pushNutrition(),
+    );
+
+    // 2. 운동 잔디: 본세트 볼륨 맵 변경 시 갱신
+    ref.listenManual(
+      heatmapDataProvider,
+      (_, __) => pushHeatmap(),
+      fireImmediately: true,
+    );
   }
 
   @override
