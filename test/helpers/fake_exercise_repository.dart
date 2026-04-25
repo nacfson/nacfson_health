@@ -25,22 +25,26 @@ class FakeExerciseRepository implements ExerciseRepository {
   }
 
   @override
-  Future<void> add(ExerciseRecord record) async {
-    _store.add(record.copyWith(
+  Future<ExerciseRecord> add(ExerciseRecord record) async {
+    final saved = record.copyWith(
       uuid: record.uuid.isEmpty ? _uuid.v4() : record.uuid,
       syncStatus: SyncStatus.created,
-    ));
+    );
+    _store.add(saved);
+    return saved;
   }
 
   @override
-  Future<void> update(ExerciseRecord record) async {
+  Future<ExerciseRecord> update(ExerciseRecord record) async {
+    final updated = record.copyWith(
+      updatedAt: DateTime.now(),
+      syncStatus: SyncStatus.modified,
+    );
     final idx = _store.indexWhere((r) => r.uuid == record.uuid);
     if (idx != -1) {
-      _store[idx] = record.copyWith(
-        updatedAt: DateTime.now(),
-        syncStatus: SyncStatus.modified,
-      );
+      _store[idx] = updated;
     }
+    return updated;
   }
 
   @override

@@ -3,8 +3,8 @@ import '../../domain/entities/diet_record.dart';
 abstract class DietRepository {
   Future<List<DietRecord>> getAll();
   Future<List<DietRecord>> getByDate(DateTime date);
-  Future<void> add(DietRecord record);
-  Future<void> update(DietRecord record);
+  Future<DietRecord> add(DietRecord record);
+  Future<DietRecord> update(DietRecord record);
   Future<void> delete(String uuid);
 
   // Sync 관련 메서드

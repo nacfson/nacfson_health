@@ -31,12 +31,16 @@ class _MemoryExerciseRepository implements ExerciseRepository {
   }
 
   @override
-  Future<void> add(ExerciseRecord record) async => _records.add(record);
+  Future<ExerciseRecord> add(ExerciseRecord record) async {
+    _records.add(record);
+    return record;
+  }
 
   @override
-  Future<void> update(ExerciseRecord record) async {
+  Future<ExerciseRecord> update(ExerciseRecord record) async {
     final index = _records.indexWhere((r) => r.uuid == record.uuid);
     if (index != -1) _records[index] = record;
+    return record;
   }
 
   @override
@@ -143,18 +147,20 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
   Future<void> refresh() => _loadRecords();
 
   Future<void> addRecord(ExerciseRecord record) async {
-    await _repository.add(record);
-    state = await _repository.getAll();
+    final saved = await _repository.add(record);
+    state = _sortDesc([...state, saved]);
   }
 
   Future<void> updateRecord(ExerciseRecord record) async {
-    await _repository.update(record);
-    state = await _repository.getAll();
+    final saved = await _repository.update(record);
+    state = _sortDesc([
+      for (final r in state) r.uuid == saved.uuid ? saved : r,
+    ]);
   }
 
   Future<void> deleteRecord(String id) async {
     await _repository.delete(id);
-    state = await _repository.getAll();
+    state = state.where((r) => r.uuid != id).toList();
   }
 
   /// 특정 날짜의 같은 운동명 레코드를 모두 soft delete 한다 (루틴 카드 제거 시 사용).
@@ -162,9 +168,19 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
   Future<int> deleteAllOnDate(String exerciseName, DateTime date) async {
     final count =
         await _repository.deleteByExerciseNameOnDate(exerciseName, date);
-    state = await _repository.getAll();
+    if (count == 0) return 0;
+    state = state.where((r) {
+      if (r.exerciseName != exerciseName) return true;
+      return !(r.timestamp.year == date.year &&
+          r.timestamp.month == date.month &&
+          r.timestamp.day == date.day);
+    }).toList();
     return count;
   }
+
+  /// `getAll()` 의 정렬 규약(timestamp DESC) 을 in-memory 갱신에서도 유지.
+  static List<ExerciseRecord> _sortDesc(List<ExerciseRecord> list) =>
+      list..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
   List<ExerciseRecord> getByDate(DateTime date) {
     return state.where((r) =>
@@ -204,8 +220,8 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
       rpe: rpe,
       setType: setType,
     );
-    await _repository.add(record);
-    state = await _repository.getAll();
+    final saved = await _repository.add(record);
+    state = _sortDesc([...state, saved]);
   }
 
   /// 세트를 삭제한 뒤 같은 운동명·같은 날짜 세트들의 currentSet을
@@ -217,23 +233,32 @@ class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
     );
     await _repository.delete(uuid);
 
-    final remaining = (await _repository.getAll())
-        .where((r) =>
-            r.exerciseName == target.exerciseName &&
-            r.timestamp.year == target.timestamp.year &&
-            r.timestamp.month == target.timestamp.month &&
-            r.timestamp.day == target.timestamp.day)
+    bool sameDay(ExerciseRecord r) =>
+        r.exerciseName == target.exerciseName &&
+        r.timestamp.year == target.timestamp.year &&
+        r.timestamp.month == target.timestamp.month &&
+        r.timestamp.day == target.timestamp.day;
+
+    final remaining = state
+        .where((r) => r.uuid != uuid && sameDay(r))
         .toList()
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
+    final renumbered = <String, ExerciseRecord>{};
     for (var i = 0; i < remaining.length; i++) {
       final r = remaining[i];
       final desired = i + 1;
       if (r.currentSet != desired) {
-        await _repository.update(r.copyWith(currentSet: desired));
+        final saved =
+            await _repository.update(r.copyWith(currentSet: desired));
+        renumbered[saved.uuid] = saved;
       }
     }
-    state = await _repository.getAll();
+
+    state = _sortDesc([
+      for (final r in state)
+        if (r.uuid != uuid) renumbered[r.uuid] ?? r,
+    ]);
   }
 }
 

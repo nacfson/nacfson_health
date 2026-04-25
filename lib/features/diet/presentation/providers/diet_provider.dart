@@ -28,19 +28,25 @@ class DietNotifier extends StateNotifier<List<DietRecord>> {
   Future<void> refresh() => _loadRecords();
 
   Future<void> addRecord(DietRecord record) async {
-    await _repository.add(record);
-    state = await _repository.getAll();
+    final saved = await _repository.add(record);
+    state = _sortDesc([...state, saved]);
   }
 
   Future<void> updateRecord(DietRecord record) async {
-    await _repository.update(record);
-    state = await _repository.getAll();
+    final saved = await _repository.update(record);
+    state = _sortDesc([
+      for (final r in state) r.uuid == saved.uuid ? saved : r,
+    ]);
   }
 
   Future<void> deleteRecord(String id) async {
     await _repository.delete(id);
-    state = await _repository.getAll();
+    state = state.where((r) => r.uuid != id).toList();
   }
+
+  /// `getAll()` 의 정렬 규약(timestamp DESC) 을 in-memory 갱신에서도 유지.
+  static List<DietRecord> _sortDesc(List<DietRecord> list) =>
+      list..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
   List<DietRecord> getByDate(DateTime date) {
     return state.where((r) =>

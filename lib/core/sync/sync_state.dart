@@ -159,6 +159,12 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
       throw Exception('로그인이 필요합니다');
     }
 
+    // 동시 sync 가드: 백그라운드 복귀 + 사용자 클릭 + auth 콜백이 동시에 트리거할 때
+    // 두번째 호출은 무위 반환. push/pull 카운트 0 으로 리포트.
+    if (state == SyncState.syncing) {
+      return const SyncResult(pushed: 0, pulled: 0);
+    }
+
     state = SyncState.syncing;
 
     try {
@@ -172,13 +178,21 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         _workoutRoutineRepo,
         _prefs,
       );
+      // pull 단계에서 실제 변화가 있던 도메인만 in-memory 갱신.
+      // (변화 없는 도메인까지 6개 모두 getAll() 하던 기존 동작 제거)
       await Future.wait<void>([
-        _exerciseNotifier.refresh(),
-        _dietNotifier.refresh(),
-        _weightNotifier.refresh(),
-        _templateNotifier.refresh(),
-        _foodTemplateNotifier.refresh(),
-        _workoutRoutineNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.exercise))
+          _exerciseNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.diet))
+          _dietNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.weight))
+          _weightNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.exerciseTemplate))
+          _templateNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.foodTemplate))
+          _foodTemplateNotifier.refresh(),
+        if (result.changedDomains.contains(SyncDomain.workoutRoutine))
+          _workoutRoutineNotifier.refresh(),
       ]);
       state = SyncState.idle;
       return result;
@@ -219,15 +233,28 @@ final currentAccountProvider = Provider<User?>((ref) {
 // Provider: Sync Result
 // ============================================================================
 
+/// pull 단계에서 실제로 remote 데이터가 흘러들어온 도메인을 식별. UI Notifier 의
+/// 선택적 `refresh()` 분기에 사용되며, 외부 인터페이스는 SyncResult.changedDomains 로 노출.
+enum SyncDomain {
+  exercise,
+  diet,
+  weight,
+  exerciseTemplate,
+  foodTemplate,
+  workoutRoutine,
+}
+
 class SyncResult {
   final int pushed;
   final int pulled;
   final List<String> errors;
+  final Set<SyncDomain> changedDomains;
 
   const SyncResult({
     required this.pushed,
     required this.pulled,
     this.errors = const [],
+    this.changedDomains = const {},
   });
 
   bool get hasErrors => errors.isNotEmpty;
@@ -402,61 +429,97 @@ Future<SyncResult> _syncAll(
   }
 
   // 2. Pull: Supabase → 로컬
+  //
+  // 네트워크 fetch 6개를 Future.wait 으로 병렬화 (RTT 누적 제거).
+  // SQLite write (mergeRemote*) 는 동일 DB 파일이라 db.transaction 으로 어차피 직렬화되므로
+  // fetch 결과를 직렬로 merge 한다 (이중 커밋 / 락 경합 회피).
+  // 기대 speedup: 네트워크 RTT 만 병렬 → 약 2-3x.
   final lastSync = prefs.lastSyncTime;
+  final changedDomains = <SyncDomain>{};
 
-  try {
-    final remoteExercise =
-        await supabaseService.readExerciseRecordsDelta(since: lastSync);
-    await exerciseRepo.mergeRemoteRecords(remoteExercise);
-    pulled += remoteExercise.length;
-  } catch (e) {
-    errors.add('운동 기록 Pull 오류: $e');
+  final fetches = await Future.wait<_PullFetchResult>([
+    _safeFetch(
+      tag: '운동 기록 Pull',
+      fetch: () => supabaseService.readExerciseRecordsDelta(since: lastSync),
+    ),
+    _safeFetch(
+      tag: '식단 기록 Pull',
+      fetch: () => supabaseService.readDietRecordsDelta(since: lastSync),
+    ),
+    _safeFetch(
+      tag: '체중 기록 Pull',
+      fetch: () => supabaseService.readWeightRecordsDelta(since: lastSync),
+    ),
+    _safeFetch(
+      tag: '운동 템플릿 Pull',
+      fetch: () => supabaseService.readTemplatesDelta(since: lastSync),
+    ),
+    _safeFetch(
+      tag: '음식 템플릿 Pull',
+      fetch: () => supabaseService.readFoodTemplatesDelta(since: lastSync),
+    ),
+    _safeFetch(
+      tag: '운동 루틴 Pull',
+      fetch: () => supabaseService.readWorkoutRoutinesDelta(since: lastSync),
+    ),
+  ]);
+
+  Future<void> mergeStep(
+    _PullFetchResult fetched,
+    SyncDomain domain,
+    Future<void> Function(List<dynamic> remote) merge,
+    String tag,
+  ) async {
+    if (fetched.error != null) {
+      errors.add('$tag 오류: ${fetched.error}');
+      return;
+    }
+    final remote = fetched.data!;
+    try {
+      await merge(remote);
+      pulled += remote.length;
+      if (remote.isNotEmpty) changedDomains.add(domain);
+    } catch (e) {
+      errors.add('$tag 오류: $e');
+    }
   }
 
-  try {
-    final remoteDiet =
-        await supabaseService.readDietRecordsDelta(since: lastSync);
-    await dietRepo.mergeRemoteRecords(remoteDiet);
-    pulled += remoteDiet.length;
-  } catch (e) {
-    errors.add('식단 기록 Pull 오류: $e');
-  }
-
-  try {
-    final remoteWeight =
-        await supabaseService.readWeightRecordsDelta(since: lastSync);
-    await weightRepo.mergeRemoteRecords(remoteWeight);
-    pulled += remoteWeight.length;
-  } catch (e) {
-    errors.add('체중 기록 Pull 오류: $e');
-  }
-
-  try {
-    final remoteTemplates =
-        await supabaseService.readTemplatesDelta(since: lastSync);
-    await templateRepo.mergeRemoteTemplates(remoteTemplates);
-    pulled += remoteTemplates.length;
-  } catch (e) {
-    errors.add('운동 템플릿 Pull 오류: $e');
-  }
-
-  try {
-    final remoteFoodTemplates =
-        await supabaseService.readFoodTemplatesDelta(since: lastSync);
-    await foodTemplateRepo.mergeRemoteTemplates(remoteFoodTemplates);
-    pulled += remoteFoodTemplates.length;
-  } catch (e) {
-    errors.add('음식 템플릿 Pull 오류: $e');
-  }
-
-  try {
-    final remoteRoutines =
-        await supabaseService.readWorkoutRoutinesDelta(since: lastSync);
-    await workoutRoutineRepo.mergeRemoteRoutines(remoteRoutines);
-    pulled += remoteRoutines.length;
-  } catch (e) {
-    errors.add('운동 루틴 Pull 오류: $e');
-  }
+  await mergeStep(
+    fetches[0],
+    SyncDomain.exercise,
+    (r) => exerciseRepo.mergeRemoteRecords(r.cast()),
+    '운동 기록 Pull',
+  );
+  await mergeStep(
+    fetches[1],
+    SyncDomain.diet,
+    (r) => dietRepo.mergeRemoteRecords(r.cast()),
+    '식단 기록 Pull',
+  );
+  await mergeStep(
+    fetches[2],
+    SyncDomain.weight,
+    (r) => weightRepo.mergeRemoteRecords(r.cast()),
+    '체중 기록 Pull',
+  );
+  await mergeStep(
+    fetches[3],
+    SyncDomain.exerciseTemplate,
+    (r) => templateRepo.mergeRemoteTemplates(r.cast()),
+    '운동 템플릿 Pull',
+  );
+  await mergeStep(
+    fetches[4],
+    SyncDomain.foodTemplate,
+    (r) => foodTemplateRepo.mergeRemoteTemplates(r.cast()),
+    '음식 템플릿 Pull',
+  );
+  await mergeStep(
+    fetches[5],
+    SyncDomain.workoutRoutine,
+    (r) => workoutRoutineRepo.mergeRemoteRoutines(r.cast()),
+    '운동 루틴 Pull',
+  );
 
   // 3. Hard Delete: sync_status == deleted
   try {
@@ -479,5 +542,30 @@ Future<SyncResult> _syncAll(
     }
   }
 
-  return SyncResult(pushed: pushed, pulled: pulled, errors: errors);
+  return SyncResult(
+    pushed: pushed,
+    pulled: pulled,
+    errors: errors,
+    changedDomains: changedDomains,
+  );
+}
+
+/// Pull 단계 fetch 결과 — 데이터 또는 에러를 보존해 후속 직렬 merge 단계에서 처리한다.
+class _PullFetchResult {
+  final List<dynamic>? data;
+  final Object? error;
+  const _PullFetchResult.success(this.data) : error = null;
+  const _PullFetchResult.failure(this.error) : data = null;
+}
+
+Future<_PullFetchResult> _safeFetch({
+  required String tag,
+  required Future<List<dynamic>> Function() fetch,
+}) async {
+  try {
+    final data = await fetch();
+    return _PullFetchResult.success(data);
+  } catch (e) {
+    return _PullFetchResult.failure(e);
+  }
 }

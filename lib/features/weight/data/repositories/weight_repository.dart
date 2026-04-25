@@ -5,8 +5,8 @@ abstract class WeightRepository {
   Future<WeightRecord?> getLatest();
   Future<List<WeightRecord>> getByDateRange(DateTime start, DateTime end);
   Future<WeightRecord?> getByDate(DateTime date);
-  Future<void> add(WeightRecord record);
-  Future<void> update(WeightRecord record);
+  Future<WeightRecord> add(WeightRecord record);
+  Future<WeightRecord> update(WeightRecord record);
   Future<void> delete(String uuid);
 
   // Sync 관련 메서드
