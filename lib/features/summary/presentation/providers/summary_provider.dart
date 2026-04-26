@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/daily_summary.dart';
+import '../../../exercise/domain/exercise_calorie_estimator.dart';
 import '../../../exercise/presentation/providers/exercise_provider.dart';
 import '../../../diet/presentation/providers/diet_provider.dart';
 import '../../../../core/sync/sync_state.dart';
@@ -72,11 +73,14 @@ final dailySummaryProvider = Provider<DailySummary>((ref) {
       .toSet()
       .toList();
 
+  final estimatedCalories = estimateExerciseCalories(dateExercises);
+
   final workoutPerformance = WorkoutPerformance(
     isWorkoutDay: dateExercises.isNotEmpty,
     targetedMuscles: targetedMuscles,
     totalVolume: totalVolume,
     averageRpe: avgRpe,
+    estimatedCalories: estimatedCalories,
   );
 
   return DailySummary(

@@ -32,11 +32,16 @@ class WorkoutPerformance {
   final double totalVolume;
   final double averageRpe;
 
+  /// 볼륨 기반 운동 칼로리 추정치 (kcal). 부위계수 적용, ±40% 추정치.
+  /// HealthKit / Health Connect 의 활동 칼로리와는 분리하여 표시한다 (합산 X).
+  final double estimatedCalories;
+
   const WorkoutPerformance({
     required this.isWorkoutDay,
     required this.targetedMuscles,
     required this.totalVolume,
     required this.averageRpe,
+    required this.estimatedCalories,
   });
 }
 

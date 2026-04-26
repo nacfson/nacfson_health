@@ -141,6 +141,14 @@
 - [x] `HealthContext` + `GeminiService.getHealthInsight` + Gemini 프롬프트에 활동 라인 추가 — 1만보 걸은 날 vs 좌식 날 추천 차별화
 - [x] 단위 테스트 10개 (`test/features/activity/`) — 엔티티 invariants + 프롬프트 라인 + contentHash 안정성
 
+### 운동 볼륨 기반 칼로리 추정 (2026-04)
+- [x] `lib/features/exercise/domain/body_part_calorie_coefficients.dart` — 부위별 계수 (하체 1.0 / 등·가슴 0.85 / 어깨·팔 0.6 / 코어 0.5 / 유산소 0.0 / 기타 0.7) + `kKcalPerKgVolume = 0.01`
+- [x] `lib/features/exercise/domain/exercise_calorie_estimator.dart` — `kcal = Σ(volume × 0.01 × 부위계수)`, warmup/failure 제외 (Scott 2011 단순 모델)
+- [x] `WorkoutPerformance.estimatedCalories` 필드 + `dailySummaryProvider` 통합
+- [x] 요약 탭 운동 카드에 "운동 칼로리 ~XX kcal *추정치*" 행 + ⓘ 탭 시 ±40% 오차 안내 스낵바
+- [x] HealthKit / Health Connect 의 활동 칼로리와 **분리 표시** — 합산하지 않음 (이중 카운팅 방지)
+- [x] 단위 테스트 11개 (`test/features/exercise/exercise_calorie_estimator_test.dart`) — 빈 입력 / 부위계수 / set_type 필터 / 폴백 / 합산
+
 ---
 
 ## 구현 패턴 요약

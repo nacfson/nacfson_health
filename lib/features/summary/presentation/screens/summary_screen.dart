@@ -447,6 +447,8 @@ class _WorkoutSummaryCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              _EstimatedCalorieTile(kcal: performance.estimatedCalories),
             ] else
               Text(
                 '오늘은 휴식을 취했습니다. 내일도 화이팅!',
@@ -495,6 +497,75 @@ class _StatTile extends StatelessWidget {
           Text(label,
               style: theme.textTheme.labelSmall
                   ?.copyWith(color: colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimatedCalorieTile extends StatelessWidget {
+  final double kcal;
+  const _EstimatedCalorieTile({required this.kcal});
+
+  void _showInfo(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '볼륨 기반 추정치입니다 (오차 ±40%). 워치 활동 칼로리와는 별도이며 합산되지 않습니다.',
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_fire_department,
+              size: 18, color: AppTheme.colorCatDiet),
+          const SizedBox(width: 8),
+          Text(
+            '운동 칼로리',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => _showInfo(context),
+            child: Icon(
+              Icons.info_outline,
+              size: 14,
+              color: colorScheme.outline,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '~${kcal.round()} kcal',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppTheme.colorCatDiet,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '추정치',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.outline,
+            ),
+          ),
         ],
       ),
     );

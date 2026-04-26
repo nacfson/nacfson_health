@@ -214,6 +214,7 @@ void main() {
             targetedMuscles: ['chest'],
             totalVolume: 500,
             averageRpe: 9.0,
+            estimatedCalories: 0,
           ),
         ),
         diets: const [],

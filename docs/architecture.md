@@ -190,6 +190,16 @@ Riverpod (autoDispose + keepAlive)
 - 다기기 동기화 가치 < 별도 테이블 운영 비용 (Phase 1 기준)
 - Phase 2 에서 BMR 자동 계산 / Workout 세션 매핑 / 추세 차트 등이 추가될 때 재평가
 
+### 자체 추정 운동 칼로리는 별도 트랙
+
+요약 탭의 운동 카드에 노출되는 "운동 칼로리(추정치)" 는 위 외부 활동 데이터 흐름과는 **완전히 독립**된 트랙이다.
+
+- 입력: `exercise_records` (사용자가 직접 기록한 sets × reps × weight)
+- 공식: `kcal = Σ(weight × reps × 0.01 × 부위계수)` — Scott(2011) 단순 모델, 부위계수만 적용 (EPOC·RPE·set_type 보정 없음, warmup/failure 는 `countsTowardVolume` 으로 제외)
+- 위치: `lib/features/exercise/domain/exercise_calorie_estimator.dart` + `body_part_calorie_coefficients.dart`
+- HealthKit 의 `activeEnergy` 와 **합산하지 않고 분리 표시** — 워치 자동 인식 운동과의 이중 카운팅 방지. `WorkoutPerformance.estimatedCalories` 가 별도 행으로 노출됨.
+- 정확도 ±40% 추정치임을 UI 의 ⓘ 아이콘으로 안내.
+
 ---
 
 ## iOS Live Activity 흐름 (휴식 타이머)
