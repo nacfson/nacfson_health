@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,7 +18,12 @@ final prRepositoryProvider = Provider<PrRepository>((ref) {
 
 /// 1RM 코치 칩에 노출할 종목 후보 (최근 90일 볼륨 상위 8개).
 /// `exerciseRecordsProvider` 변경(세트 추가/삭제) 시 무효화.
-final topExerciseNamesProvider = FutureProvider<List<String>>((ref) async {
+///
+/// **lifecycle**: autoDispose. 1RM 코치 풀스크린이 닫히면 즉시 dispose.
+/// 다른 탭에서 운동 세트가 추가되어도 invalidate 가 이 Provider 까지 전파되지
+/// 않는다 (이미 dispose 됨). 다음 풀스크린 진입 시 새로 쿼리.
+final topExerciseNamesProvider =
+    FutureProvider.autoDispose<List<String>>((ref) async {
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
   return repo.getTopExerciseNames();
@@ -33,15 +40,30 @@ final coachInputWeightProvider = StateProvider<double>((ref) => 80.0);
 final coachInputRepsProvider = StateProvider<int>((ref) => 5);
 
 /// 선택된 종목의 PR 요약 (FutureProvider.family).
-final prSummaryProvider =
-    FutureProvider.family<PrSummary, String>((ref, exerciseName) async {
+///
+/// **lifecycle**: family.autoDispose + keepAlive 30초 윈도우.
+/// - 칩 A→B→A 빠른 전환 시 30초 안의 재선택은 캐시 히트 (DB 쿼리 0).
+/// - 30초 경과 + listener 0 이면 dispose. 재진입 시 새 쿼리.
+/// - `exerciseRecordsProvider` 변경 시에는 keepAlive 와 무관하게 invalidate.
+final prSummaryProvider = FutureProvider.family
+    .autoDispose<PrSummary, String>((ref, exerciseName) async {
+  // 빠른 칩 전환 / 화면 짧은 잠시 떠남에서 재쿼리 회귀 방지
+  final link = ref.keepAlive();
+  final timer = Timer(const Duration(seconds: 30), link.close);
+  ref.onDispose(timer.cancel);
+
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
   return repo.getPrSummary(exerciseName);
 });
 
 /// 요약 탭 RecentPrCard 용 — 상위 3개 PR.
-final topPrsProvider = FutureProvider<List<PrSummary>>((ref) async {
+///
+/// **lifecycle**: autoDispose. 현재 BottomNavShell 가 화면을 메모리에 유지하므로
+/// 실질 효과는 미미하지만, BottomNav 정책 변경 / `ref.invalidate` 호출 시
+/// 다음 read 까지 결과 폐기를 보장하기 위해 명시적으로 autoDispose 로 둔다.
+final topPrsProvider =
+    FutureProvider.autoDispose<List<PrSummary>>((ref) async {
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
   return repo.getTopPrs();
@@ -84,8 +106,12 @@ class CoachNoteRequest {
 
 /// Gemini 1RM 코치 노트. 종목 + 신호등 + 날짜 별로 SharedPreferences 캐시.
 /// 동일 일자 내 같은 종목/신호등이면 캐시 히트.
-final oneRmCoachNoteProvider =
-    FutureProvider.family<String, CoachNoteRequest>((ref, req) async {
+///
+/// **lifecycle**: family.autoDispose. CoachNoteCard 가 unmount 되거나
+/// 종목/신호등이 바뀌면 listener 0 → dispose. SharedPreferences 캐시는 영속이므로
+/// 다음 진입 시 같은 날짜·종목·신호등이면 즉시 캐시 히트 (Gemini 호출 X).
+final oneRmCoachNoteProvider = FutureProvider.family
+    .autoDispose<String, CoachNoteRequest>((ref, req) async {
   final prefs = await SharedPreferences.getInstance();
   final cached = prefs.getString(req.cacheKey);
   if (cached != null && cached.isNotEmpty) return cached;
