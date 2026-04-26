@@ -35,6 +35,17 @@
 - 기능 완료 → `docs/features.md` 체크박스 반영 필수.
 - 실수 발생 시 → 관련 docs 가이드라인에 하네스 프롬프트 추가.
 
+### 마이그레이션 (DB / Supabase) — 무조건 다음 문서를 함께 업데이트할 것
+
+DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 시, 같은 작업 단위에서 **반드시** 다음을 모두 갱신한다 (하나라도 누락 시 PR 미완성으로 간주):
+
+1. **이 파일 (`CLAUDE.md`)** — 위 "프로젝트 요약" 의 **DB 버전** 라인 (버전 숫자 + 새 컬럼/테이블 한 줄 요약).
+2. **`docs/db-schema.md`** — "버전 이력" 표에 한 행 추가 + 새 버전 마이그레이션 SQL 상세 섹션 작성 + 영향받는 테이블 스키마 본문 갱신.
+3. **`docs/features.md`** — 새 기능 체크박스 추가 (구현 완료 항목) + 레거시 항목 취소선 처리.
+4. **`docs/changelog-vN.md`** — 새 버전 changelog 파일 신규 작성 (배경 / DB 변경 / 사고 회고(있으면) / UX 개편).
+5. **이 파일 (`CLAUDE.md`) 의 "참조 문서 목록" 표** — 새 changelog 행 등록.
+6. **Supabase 마이그레이션의 경우 — 원격 DB 적용까지 동일 작업 단위에서 완료**. 작성만 하고 push 누락 상태로 클라이언트 배포 금지. 절차·검증 쿼리는 `docs/db-schema.md` "마이그레이션 작성·적용 작업 체크리스트" 참조.
+
 ## 참조 문서 목록
 
 | 문서 | 설명 |
@@ -50,6 +61,8 @@
 | `docs/changelog-v5.md` | v5 변경 로그 (운동 템플릿 & UI 개선) |
 | `docs/changelog-v5-1.md` | v5.1 변경 로그 (기존 데이터 정리 & 설정 UI 개선) |
 | `docs/changelog-v6.md` | v6 변경 로그 (DB v7, AI 인사이트, 온보딩, 다크 모드, Pretendard) |
+| `docs/changelog-v7.md` | v7 변경 로그 (Google Sheets → Supabase 전환) |
+| `docs/changelog-v11.md` | v11 변경 로그 (`rest_seconds_override` + 부위별 휴식 + 템플릿 카드 UX 개편 + Supabase 마이그레이션 사고 회고) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 
 ## Git 환경 설정

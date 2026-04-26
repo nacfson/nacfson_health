@@ -14,6 +14,7 @@ import '../../../diet/presentation/widgets/calorie_trend_chart.dart';
 import '../../domain/entities/daily_summary.dart';
 import '../providers/summary_provider.dart';
 import '../widgets/coach_chat_sheet.dart';
+import '../widgets/recent_pr_card.dart';
 import '../widgets/workout_heatmap_card.dart';
 
 class SummaryScreen extends ConsumerWidget {
@@ -49,6 +50,7 @@ class SummaryScreen extends ConsumerWidget {
               child: _WorkoutSummaryCard(
                   performance: summary.workoutPerformance!),
             ),
+          const SliverToBoxAdapter(child: RecentPrCard()),
           // ── 추세 차트 섹션 ──
           SliverToBoxAdapter(
             child: Padding(

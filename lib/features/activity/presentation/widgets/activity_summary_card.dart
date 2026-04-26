@@ -4,7 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/nutrition/nutrition_calculator.dart';
+import '../../../../core/sync/sync_state.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/providers/user_profile_provider.dart';
+import '../../../weight/presentation/providers/weight_provider.dart';
 import '../../data/sources/health_data_source.dart';
 import '../../domain/entities/daily_activity.dart';
 import '../providers/activity_provider.dart';
@@ -168,19 +172,20 @@ class _AmbiguousEmptyBody extends StatelessWidget {
   }
 }
 
-class _ActivityBody extends StatelessWidget {
+class _ActivityBody extends ConsumerWidget {
   final DailyActivity activity;
   const _ActivityBody({required this.activity});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     final stepsText = _formatInt(activity.steps);
     final activeKcal = activity.activeCaloriesKcal.round();
-    final basalKcal = activity.basalCaloriesKcal.round();
     final totalKcal = activity.totalCaloriesKcal.round();
+
+    final bmrKcal = _resolveBmrKcal(ref);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,9 +215,16 @@ class _ActivityBody extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '활동 ${activeKcal}kcal · 기초대사 ${basalKcal}kcal',
+          '오늘 활동 ${activeKcal}kcal',
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
+        if (bmrKcal != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            '기초대사량 ${bmrKcal}kcal/일',
+            style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+          ),
+        ],
         if (activity.averageHeartRateBpm != null ||
             activity.restingHeartRateBpm != null) ...[
           const SizedBox(height: 12),
@@ -256,6 +268,31 @@ class _ActivityBody extends StatelessWidget {
       buf.write(s[i]);
     }
     return buf.toString();
+  }
+
+  /// 프로필이 충분히 갖춰졌을 때만 BMR(kcal/일) 반환. 하나라도 비면 null.
+  /// - heightMProvider: 0 이거나 비현실적이면 null
+  /// - latestWeightProvider: 체중 기록 0건이면 null
+  /// - userAge: 0 이하면 null
+  static int? _resolveBmrKcal(WidgetRef ref) {
+    final heightM = ref.watch(heightMProvider);
+    final latestWeight = ref.watch(latestWeightProvider);
+    final prefs = ref.read(syncPreferencesProvider);
+
+    if (heightM <= 0) return null;
+    final weightKg = latestWeight?.weight;
+    if (weightKg == null || weightKg <= 0) return null;
+    final age = prefs.userAge;
+    if (age <= 0) return null;
+
+    final gender = UserGenderX.fromPrefsKey(prefs.userGenderRaw);
+    final bmr = computeBmr(
+      weightKg: weightKg,
+      heightCm: heightM * 100,
+      age: age,
+      gender: gender,
+    );
+    return bmr.round();
   }
 }
 

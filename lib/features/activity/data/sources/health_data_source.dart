@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/daily_activity.dart';
 
@@ -46,6 +47,12 @@ abstract class HealthDataSource {
 class HealthDataSourceImpl implements HealthDataSource {
   HealthDataSourceImpl();
 
+  /// iOS 는 read 권한 거부 여부를 앱이 알 수 없도록 막아놓음 (Apple 프라이버시 설계).
+  /// 따라서 `Health().hasPermissions()` 가 read 권한에 대해 `null` 을 반환하므로
+  /// 권한 시트를 거쳤는지 자체 플래그로 추적한다. 실제 데이터 부재/거부 케이스는
+  /// UI 의 양가적 안내 (`_AmbiguousEmptyBody`) 가 처리.
+  static const _kIosAuthRequestedKey = 'activity_ios_auth_requested';
+
   static const _readTypes = <HealthDataType>[
     HealthDataType.STEPS,
     HealthDataType.ACTIVE_ENERGY_BURNED,
@@ -87,10 +94,19 @@ class HealthDataSourceImpl implements HealthDataSource {
         debugPrint('[HealthDataSource] HC status check failed: $e');
         return ActivityAuthStatus.needsHealthConnectInstall;
       }
+      final hasAll = await _hasAllPermissions();
+      return hasAll
+          ? ActivityAuthStatus.authorized
+          : ActivityAuthStatus.notDetermined;
     }
 
-    final hasAll = await _hasAllPermissions();
-    return hasAll ? ActivityAuthStatus.authorized : ActivityAuthStatus.notDetermined;
+    // iOS: hasPermissions 가 read 에 대해 null 을 반환하므로 신뢰 불가.
+    // 한 번이라도 권한 시트를 거쳤으면 authorized 로 간주하고 실제 데이터로 판단한다.
+    final prefs = await SharedPreferences.getInstance();
+    final requested = prefs.getBool(_kIosAuthRequestedKey) ?? false;
+    return requested
+        ? ActivityAuthStatus.authorized
+        : ActivityAuthStatus.notDetermined;
   }
 
   @override
@@ -105,11 +121,15 @@ class HealthDataSourceImpl implements HealthDataSource {
       if (!granted) return ActivityAuthStatus.denied;
 
       // Android 는 hasPermissions 로 명확히 검증 가능.
-      // iOS 는 read 권한 거부를 알려주지 않으므로 일단 authorized 로 둠.
       if (Platform.isAndroid) {
         final hasAll = await _hasAllPermissions();
         return hasAll ? ActivityAuthStatus.authorized : ActivityAuthStatus.denied;
       }
+
+      // iOS: 시트를 거쳤다는 사실만 기록. 실제 read 거부는 알 수 없으므로
+      // authorized 로 두고 데이터 fetch 결과로 양가적 안내 처리.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kIosAuthRequestedKey, true);
       return ActivityAuthStatus.authorized;
     } catch (e, st) {
       debugPrint('[HealthDataSource] requestAuthorization failed: $e\n$st');

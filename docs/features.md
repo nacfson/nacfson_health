@@ -182,6 +182,16 @@
   - 본세트 볼륨 분위수(Q1/Q2/Q3+) 기반 4단계 색상
   - 셀 탭 → `selectedDateProvider` + `/exercise` 라우팅
   - 요약 탭 최상단 배치
+- [x] **1RM 코치** 풀스크린 (`/exercise/coach/one-rm`, `OneRMCoachScreen`)
+  - 종목 칩(최근 90일 볼륨 상위 8) + 메인 카드(Epley e1RM + 5주 추세 스파크라인 + 4주 전 대비 변화량)
+  - 빠른 추정 스테퍼(중량 ±2.5kg / 횟수 ±1) + 입력 신뢰도 배지
+  - **1RM 도전 가이드 카드** — 신호등(녹/황/적/회). "현재 능력으로 봤을 때 도전이 적절한 시점인지" 진단(트레이너 처방 X)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;판단 입력: 5주 e1RM 추세 + 최근 7일 work 세트 수 + 최근 7일 RPE 평균 + 최근 14일 failure 세트 수
+  - % of 1RM 환산표 (100~65%, 8행) — 현재 reps 행 강조
+  - **AI 코치 노트** (Gemini, 100자 이내, 처방·진단 금지) — `oneRmNote_{exercise}_{level}_{yyyymmdd}` SharedPreferences 캐시
+  - 진입점 3곳: 운동 탭 AppBar `bolt` IconButton / `ExerciseGroupCard ⋯` 메뉴 / `ExerciseProgressionSheet` 하단 `1RM 코치 보기` 버튼 / 요약 탭 `RecentPrCard`
+  - 데이터 부족(currentE1RM null) 케이스 처리 — 변화량 배지 숨김, 회색 신호등, "데이터 부족" 안내
+  - DB 마이그레이션 불필요 (`exercise_records.weight, reps, set_type, timestamp, rpe` 만 사용)
+- [x] **요약 탭 최근 PR 카드** (`RecentPrCard`) — 상위 3종목 e1RM + Δ, 행 탭 시 1RM 코치(해당 종목 선택) 진입
 
 ## 백로그 📋
 
@@ -195,7 +205,7 @@
 - [ ] 스트릭 시스템 (연속 기록 동기부여)
 - [ ] 설정 화면에서 키 수정 기능 (온보딩 이후 변경)
 - [ ] AI 인사이트 캐싱 (같은 날 데이터 변경 없으면 재호출 생략)
-- [ ] 개인 기록(PR) 카드 + 3대 운동 합산 (요약 탭)
+- [x] 개인 기록(PR) 카드 (요약 탭) — `RecentPrCard` 로 구현. 3대 운동 합산은 별도 항목으로 후속
 - [ ] 원판 계산기 (플레이트 브레이크다운)
 - [ ] 기본 운동 라이브러리 (30~50종 시드)
 

@@ -277,6 +277,20 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
   ```
 - 스키마 변경 후에는 이 문서의 테이블 섹션도 함께 갱신한다.
 
+### 마이그레이션 작성·적용 작업 체크리스트 (반드시 준수)
+
+**SQL 파일 작성과 원격 DB 적용은 동일 작업 단위에서 함께 완료한다.** 작성만 하고 push 를 미루면 다음 클라이언트 배포에서 컬럼/트리거 누락으로 PGRST204 / silent drift 가 발생한다 (실사례: v11 `rest_seconds_override` — [docs/changelog-v11.md](changelog-v11.md) "사고 회고" 참조).
+
+1. **SQL 작성** — `supabase/migrations/YYYYMMDD_NNNN_<snake_case>.sql`. 모든 DDL 은 idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE EXTENSION IF NOT EXISTS`, `DROP TRIGGER IF EXISTS` 후 CREATE) 로 작성.
+2. **원격 적용** — 작성과 동시에 둘 중 하나로 push:
+   - Supabase MCP `apply_migration` (write 모드일 때).
+   - Supabase Studio → SQL Editor → 파일 내용 붙여넣고 Run.
+3. **적용 검증** — `mcp__supabase__execute_sql` 또는 Studio 에서 `information_schema.columns` / `information_schema.triggers` 조회로 변경이 실제 반영됐는지 확인. `mcp__supabase__list_migrations` 또는 `supabase_migrations.schema_migrations` 가 비어 있으면 push 가 안 된 것.
+4. **문서 동기화** — [CLAUDE.md](../CLAUDE.md) 의 "DB 버전" 라인, 본 문서의 "버전 이력" 표 + 마이그레이션 SQL 섹션, [docs/features.md](features.md) 체크박스, `docs/changelog-vN.md` 신규 작성. CLAUDE.md "참조 문서 목록" 표에도 새 changelog 등록.
+5. **문제 발생 시** — 본 섹션과 관련 changelog 에 사고 회고 + 재발 방지 하네스 프롬프트를 즉시 추가 (CLAUDE.md "실수 발생 시" 규칙).
+
+**금지**: 마이그레이션 SQL 파일 작성 후 원격 push 없이 클라이언트 코드 (DB 버전 증가, 새 컬럼 read/write) 를 배포하는 것.
+
 ---
 
 ## 공통 규칙

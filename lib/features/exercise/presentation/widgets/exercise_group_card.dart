@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
@@ -153,23 +154,36 @@ class _ExerciseGroupCardState extends ConsumerState<ExerciseGroupCard> {
                       ),
                   ],
                 ),
-                if (widget.editable && widget.onRemoveFromRoutine != null)
-                  PopupMenuButton<String>(
-                    tooltip: '카드 메뉴',
-                    icon: Icon(Icons.more_vert,
-                        size: 20, color: colorScheme.onSurfaceVariant),
-                    onSelected: (v) {
-                      if (v == 'remove') widget.onRemoveFromRoutine!();
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(
+                PopupMenuButton<String>(
+                  tooltip: '카드 메뉴',
+                  icon: Icon(Icons.more_vert,
+                      size: 20, color: colorScheme.onSurfaceVariant),
+                  onSelected: (v) {
+                    if (v == 'remove') widget.onRemoveFromRoutine?.call();
+                    if (v == 'one_rm_coach') {
+                      context.push(
+                        '/exercise/coach/one-rm?exercise=${Uri.encodeComponent(widget.exerciseName)}',
+                      );
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    if (widget.editable && widget.onRemoveFromRoutine != null)
+                      const PopupMenuItem(
                         value: 'remove',
                         child: Text('운동 제거'),
                       ),
-                    ],
-                  )
-                else
-                  const SizedBox(width: 8),
+                    PopupMenuItem(
+                      value: 'one_rm_coach',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.bolt_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text('1RM 코치'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

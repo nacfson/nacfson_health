@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/auth/presentation/screens/auth_callback_screen.dart';
 import '../../features/diet/presentation/screens/diet_screen.dart';
 import '../../features/exercise/presentation/screens/exercise_screen.dart';
+import '../../features/exercise/presentation/screens/one_rm_coach_screen.dart';
 import '../../features/onboarding/presentation/screens/onboarding_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/summary/presentation/screens/summary_screen.dart';
@@ -21,8 +22,8 @@ final shellNavigatorKey = GlobalKey<NavigatorState>();
 class _RouterNotifier extends ChangeNotifier {
   _RouterNotifier(this._ref) {
     // 온보딩/로그인 상태 변경 시 GoRouter redirect 재평가
-    _ref.listen<bool>(onboardingDoneProvider, (_, __) => notifyListeners());
-    _ref.listen<bool>(isSignedInProvider, (_, __) => notifyListeners());
+    _ref.listen<bool>(onboardingDoneProvider, (_, _) => notifyListeners());
+    _ref.listen<bool>(isSignedInProvider, (_, _) => notifyListeners());
     // signedIn 이벤트는 stream 한 틱 뒤에 도착할 수 있어 명시적으로 구독
     _ref.listen<AsyncValue<AuthState>>(supabaseAuthStreamProvider, (_, next) {
       next.whenData((authState) {
@@ -73,7 +74,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // OS가 주입하는 루트 경로 silent 처리
       GoRoute(
         path: '/',
-        redirect: (_, __) => '/exercise',
+        redirect: (_, _) => '/exercise',
       ),
       GoRoute(
         path: '/onboarding',
@@ -96,6 +97,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => const NoTransitionPage(
               child: ExerciseScreen(),
             ),
+            routes: [
+              GoRoute(
+                path: 'coach/one-rm',
+                // BottomNav 숨긴 몰입형 풀스크린: ShellRoute 밖의 root navigator 에 push.
+                parentNavigatorKey: rootNavigatorKey,
+                pageBuilder: (context, state) => MaterialPage(
+                  fullscreenDialog: true,
+                  child: OneRMCoachScreen(
+                    initialExerciseName:
+                        state.uri.queryParameters['exercise'],
+                  ),
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: '/diet',

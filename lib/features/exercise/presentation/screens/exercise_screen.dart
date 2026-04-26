@@ -245,6 +245,11 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       appBar: AppBar(
         title: const Text('운동 기록'),
         actions: [
+          IconButton(
+            tooltip: '1RM 코치',
+            icon: const Icon(Icons.bolt_outlined),
+            onPressed: () => context.push('/exercise/coach/one-rm'),
+          ),
           if (isToday)
             IconButton(
               tooltip: '저장된 루틴',

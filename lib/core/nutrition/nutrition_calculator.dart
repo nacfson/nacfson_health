@@ -284,8 +284,11 @@ class NutritionCalculationInput {
   });
 }
 
-/// Mifflin-St Jeor 공식 기반 BMR (kcal/day)
-double _calculateBmr({
+/// Mifflin-St Jeor 공식 기반 BMR (kcal/day).
+///
+/// `calculateTargets()` 의 내부 단계이자, UI 가 별도로 BMR 만 표시하고 싶을 때
+/// (예: 활동 카드의 "기초대사량 NNNkcal/일" 보조 라인) 직접 호출하는 진입점.
+double computeBmr({
   required double weightKg,
   required double heightCm,
   required int age,
@@ -327,7 +330,7 @@ NutritionTargets calculateTargets(NutritionCalculationInput input) {
     throw ArgumentError.value(input.age, 'age', '0보다 커야 합니다');
   }
 
-  final bmr = _calculateBmr(
+  final bmr = computeBmr(
     weightKg: input.weightKg,
     heightCm: input.heightCm,
     age: input.age,

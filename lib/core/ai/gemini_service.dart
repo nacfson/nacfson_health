@@ -9,6 +9,7 @@ import '../../features/activity/domain/entities/daily_activity.dart';
 import '../../features/diet/domain/entities/food_analysis_result.dart';
 import '../../features/summary/domain/entities/daily_summary.dart';
 import '../../features/weight/domain/entities/weight_record.dart';
+import '../training/challenge_readiness.dart';
 import 'coach_chat_models.dart';
 
 /// Gemini AI 건강 인사이트 + 음식 사진 분석 + 코치 챗봇 서비스.
@@ -313,6 +314,60 @@ ${ctx.toPromptContext()}
     } catch (_) {
       // JSON 파싱 실패 시 raw 텍스트를 answer로 fallback
       return CoachReply(answer: text, followUps: const []);
+    }
+  }
+
+  /// 1RM 코치 노트 — 종목별 PR 추세 + 도전 가능 신호등을 1~2문장 한국어로 코칭.
+  ///
+  /// **주의**: 처방·진단·의료 조언 금지. 동기부여/안내 톤만 허용.
+  /// 캐시는 호출자 (Provider) 책임 (날짜·종목·신호등 키).
+  Future<String> getOneRMCoachNote({
+    required String exerciseName,
+    required double currentE1RM,
+    required double? deltaKg,
+    required ReadinessLevel readiness,
+    required double lastSetWeight,
+    required int lastSetReps,
+  }) async {
+    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
+      return 'Gemini API 키를 설정해 주세요.';
+    }
+
+    final delta = deltaKg == null
+        ? '비교 데이터 없음'
+        : (deltaKg >= 0
+            ? '+${deltaKg.toStringAsFixed(1)}kg'
+            : '${deltaKg.toStringAsFixed(1)}kg');
+    final levelLabel = switch (readiness) {
+      ReadinessLevel.green => 'green (도전 적절)',
+      ReadinessLevel.amber => 'amber (1주 더 쌓기 권장)',
+      ReadinessLevel.red => 'red (회복 우선)',
+      ReadinessLevel.gray => 'gray (데이터 부족)',
+    };
+
+    final prompt = '''당신은 한국어 헬스 코치입니다. 아래 데이터로 1~2문장 짧은 코칭 메시지를 만들어 주세요.
+
+【원칙 (반드시 지킬 것)】
+- 처방·진단·의료 조언 금지. 동기부여/안내 톤만.
+- "꼭 도전하세요" 같은 강요 금지. "권장", "가능", "추천" 톤.
+- 100자 이내. 마크다운/이모지 금지. 평문만 출력.
+
+【데이터】
+- 종목: $exerciseName
+- 추정 1RM: ${currentE1RM.toStringAsFixed(0)}kg (4주 전 대비 $delta)
+- 최근 세트: ${lastSetWeight.toStringAsFixed(1)}kg × $lastSetReps회
+- 도전 신호등: $levelLabel
+
+위 데이터를 기반으로 한국어 1~2문장으로만 출력하세요.''';
+
+    try {
+      final response = await _model.generateContent([Content.text(prompt)]);
+      return response.text?.trim() ?? '';
+    } catch (e, st) {
+      debugPrint('[GeminiService.oneRm] ${e.runtimeType}: $e');
+      debugPrint('[GeminiService.oneRm] stack: $st');
+      rethrow;
     }
   }
 

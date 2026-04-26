@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../providers/exercise_provider.dart';
@@ -77,6 +78,26 @@ class ExerciseProgressionSheet extends ConsumerWidget {
                     _SummaryRow(exerciseName: exerciseName),
                     const SizedBox(height: 24),
                     _RecentSessions(exerciseName: exerciseName),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          context.push(
+                            '/exercise/coach/one-rm?exercise=${Uri.encodeComponent(exerciseName)}',
+                          );
+                        },
+                        icon: const Icon(Icons.bolt_outlined, size: 18),
+                        label: const Text('1RM 코치 보기'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
