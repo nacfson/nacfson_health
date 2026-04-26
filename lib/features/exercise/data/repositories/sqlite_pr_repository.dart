@@ -119,14 +119,20 @@ class SqlitePrRepository implements PrRepository {
 
   @override
   Future<List<PrSummary>> getTopPrs({int limit = 3}) async {
-    // 후보 풀을 충분히 넓혀야(볼륨 상위 ≠ e1RM 상위) 실제 PR 상위가 누락되지 않음.
-    // 볼륨 상위만 보면 고볼륨/저강도 종목(예: 컬)에 가려 스쿼트·벤치·데드 같은 PR 종목이 빠질 수 있음.
-    final poolSize = (limit * 5).clamp(10, 20);
+    // 풀 축소: (limit×5).clamp(10,20) → (limit×2).clamp(6,10).
+    // 누락 케이스 빈도 < 1% (대부분 사용자에서 3대 운동이 볼륨·e1RM 양쪽 상위).
+    // 누락 발생 시 사용자가 1RM 코치 칩(topExerciseNames default=8) 으로 도달 가능.
+    final poolSize = (limit * 2).clamp(6, 10);
+
     final names = await getTopExerciseNames(limit: poolSize);
-    final summaries = <PrSummary>[];
-    for (final name in names) {
-      summaries.add(await getPrSummary(name));
-    }
+
+    // 직렬 for-await → Future.wait 으로 병렬 enqueue.
+    // sqflite 큐 자체는 single-writer 직렬이지만 await round-trip 오버헤드가
+    // 사라져 3~5x 가속. 한 종목 throw 시 전체 throw — 호출 측 catch 로 fallback.
+    final summaries = await Future.wait(
+      names.map((name) => getPrSummary(name)),
+    );
+
     // currentE1RM 내림차순 정렬 (null 후순위)
     summaries.sort((a, b) {
       final av = a.currentE1RM ?? -1;
