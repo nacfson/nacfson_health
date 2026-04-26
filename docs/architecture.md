@@ -192,6 +192,45 @@ Riverpod (autoDispose + keepAlive)
 
 ---
 
+## iOS Live Activity 흐름 (휴식 타이머)
+
+휴식 타이머의 ±15초 / 일시정지·재개 / 종료가 Dynamic Island · Lock Screen · Home 위젯에 즉시 반영되도록, ActivityKit 호출 일체를 자체 native bridge 가 담당한다. ContentState 가 매 update 마다 의미 있게 변하므로 ActivityKit 이 위젯 rebuild 를 throttling 하지 않는다.
+
+### 컴포넌트
+- **Flutter UI**: `RestTimerBar` (`lib/features/exercise/presentation/widgets/rest_timer_bar.dart`) — ±15초·일시정지 버튼.
+- **State**: `RestTimerNotifier` (`lib/features/exercise/presentation/providers/rest_timer_provider.dart`) — `endAt` 기반 인앱 카운트다운, `addSeconds` 호출 시 외부 표시도 동시 갱신.
+- **Service**: `RestNotificationServiceIOS` (`lib/features/exercise/data/rest_notification_service_ios.dart`) — `MethodChannel('nacfson/rest_activity')` 호출 wrapper. `live_activities` 패키지 의존성은 더 이상 사용하지 않는다.
+- **Native Bridge**: `RestActivityBridge` (`ios/Runner/RestActivityBridge.swift`) — `start / update / endActivity / endAll / areEnabled / scheduleDismiss` 메서드 핸들러. `Activity.request(..., pushType: nil)` / `Activity.update(ActivityContent(state:staleDate:))` / `Activity.end(...)` 직접 호출.
+- **Attributes**: `RestActivityAttributes` — Runner (`RestActivityBridge.swift`) 와 Widget Extension (`ios/RestActivityWidget/RestActivityAttributes.swift`) 양쪽에 **동일한 이름·레이아웃** 으로 선언. ContentState: `endAtMs: Double, isPaused: Bool, exerciseName: String, totalSeconds: Int`.
+- **Widget**: `RestActivityWidget` (`ios/RestActivityWidget/RestActivityWidget.swift`) — `ActivityConfiguration(for: RestActivityAttributes.self)`. `context.state.endAtMs` 등을 직접 읽어 `Text(timerInterval: Date()...endDate)` / `ProgressView(timerInterval:)` 에 바인딩.
+
+### 흐름
+```
+사용자 ±15초 / 일시정지 토글
+  → RestTimerBar
+  → RestTimerNotifier.addSeconds() / pause()  (state.endAt 갱신, Timer.periodic 으로 인앱 카운트)
+  → RestNotificationServiceIOS.update(endAt, isPaused)
+  → MethodChannel('nacfson/rest_activity').invokeMethod('update', {activityId, endAtMs, isPaused})
+  → RestActivityBridge.update()
+  → activity.update(ActivityContent(
+      state: RestActivityAttributes.ContentState(endAtMs, isPaused, exerciseName, totalSeconds),
+      staleDate: endDate))
+  → ActivityKit: ContentState 변경 감지 → 위젯 rebuild trigger
+  → SwiftUI: context.state 의 새 endAtMs 로 Text(timerInterval:) 재바인딩
+  → Dynamic Island / Lock Screen 카운트다운 즉시 반영
+```
+
+### 설계 근거
+- `live_activities` 패키지의 `LiveActivitiesAppAttributes.ContentState` 는 `appGroupId: String` 단일 필드라 update 호출 시 **state 변경 없는 update** 가 되어 ActivityKit 이 위젯 rebuild 를 강하게 throttling 했다. 결과적으로 매 update 의 새 `endAtMs` 가 위젯의 `Text(timerInterval:)` 바인딩에 반영되지 않는 race 가 발생.
+- 자체 attribute 로 ContentState 를 의미 있게 갱신함으로써 trigger 누락을 해소하고, App Group `UserDefaults` 의 `"\(activity.id)_\(key)"` 우회를 단일 데이터 소스 (ContentState) 로 일원화.
+- `pushType: nil` 명시로 Personal Apple ID 팀에서도 `aps-environment` 엔타이틀먼트 불필요. App Store 배포 시 push 기반 update 가 필요해지면 bridge 가 ActivityKit `pushType: .token` 로 전환하면 된다.
+
+### 잔여 정리 (Cleanup)
+- `live_activities` / `permission_handler` (iOS) 패키지 의존성은 코드상 사용처가 사라진 뒤 별도 cleanup PR 에서 제거.
+- 레거시 `LiveActivitiesAppAttributes` 선언은 이전 버전 잔여 activity 정리 (`endAll`) 경로에서만 유지. 두 버전 이상 경과하면 안전하게 제거 가능.
+
+---
+
 ## 라우팅 흐름 (v7)
 
 `lib/core/router/app_router.dart` — Riverpod 상태와 GoRouter redirect를 연결하는 패턴.

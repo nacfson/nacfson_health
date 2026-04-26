@@ -1,10 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:live_activities/live_activities.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:uuid/uuid.dart';
 
 import 'rest_notification_service.dart';
 
@@ -18,16 +16,19 @@ import 'rest_notification_service.dart';
 ///
 /// 자세한 절차는 `docs/build-debug.md` 참조.
 ///
+/// 본 구현체는 ActivityKit 호출 일체를 자체 `RestActivityBridge` (Swift, MethodChannel
+/// `nacfson/rest_activity`) 로 위임한다. ContentState 에 타이머 데이터(endAtMs/isPaused/
+/// exerciseName/totalSeconds)가 직접 들어가므로 매 update 마다 ActivityKit 이 위젯
+/// rebuild 를 즉시 trigger 한다.
+///
 /// 진단 로그: `[LiveActivity]` 접두사로 Xcode 콘솔에 출력됩니다.
 /// Live Activity가 뜨지 않을 때 Xcode 콘솔에서 필터링하여 원인 확인 가능:
 ///   `log stream --predicate 'eventMessage contains "[LiveActivity]"'`
 class RestNotificationServiceIOS implements RestNotificationService {
-  RestNotificationServiceIOS({String? appGroupId})
-      : _appGroupId = appGroupId ?? _defaultAppGroupId {
+  RestNotificationServiceIOS() {
     _initFuture = _initialize();
   }
 
-  static const _defaultAppGroupId = 'group.com.nacfson.nacfsonHealth';
   static const _bridgeChannel = MethodChannel('nacfson/rest_activity');
   static const _preAlertId = 9101;
 
@@ -37,15 +38,11 @@ class RestNotificationServiceIOS implements RestNotificationService {
   /// `update()` 시에도 재스케줄을 시도.
   static const _dismissGrace = Duration(seconds: 15);
 
-  final LiveActivities _liveActivities = LiveActivities();
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  final String _appGroupId;
-  final _uuid = const Uuid();
 
-  /// init() 은 MethodChannel 핸드쉐이크를 포함하므로 반드시 `show/update/end` 호출 전에
-  /// await 되어야 한다. 생성자에서 버려진 Future를 await 하지 않고 `createActivity` 를
-  /// 호출하면 첫 Activity가 silently fail 할 수 있다.
+  /// init() 은 MethodChannel 핸드쉐이크 + 잔여 Activity cleanup 을 포함하므로
+  /// 반드시 `show/update/end` 호출 전에 await 되어야 한다.
   late final Future<void> _initFuture;
 
   String? _activityId;
@@ -56,21 +53,10 @@ class RestNotificationServiceIOS implements RestNotificationService {
 
   Future<void> _initialize() async {
     try {
-      await _liveActivities.init(
-        appGroupId: _appGroupId,
-        requestAndroidNotificationPermission: false,
-      );
       // 이전 세션이 휴식 중 강제 종료되면 _activityId 는 사라지지만 iOS는 Activity 를
       // 유지한다. 새 실행에서 중복으로 보이지 않도록 정리.
-      final stale = await _liveActivities.getAllActivitiesIds();
-      for (final id in stale) {
-        try {
-          await _liveActivities.endActivity(id);
-        } catch (e, s) {
-          debugPrint('[LiveActivity] cleanup id=$id failed: $e\n$s');
-        }
-      }
-      debugPrint('[LiveActivity] init OK, cleaned ${stale.length} stale');
+      await _bridgeChannel.invokeMethod('endAll');
+      debugPrint('[LiveActivity] init OK (endAll requested)');
     } catch (e, s) {
       debugPrint('[LiveActivity] init FAILED: $e\n$s');
     }
@@ -131,51 +117,45 @@ class RestNotificationServiceIOS implements RestNotificationService {
   }) async {
     await _initFuture;
 
+    bool enabled = false;
     try {
-      final enabled = await _liveActivities.areActivitiesEnabled();
-      if (!enabled) {
-        debugPrint(
-          '[LiveActivity] disabled by user (Settings > $_appGroupId > Live Activities)',
-        );
-        return null;
-      }
+      enabled = await _bridgeChannel.invokeMethod<bool>('areEnabled') ?? false;
     } catch (e, s) {
-      debugPrint('[LiveActivity] areActivitiesEnabled FAILED: $e\n$s');
+      debugPrint('[LiveActivity] areEnabled FAILED: $e\n$s');
+      return null;
+    }
+    if (!enabled) {
+      debugPrint(
+        '[LiveActivity] disabled by user (Settings > Live Activities)',
+      );
       return null;
     }
 
-    final customId = _uuid.v4();
-    final data = <String, dynamic>{
-      'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
-      'isPaused': false,
-      'totalSeconds': totalSeconds,
-      'exerciseName': exerciseName ?? '',
-    };
-
     try {
-      // 플러그인은 ActivityKit 이 부여한 진짜 Activity.id 를 반환한다.
-      // updateActivity 는 Activity.id 로만 엄격히 매칭하므로(플러그인 LiveActivitiesPlugin.swift:291)
-      // 반드시 반환값을 저장해야 이후 update 가 성공한다.
-      final returnedId = await _liveActivities.createActivity(
-        customId,
-        data,
-        removeWhenAppIsKilled: true,
-        iOSEnableRemoteUpdates: false,
+      final returnedId = await _bridgeChannel.invokeMethod<String>(
+        'start',
+        <String, Object>{
+          'totalSeconds': totalSeconds,
+          'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
+          'exerciseName': exerciseName ?? '',
+        },
       );
-      _activityId = returnedId ?? customId;
+      if (returnedId == null) {
+        debugPrint('[LiveActivity] start returned null (request failed)');
+        _activityId = null;
+        return null;
+      }
+      _activityId = returnedId;
       debugPrint(
         '[LiveActivity] created id=$_activityId name="${exerciseName ?? ''}" endAt=$endAt',
       );
-      final id = _activityId;
-      if (id != null) {
-        await _scheduleDismissBridge(
-          activityId: id,
-          dismissAt: endAt.add(_dismissGrace),
-        );
-      }
-      return _activityId;
+      await _scheduleDismissBridge(
+        activityId: returnedId,
+        dismissAt: endAt.add(_dismissGrace),
+      );
+      return returnedId;
     } catch (e, s) {
-      debugPrint('[LiveActivity] createActivity FAILED: $e\n$s');
+      debugPrint('[LiveActivity] start FAILED: $e\n$s');
       _activityId = null;
       return null;
     }
@@ -192,15 +172,15 @@ class RestNotificationServiceIOS implements RestNotificationService {
       '[LiveActivity] update called id=$id endAt=$endAt paused=$isPaused',
     );
     if (id == null) return;
-    final data = <String, dynamic>{
-      'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
-      'isPaused': isPaused,
-    };
     try {
-      await _liveActivities.updateActivity(id, data);
-      debugPrint('[LiveActivity] updateActivity id=$id OK');
+      await _bridgeChannel.invokeMethod('update', <String, Object>{
+        'activityId': id,
+        'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
+        'isPaused': isPaused,
+      });
+      debugPrint('[LiveActivity] update id=$id OK');
     } catch (e, s) {
-      debugPrint('[LiveActivity] updateActivity id=$id FAILED: $e\n$s');
+      debugPrint('[LiveActivity] update id=$id FAILED: $e\n$s');
     }
     // +15 연타 등으로 새 endAt 이 초기 dismiss 시각을 넘길 수 있으니 재스케줄.
     // 일시정지 상태에선 endAt 이 display 용이라 dismiss 를 밀지 않음.
@@ -218,7 +198,9 @@ class RestNotificationServiceIOS implements RestNotificationService {
     final id = _activityId;
     if (id == null) return;
     try {
-      await _liveActivities.endActivity(id);
+      await _bridgeChannel.invokeMethod('endActivity', <String, Object>{
+        'activityId': id,
+      });
     } catch (e, s) {
       debugPrint('[LiveActivity] endActivity id=$id FAILED: $e\n$s');
     }

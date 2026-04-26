@@ -13,6 +13,7 @@ import '../../../settings/presentation/providers/exercise_template_provider.dart
 import '../../domain/entities/exercise_record.dart';
 import '../../domain/entities/routine_item.dart';
 import '../providers/exercise_provider.dart';
+import '../providers/one_rm_coach_provider.dart';
 import '../providers/routine_planner_provider.dart';
 import '../providers/workout_routine_provider.dart';
 import '../widgets/direct_routine_input_dialog.dart';
@@ -245,11 +246,18 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
       appBar: AppBar(
         title: const Text('운동 기록'),
         actions: [
-          IconButton(
-            tooltip: '1RM 코치',
-            icon: const Icon(Icons.bolt_outlined),
-            onPressed: () => context.push('/exercise/coach/one-rm'),
-          ),
+          // visibility gating: 어떤 종목이든 work/drop 세트가 1개라도 있을 때만 ⚡.
+          // topExerciseNames 가 비어있으면 1RM 코치 풀스크린 자체가 의미 없어 진입 차단.
+          // exerciseRecordsProvider 와 자동 연동 → 첫 세트 추가 직후 ⚡ 자동 등장.
+          if (ref.watch(topExerciseNamesProvider).maybeWhen(
+                data: (names) => names.isNotEmpty,
+                orElse: () => false,
+              ))
+            IconButton(
+              tooltip: '1RM 코치',
+              icon: const Icon(Icons.bolt_outlined),
+              onPressed: () => context.push('/exercise/coach/one-rm'),
+            ),
           if (isToday)
             IconButton(
               tooltip: '저장된 루틴',

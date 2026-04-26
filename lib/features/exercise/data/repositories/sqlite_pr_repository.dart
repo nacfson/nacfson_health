@@ -158,4 +158,31 @@ class SqlitePrRepository implements PrRepository {
     );
     return rows.map((r) => r['exercise_name'] as String).toList();
   }
+
+  @override
+  Future<({double weight, int reps})?> getLatestWorkSet(
+    String exerciseName,
+  ) async {
+    final db = await DatabaseHelper.instance.database;
+    final rows = await db.query(
+      'exercise_records',
+      columns: const ['weight', 'reps'],
+      where:
+          'exercise_name = ? AND set_type IN (?, ?) AND sync_status != ?',
+      whereArgs: [
+        exerciseName,
+        'work',
+        'drop',
+        SyncStatus.deleted.value,
+      ],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return (
+      weight: (r['weight'] as num).toDouble(),
+      reps: r['reps'] as int,
+    );
+  }
 }

@@ -55,9 +55,9 @@
 - [x] ±15초 빠른 조정 (`RestTimerBar` 인라인 버튼 + 알림 액션) / 일시정지·재개 / 수동 종료
 - [x] 백그라운드 복귀 정확성 (`endAt` 기반 계산, Timer.periodic은 UI 갱신 전용)
 - [x] 5초 전 햅틱 1회 + 0초 도달 시 강한 햅틱 (`HapticFeedback`)
-- [x] iOS Live Activity (Dynamic Island + Lock Screen) — `RestNotificationServiceIOS` + `live_activities` 패키지 + `RestActivityWidget.swift` (App Group `group.com.nacfson.nacfsonHealth` 통일, Xcode 수동 단계는 `docs/build-debug.md` §14)
+- [x] iOS Live Activity (Dynamic Island + Lock Screen) — `RestNotificationServiceIOS` + 자체 `RestActivityBridge` (Swift, MethodChannel `nacfson/rest_activity`) + `RestActivityWidget.swift`. ContentState (`RestActivityAttributes.ContentState`) 에 `endAtMs / isPaused / exerciseName / totalSeconds` 직접 적재 → ±15초 / 일시정지 변경 시 ActivityKit 이 위젯 rebuild 즉시 trigger (UserDefaults 우회 폐기). App Group `group.com.nacfson.nacfsonHealth` 유지, Xcode 수동 단계는 `docs/build-debug.md` §14
 - [x] Android persistent notification (chronometer + `[+15초]`·`[정지]` 액션) — `RestNotificationServiceAndroid` + `flutter_local_notifications` + `permission_handler`
-- [ ] iOS Live Activity App Intents 액션 (현재는 인앱/Android만 액션 처리) — 백로그
+- [ ] iOS Live Activity App Intents 액션 — 자체 `RestActivityAttributes` 도입으로 ContentState 수정 자유도 확보. App Intents 추가 시 widget 코드만 변경하면 됨. (현재는 인앱/Android만 액션 처리) — 백로그
 - [ ] Android Foreground Service (앱 강제 종료 시에도 알림 유지) — 백로그
 
 ### 홈스크린 위젯 (iOS)

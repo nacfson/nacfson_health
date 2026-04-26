@@ -3,31 +3,17 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-/// App Group 은 Runner / Widget Extension / entitlements 에 등록된 값과 일치해야 한다.
-private let appGroupId = "group.com.nacfson.nacfsonHealth"
-
-/// 플러그인이 App Group UserDefaults 에 `"\(activity.id)_\(key)"` 로 저장한 사용자 데이터.
-/// 플러그인 소스 `LiveActivitiesPlugin.swift:261` 참고.
-@available(iOS 16.1, *)
-private func readRestPrefs(
-    _ context: ActivityViewContext<LiveActivitiesAppAttributes>
-) -> (endDate: Date, isPaused: Bool, name: String) {
-    let defaults = UserDefaults(suiteName: appGroupId)
-    let prefix = context.attributes.id.uuidString
-    let endAtMs = defaults?.double(forKey: "\(prefix)_endAtMs") ?? 0
-    let isPaused = defaults?.bool(forKey: "\(prefix)_isPaused") ?? false
-    let name = defaults?.string(forKey: "\(prefix)_exerciseName") ?? ""
-    let endDate = Date(timeIntervalSince1970: endAtMs / 1000.0)
-    return (endDate, isPaused, name)
-}
-
 @available(iOS 16.1, *)
 struct RestActivityWidget: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: LiveActivitiesAppAttributes.self) { context in
+        ActivityConfiguration(for: RestActivityAttributes.self) { context in
             RestLockScreenView(context: context)
                 .padding()
         } dynamicIsland: { context in
+            let endDate = Date(timeIntervalSince1970: context.state.endAtMs / 1000.0)
+            let isPaused = context.state.isPaused
+            let name = context.state.exerciseName
+
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     Image(systemName: "timer")
@@ -36,23 +22,20 @@ struct RestActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     TimelineView(.periodic(from: Date(), by: 1)) { _ in
-                        let prefs = readRestPrefs(context)
-                        timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                        timerText(endDate: endDate, isPaused: isPaused)
                             .font(.system(size: 22, weight: .semibold, design: .rounded))
                             .monospacedDigit()
                             .foregroundColor(.primary)
                     }
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    let prefs = readRestPrefs(context)
-                    Text(prefs.name.isEmpty ? "휴식 중" : prefs.name)
+                    Text(name.isEmpty ? "휴식 중" : name)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     TimelineView(.periodic(from: Date(), by: 1)) { _ in
-                        let prefs = readRestPrefs(context)
-                        progressBar(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                        progressBar(endDate: endDate, isPaused: isPaused)
                     }
                 }
             } compactLeading: {
@@ -60,8 +43,7 @@ struct RestActivityWidget: Widget {
                     .foregroundColor(.mint)
             } compactTrailing: {
                 TimelineView(.periodic(from: Date(), by: 1)) { _ in
-                    let prefs = readRestPrefs(context)
-                    timerText(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                    timerText(endDate: endDate, isPaused: isPaused)
                         .monospacedDigit()
                         .foregroundColor(.primary)
                 }
@@ -105,31 +87,34 @@ struct RestActivityWidget: Widget {
 
 @available(iOS 16.1, *)
 struct RestLockScreenView: View {
-    let context: ActivityViewContext<LiveActivitiesAppAttributes>
+    let context: ActivityViewContext<RestActivityAttributes>
 
     var body: some View {
+        let endDate = Date(timeIntervalSince1970: context.state.endAtMs / 1000.0)
+        let isPaused = context.state.isPaused
+        let name = context.state.exerciseName
+
         TimelineView(.periodic(from: Date(), by: 1)) { _ in
-            let prefs = readRestPrefs(context)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Image(systemName: Date() >= prefs.endDate ? "checkmark.circle.fill" : "timer")
+                    Image(systemName: Date() >= endDate ? "checkmark.circle.fill" : "timer")
                         .foregroundColor(.mint)
-                    Text(prefs.name.isEmpty ? (Date() >= prefs.endDate ? "휴식 완료" : "휴식 중") : prefs.name)
+                    Text(name.isEmpty ? (Date() >= endDate ? "휴식 완료" : "휴식 중") : name)
                         .font(.headline)
                     Spacer()
-                    trailingLabel(endDate: prefs.endDate, isPaused: prefs.isPaused)
+                    trailingLabel(endDate: endDate, isPaused: isPaused)
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .monospacedDigit()
                 }
-                if !prefs.isPaused && Date() < prefs.endDate {
+                if !isPaused && Date() < endDate {
                     ProgressView(
-                        timerInterval: Date()...prefs.endDate,
+                        timerInterval: Date()...endDate,
                         countsDown: true,
                         label: { EmptyView() },
                         currentValueLabel: { EmptyView() }
                     )
                     .tint(.mint)
-                } else if Date() >= prefs.endDate {
+                } else if Date() >= endDate {
                     ProgressView(value: 1.0)
                         .tint(.mint)
                 }

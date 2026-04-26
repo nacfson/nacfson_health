@@ -29,6 +29,21 @@ final topExerciseNamesProvider =
   return repo.getTopExerciseNames();
 });
 
+/// 종목의 최근 work/drop 세트 1개. 입력값 자동 초기화 용도.
+///
+/// **lifecycle**: family.autoDispose. 풀스크린 닫히거나 종목이 변경돼
+/// 다른 인스턴스가 활성화되면 listener 0 → 즉시 dispose.
+/// `exerciseRecordsProvider` 변경(세트 추가/삭제) 시 자동 invalidate.
+///
+/// `prSummaryProvider` 와 달리 keepAlive 없음 — 입력 초기화는 칩 클릭 시
+/// 1회만 실행되므로 캐시 가치가 적음.
+final latestWorkSetProvider = FutureProvider.family
+    .autoDispose<({double weight, int reps})?, String>((ref, exerciseName) async {
+  ref.watch(exerciseRecordsProvider);
+  final repo = ref.watch(prRepositoryProvider);
+  return repo.getLatestWorkSet(exerciseName);
+});
+
 /// 1RM 코치 풀스크린에서 현재 선택된 종목명.
 /// 진입 시 query param 또는 [topExerciseNamesProvider] 의 첫 항목으로 초기화.
 final selectedCoachExerciseProvider = StateProvider<String?>((ref) => null);

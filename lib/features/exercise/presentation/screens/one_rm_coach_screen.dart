@@ -51,12 +51,28 @@ class _OneRMCoachScreenState extends ConsumerState<OneRMCoachScreen> {
     }
   }
 
+  /// 종목 선택 변경 시 입력값을 그 종목의 최근 work/drop 세트로 reset.
+  /// 데이터가 없으면 기존 입력값 유지 (이전 사용자 조정값을 강제 되돌리지 않음).
+  Future<void> _applyLatestSetToInputs(String exerciseName) async {
+    final latest =
+        await ref.read(latestWorkSetProvider(exerciseName).future);
+    if (!mounted || latest == null) return;
+    ref.read(coachInputWeightProvider.notifier).state = latest.weight;
+    ref.read(coachInputRepsProvider.notifier).state = latest.reps;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final selected = ref.watch(selectedCoachExerciseProvider);
     final inputWeight = ref.watch(coachInputWeightProvider);
     final inputReps = ref.watch(coachInputRepsProvider);
+
+    // 종목 변경 시 입력값 1회 reset. ExerciseChips 의 ensureVisible 은 위젯 자체 listen.
+    ref.listen<String?>(selectedCoachExerciseProvider, (prev, next) {
+      if (next == null || next == prev) return;
+      _applyLatestSetToInputs(next);
+    });
 
     return Scaffold(
       appBar: AppBar(

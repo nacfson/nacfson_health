@@ -11,4 +11,8 @@ abstract class PrRepository {
   /// 최근 90일 work/drop 세트 총 볼륨 상위 [limit] 종목 이름.
   /// 1RM 코치 종목 칩 후보 목록.
   Future<List<String>> getTopExerciseNames({int limit = 8});
+
+  /// 종목의 가장 최근 work/drop 세트의 (weight, reps). 없으면 null.
+  /// warmup / failure 는 제외 — 1RM 코치 입력 초기값 용도.
+  Future<({double weight, int reps})?> getLatestWorkSet(String exerciseName);
 }
