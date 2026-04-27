@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/ai/food_vision_provider.dart';
+import 'core/router/app_router.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
 import 'core/widget/home_widget_service.dart';
@@ -160,6 +162,52 @@ class _NacfsonHealthAppWithSyncState
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _registerHomeWidgetSync();
+    _registerWidgetTapListener();
+  }
+
+  /// 홈스크린 위젯 탭으로 들어온 URI 를 GoRouter 로 라우팅한다.
+  ///
+  /// iOS 위젯의 `.widgetURL(URL(string: "nacfsonhealth://<host>"))` 가 트리거하면
+  /// home_widget 플러그인이 두 채널로 알린다:
+  ///   - cold launch  : `HomeWidget.initiallyLaunchedFromHomeWidget()` (1회)
+  ///   - warm launch  : `HomeWidget.widgetClicked` Stream
+  ///
+  /// 매핑은 위젯 정의(NutritionWidget / WorkoutHeatmapWidget)와 일치해야 한다.
+  void _registerWidgetTapListener() {
+    if (kIsWeb) return;
+    try {
+      if (!Platform.isIOS) return;
+    } catch (_) {
+      return;
+    }
+
+    void handle(Uri? uri) {
+      if (uri == null) return;
+      // supabase OAuth(`io.supabase.nacfson://...`) 등 다른 스킴은 무시.
+      if (uri.scheme != 'nacfsonhealth') return;
+      final route = switch (uri.host) {
+        'diet' => '/diet',
+        'summary' => '/summary',
+        'exercise' => '/exercise',
+        'weight' => '/weight',
+        'settings' => '/settings',
+        _ => null,
+      };
+      if (route == null) return;
+      ref.read(appRouterProvider).go(route);
+    }
+
+    // Cold launch — 라우터/첫 프레임이 준비된 뒤에 이동시켜야 redirect 와 충돌 없음.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        handle(await HomeWidget.initiallyLaunchedFromHomeWidget());
+      } catch (_) {
+        // 위젯 미설치 등 — 무시.
+      }
+    });
+
+    // Warm launch — 앱이 백그라운드에 있다 위젯 탭으로 복귀한 경우.
+    HomeWidget.widgetClicked.listen(handle);
   }
 
   /// 홈스크린 위젯(영양 / 운동 잔디) 데이터 동기화 리스너 등록.
