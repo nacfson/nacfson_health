@@ -92,6 +92,10 @@ struct NutritionWidget: Widget {
         StaticConfiguration(kind: kind, provider: NutritionProvider()) { entry in
             NutritionWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
+                // 위젯 탭 → 앱 진입(식단 탭). systemMedium 은 widgetURL 없이는 탭 무반응.
+                // Info.plist 의 CFBundleURLSchemes("nacfsonhealth") 와 일치해야 한다.
+                // Flutter 측 라우팅: lib/main.dart 의 _registerWidgetTapListener()
+                .widgetURL(URL(string: "nacfsonhealth://diet"))
         }
         .configurationDisplayName("오늘의 영양")
         .description("칼로리·탄단지 진행률을 한눈에")

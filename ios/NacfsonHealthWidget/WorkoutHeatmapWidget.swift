@@ -107,6 +107,10 @@ struct WorkoutHeatmapWidget: Widget {
         StaticConfiguration(kind: kind, provider: WorkoutHeatmapProvider()) { entry in
             HeatmapView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
+                // 위젯 탭 → 앱 진입(요약 탭). medium/large 만 지원하므로 widgetURL 필수.
+                // Info.plist 의 CFBundleURLSchemes("nacfsonhealth") 와 일치해야 한다.
+                // Flutter 측 라우팅: lib/main.dart 의 _registerWidgetTapListener()
+                .widgetURL(URL(string: "nacfsonhealth://summary"))
         }
         .configurationDisplayName("운동 잔디")
         .description("최근 13주 운동 볼륨 히트맵")

@@ -64,6 +64,7 @@
 - [x] `NutritionWidget` — 오늘 칼로리·탄단지 진행률 (small / medium) — `ios/NacfsonHealthWidget/NutritionWidget.swift`, 데이터: `HomeWidgetService.update()`
 - [x] `WorkoutHeatmapWidget` — 최근 13주 운동 볼륨 잔디밭 (medium / large) — `ios/NacfsonHealthWidget/WorkoutHeatmapWidget.swift`, 데이터: `HomeWidgetService.updateHeatmap()` (요약 탭 `WorkoutHeatmapCard` 와 동일한 4분위 색상 로직)
 - [x] App Group `group.com.nacfson.nacfsonHealth` 공유 (Live Activity 와 통일) + `_registerHomeWidgetSync` 자동 갱신 (식단 합계 / 영양 목표 / 본세트 볼륨 변경 시)
+- [x] 위젯 탭 → 앱 진입 딥링크 — `nacfsonhealth://` 자체 URL 스킴 + 각 위젯 `.widgetURL(...)` (영양 → `/diet`, 잔디 → `/summary`). cold/warm launch 모두 `lib/main.dart`의 `_registerWidgetTapListener` → `appRouterProvider.go(...)` 로 라우팅. medium/large 위젯은 `widgetURL` 없이는 탭 무반응이므로 필수.
 - [ ] Android App Widget — 백로그
 
 ### Supabase 동기화
