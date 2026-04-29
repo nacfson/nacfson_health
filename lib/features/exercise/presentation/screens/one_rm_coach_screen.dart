@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/training/challenge_readiness.dart';
 import '../../../../core/training/one_rm_calculator.dart';
+import '../../../../core/training/one_rm_formula.dart';
 import '../../domain/entities/pr_summary.dart';
+import '../providers/master_data_provider.dart';
 import '../providers/one_rm_coach_provider.dart';
 import '../widgets/exercise_progression_sheet.dart';
 import '../widgets/one_rm/challenge_readiness_card.dart';
@@ -31,6 +33,9 @@ class _OneRMCoachScreenState extends ConsumerState<OneRMCoachScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // v12: 1RM 코치 진입 시 master data TTL 24h fetch trigger.
+      // 오프라인이면 SQLite 캐시 사용, 첫 설치라면 Supabase 호출 1회.
+      ref.read(masterDataBundleProvider);
       _initSelectedExercise();
     });
   }
@@ -151,7 +156,13 @@ class _Body extends ConsumerWidget {
           recentRpeAvg: summary.recentRpeAvg,
           recentFailureCount: summary.recentFailureCount,
         ));
-        final live1RM = calculateE1RM(inputWeight, inputReps);
+
+        // v12: 종목별 권위 공식이 있으면 그걸로 live e1RM 계산. 없으면 Epley fallback.
+        final formulaAsync = ref.watch(selectedExerciseFormulaProvider);
+        final OneRMFormulaSpec? spec = formulaAsync.valueOrNull;
+        final double live1RM = spec != null
+            ? spec.calculate(inputWeight, inputReps)
+            : calculateE1RM(inputWeight, inputReps);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

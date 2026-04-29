@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+
+import '../../features/exercise/data/legacy_korean_mapping.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -24,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -140,6 +144,69 @@ class DatabaseHelper {
         updated_at INTEGER NOT NULL
       )
     ''');
+
+    // v12: 다국어 master 운동 데이터 + 1RM 공식
+    await _createV12Tables(db);
+    // exercise_records / exercise_templates 의 exercise_key 컬럼은
+    // _createDB 첫 진입 시점부터 함께 생성 (신규 사용자는 마이그레이션 불필요).
+    await db.execute('ALTER TABLE exercise_records ADD COLUMN exercise_key TEXT');
+    await db.execute('ALTER TABLE exercise_records ADD COLUMN category_key TEXT');
+    await db.execute('ALTER TABLE exercise_templates ADD COLUMN exercise_key TEXT');
+    await db.execute('ALTER TABLE exercise_templates ADD COLUMN category_key TEXT');
+  }
+
+  /// v12 master 운동 데이터 테이블 5개 생성. _createDB / _upgradeDB 양쪽에서 사용.
+  Future<void> _createV12Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exercise_categories (
+        category_key TEXT PRIMARY KEY,
+        display_order INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exercise_category_translations (
+        category_key TEXT NOT NULL,
+        locale TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (category_key, locale)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exercise_definitions (
+        exercise_key TEXT PRIMARY KEY,
+        category_key TEXT NOT NULL,
+        is_compound INTEGER NOT NULL DEFAULT 0,
+        default_name TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS exercise_translations (
+        exercise_key TEXT NOT NULL,
+        locale TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        aliases TEXT,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (exercise_key, locale)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS one_rm_formulas (
+        exercise_key TEXT PRIMARY KEY,
+        formula_type TEXT NOT NULL,
+        coefficients TEXT NOT NULL,
+        source TEXT,
+        optimal_rep_max INTEGER,
+        notice_translations TEXT,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_exercise_definitions_category ON exercise_definitions(category_key)');
+    await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_exercise_translations_locale ON exercise_translations(locale)');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -292,6 +359,100 @@ class DatabaseHelper {
         ''');
       } catch (_) {
         // 이미 존재
+      }
+    }
+    if (oldVersion < 12) {
+      // v12: 다국어 master 운동 데이터 (exercise_definitions/translations/categories)
+      // + one_rm_formulas + 기존 사용자 데이터의 exercise_key 자동 매핑.
+      await _createV12Tables(db);
+
+      // 기존 user-owned 테이블에 exercise_key/category_key 컬럼 추가
+      for (final stmt in const [
+        'ALTER TABLE exercise_records ADD COLUMN exercise_key TEXT',
+        'ALTER TABLE exercise_records ADD COLUMN category_key TEXT',
+        'ALTER TABLE exercise_templates ADD COLUMN exercise_key TEXT',
+        'ALTER TABLE exercise_templates ADD COLUMN category_key TEXT',
+      ]) {
+        try {
+          await db.execute(stmt);
+        } catch (_) {
+          // 이미 존재
+        }
+      }
+
+      // 한글명 → exercise_key 자동 매핑 (M1 — Eager).
+      // exercise_name / exercise_type 컬럼은 보존 (historical snapshot).
+      await _backfillExerciseKeysV12(db, 'exercise_records');
+      await _backfillExerciseKeysV12(db, 'exercise_templates');
+
+      // 루틴 items_json 도 한글명 → exercise_key 보강 (Dart 처리).
+      await _migrateRoutineItemsJsonV12(db);
+    }
+  }
+
+  /// v12 마이그레이션: 한글명 → exercise_key 자동 매핑.
+  Future<void> _backfillExerciseKeysV12(Database db, String table) async {
+    // exercise_templates 의 컬럼명은 'name', exercise_records 는 'exercise_name'.
+    final nameCol = table == 'exercise_templates' ? 'name' : 'exercise_name';
+    final typeCol = 'exercise_type';
+
+    for (final entry in kLegacyKoreanExerciseNameToKey.entries) {
+      await db.rawUpdate(
+        'UPDATE $table SET exercise_key = ? WHERE $nameCol = ? AND exercise_key IS NULL',
+        [entry.value, entry.key],
+      );
+    }
+    for (final entry in kLegacyKoreanCategoryToKey.entries) {
+      await db.rawUpdate(
+        'UPDATE $table SET category_key = ? WHERE $typeCol = ? AND category_key IS NULL',
+        [entry.value, entry.key],
+      );
+    }
+  }
+
+  /// v12 마이그레이션: workout_routines / daily_routine 의 items_json 안
+  /// 한글 종목명에 exerciseKey 필드를 추가한다.
+  Future<void> _migrateRoutineItemsJsonV12(Database db) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    for (final tableName in const ['workout_routines', 'daily_routine']) {
+      final rows = await db.query(tableName);
+      for (final row in rows) {
+        final raw = row['items_json'] as String?;
+        if (raw == null || raw.isEmpty) continue;
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is! List) continue;
+          var changed = false;
+          for (final item in decoded) {
+            if (item is! Map<String, dynamic>) continue;
+            if (item['exerciseKey'] != null) continue;
+            final name = item['exerciseName'] as String?;
+            final key = legacyKoreanToExerciseKey(name);
+            if (key != null) {
+              item['exerciseKey'] = key;
+              changed = true;
+            }
+          }
+          if (changed) {
+            final values = <String, Object?>{
+              'items_json': jsonEncode(decoded),
+              'updated_at': now,
+            };
+            // workout_routines 는 sync_status 가 있으므로 modified 로 마킹하여 재push.
+            if (tableName == 'workout_routines') {
+              values['sync_status'] = 2; // SyncStatus.modified
+            }
+            await db.update(
+              tableName,
+              values,
+              where: 'id = ?',
+              whereArgs: [row['id']],
+            );
+          }
+        } catch (_) {
+          // 한 행 파싱 실패해도 나머지는 계속 처리
+        }
       }
     }
   }

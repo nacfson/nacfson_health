@@ -6,7 +6,7 @@
 
 - **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
 - **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
-- **DB 버전**: v11 (테이블 8개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine. v11: `exercise_templates.rest_seconds_override` 컬럼 추가 — 종목별 휴식 시간 오버라이드 + 부위별 기본값 체계)
+- **DB 버전**: v12 (테이블 13개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine + v12 신규 5개 admin-curated 마스터: exercise_categories · exercise_category_translations · exercise_definitions · exercise_translations · one_rm_formulas. v12: 다국어 지원(ko/en) + 종목별 권위 1RM 공식 — exercise_records/templates 에 exercise_key 컬럼 추가, NSCA LeSuer 1997 검증 기반 Mayhew/Wathen/Brzycki 공식 적용, 1RM 코치 진입 시 Supabase TTL 24h fetch)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화
 - **데이터 흐름**: UI → Provider(StateNotifier) → Repository(Interface) → SQLite(구현체) ↔ SupabaseService ↔ Supabase API
@@ -63,6 +63,7 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 | `docs/changelog-v6.md` | v6 변경 로그 (DB v7, AI 인사이트, 온보딩, 다크 모드, Pretendard) |
 | `docs/changelog-v7.md` | v7 변경 로그 (Google Sheets → Supabase 전환) |
 | `docs/changelog-v11.md` | v11 변경 로그 (`rest_seconds_override` + 부위별 휴식 + 템플릿 카드 UX 개편 + Supabase 마이그레이션 사고 회고) |
+| `docs/changelog-v12.md` | v12 변경 로그 (다국어 ko/en + 종목별 권위 1RM 공식 + admin-curated 운동 마스터 데이터 + TTL 24h 캐시) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 
 ## Git 환경 설정

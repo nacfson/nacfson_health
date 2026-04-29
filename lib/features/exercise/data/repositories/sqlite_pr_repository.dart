@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/sync/sync_status.dart';
 import '../../../../core/training/one_rm_calculator.dart';
+import '../../../../core/training/one_rm_formula.dart';
 import '../../domain/entities/pr_summary.dart';
 import '../../domain/repositories/pr_repository.dart';
 
@@ -18,7 +19,11 @@ class SqlitePrRepository implements PrRepository {
   static const _msPerDay = 24 * 60 * 60 * 1000;
 
   @override
-  Future<PrSummary> getPrSummary(String exerciseName, {int weeks = 5}) async {
+  Future<PrSummary> getPrSummary(
+    String exerciseName, {
+    int weeks = 5,
+    OneRMFormulaSpec? formulaSpec,
+  }) async {
     final db = await DatabaseHelper.instance.database;
     final now = DateTime.now();
     final nowMs = now.millisecondsSinceEpoch;
@@ -64,7 +69,10 @@ class SqlitePrRepository implements PrRepository {
       final setType = r['set_type'] as String;
       final rpe = (r['rpe'] as num?)?.toDouble();
 
-      final e1 = calculateE1RM(w, reps);
+      // v12: formulaSpec 가 있으면 종목별 권위 공식, 없으면 Epley fallback.
+      final e1 = formulaSpec != null
+          ? formulaSpec.calculate(w, reps)
+          : calculateE1RM(w, reps);
       final weekIdx = ((nowMs - ts) / _msPerWeek).floor();
       if (weekIdx >= 0 && weekIdx < weeks) {
         final slot = weeks - 1 - weekIdx;
@@ -228,5 +236,69 @@ class SqlitePrRepository implements PrRepository {
       result[name] = (current: cur, fourWeeksAgo: old);
     }
     return result;
+  }
+
+  @override
+  Future<({double weight, int reps})?> getLatestWorkSetByKey(
+    String exerciseKey,
+  ) async {
+    final db = await DatabaseHelper.instance.database;
+    final rows = await db.query(
+      'exercise_records',
+      columns: const ['weight', 'reps'],
+      where:
+          'exercise_key = ? AND set_type IN (?, ?) AND sync_status != ?',
+      whereArgs: [
+        exerciseKey,
+        'work',
+        'drop',
+        SyncStatus.deleted.value,
+      ],
+      orderBy: 'timestamp DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    return (
+      weight: (r['weight'] as num).toDouble(),
+      reps: r['reps'] as int,
+    );
+  }
+
+  @override
+  Future<List<RegisteredExercise>> getTopRegisteredExercises({
+    required Set<String> registeredExerciseKeys,
+    int limit = 8,
+  }) async {
+    if (registeredExerciseKeys.isEmpty) return const [];
+    final db = await DatabaseHelper.instance.database;
+    final since90 = DateTime.now().millisecondsSinceEpoch - 90 * _msPerDay;
+
+    final placeholders =
+        List<String>.filled(registeredExerciseKeys.length, '?').join(',');
+    final rows = await db.rawQuery(
+      'SELECT exercise_key, MAX(exercise_name) AS legacy_name, '
+      'SUM(weight * reps) AS vol '
+      'FROM exercise_records '
+      'WHERE timestamp >= ? AND set_type IN (?, ?) AND sync_status != ? '
+      'AND exercise_key IS NOT NULL AND exercise_key IN ($placeholders) '
+      'GROUP BY exercise_key '
+      'ORDER BY vol DESC '
+      'LIMIT ?',
+      [
+        since90,
+        'work',
+        'drop',
+        SyncStatus.deleted.value,
+        ...registeredExerciseKeys,
+        limit,
+      ],
+    );
+    return rows
+        .map((r) => RegisteredExercise(
+              exerciseKey: r['exercise_key'] as String,
+              legacyDisplayName: r['legacy_name'] as String?,
+            ))
+        .toList();
   }
 }

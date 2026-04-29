@@ -1,11 +1,24 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-04  
+> **마지막 업데이트**: 2026-04-29  
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
+
+### v12 (2026-04-29) — 다국어 + 종목별 권위 1RM 공식
+- [x] 운동 마스터 데이터 다국어 지원 (`exercise_definitions` + `exercise_translations` ko/en, 161개 표준 웨이트 종목 + 322개 번역)
+- [x] 카테고리 다국어 지원 (`exercise_categories` + `exercise_category_translations`, 11개 카테고리)
+- [x] 종목별 1RM 공식 테이블 (`one_rm_formulas`, NSCA LeSuer 1997 검증 기반 — 벤치=Mayhew, 스쿼트/데드=Wathen, 등=Brzycki, 24개 종목 시드)
+- [x] `OneRMFormulaSpec` 4 type evaluator (epley/linear/exponential/polynomial) + 22 회귀 테스트
+- [x] TTL 24h pull-only 캐시 (1RM 코치 진입 시 Supabase 5 테이블 병렬 fetch + SQLite replace, 일반 sync 사이클과 분리)
+- [x] 기존 사용자 데이터 마이그레이션 — `exercise_records`/`exercise_templates`/`workout_routines.items_json`/`daily_routine.items_json` 의 한글명 → `exercise_key` 자동 매핑 (M1 Eager, 52개 default 종목)
+- [x] 1RM 코치가 종목별 권위 공식으로 e1RM 계산 (등록 종목 한정, 미등록은 Epley fallback)
+- [x] 1RM 코치 종목 칩 — 공식 등록 종목만 노출 (`topExerciseNamesProvider` + `oneRMFormulaSpecMapProvider` 필터)
+- [~] 사용자 커스텀 종목 입력 차단 (UI 측 변경은 v13으로 이월 — admin-curated 마스터로 충분히 커버)
+- [~] 모든 화면의 운동명 locale별 표시 (구조 완료, 전 화면 적용은 v13)
+
 
 ### 핵심 데이터 입력
 - [x] 운동 기록 CRUD (`ExerciseRecord` — 부위/종목/세트/중량/횟수/RPE)
