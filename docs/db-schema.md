@@ -1,8 +1,8 @@
 # DB 스키마 (SQLite)
 
-> **현재 버전**: v11  
+> **현재 버전**: v12  
 > **DB 파일명**: `nacfson_health.db`  
-> **마지막 업데이트**: 2026-04
+> **마지막 업데이트**: 2026-04-29
 
 ---
 
@@ -21,6 +21,33 @@
 | v9 | `exercise_records.set_type` 컬럼 추가 (`warmup`/`work`/`drop`/`failure`) | 세트 타입 구분 + 본세트 기준 볼륨 집계 (2026-04) |
 | v10 | `user_profiles` 에 `age` / `activity_level` / `training_intensity` 컬럼 추가 + `age_group` NOT NULL 해제 | 만 나이 직접 입력, 활동계수 5단계, 운동 강도 4단계 (2026-04) |
 | v11 | `exercise_templates.rest_seconds_override INTEGER` 컬럼 추가 | 종목별 휴식 시간 오버라이드. NULL=부위 기본값 (2026-04) |
+| v12 | 다국어 master 운동 데이터 5 테이블 신규 + `exercise_records`/`exercise_templates` 에 `exercise_key`/`category_key` 추가 + 한글명 자동 매핑 | NSCA 검증 종목별 1RM 공식 + ko/en 번역 + admin-curated 마스터 (2026-04-29) |
+
+### v12 마이그레이션 (다국어 + 종목별 1RM 공식)
+
+**상세는 `docs/changelog-v12.md` 참조.** 핵심 SQL:
+
+```sql
+-- 1) admin-curated master 5 테이블 신규
+CREATE TABLE exercise_categories (category_key TEXT PRIMARY KEY, display_order INTEGER, updated_at INTEGER);
+CREATE TABLE exercise_category_translations (category_key TEXT, locale TEXT, display_name TEXT, updated_at INTEGER, PRIMARY KEY (category_key, locale));
+CREATE TABLE exercise_definitions (exercise_key TEXT PRIMARY KEY, category_key TEXT, is_compound INTEGER, default_name TEXT, updated_at INTEGER);
+CREATE TABLE exercise_translations (exercise_key TEXT, locale TEXT, display_name TEXT, aliases TEXT, updated_at INTEGER, PRIMARY KEY (exercise_key, locale));
+CREATE TABLE one_rm_formulas (exercise_key TEXT PRIMARY KEY, formula_type TEXT, coefficients TEXT, source TEXT, optimal_rep_max INTEGER, notice_translations TEXT, updated_at INTEGER);
+
+-- 2) 기존 user-owned 테이블에 exercise_key/category_key 추가
+ALTER TABLE exercise_records ADD COLUMN exercise_key TEXT;
+ALTER TABLE exercise_records ADD COLUMN category_key TEXT;
+ALTER TABLE exercise_templates ADD COLUMN exercise_key TEXT;
+ALTER TABLE exercise_templates ADD COLUMN category_key TEXT;
+
+-- 3) 한글명 → exercise_key 자동 매핑 (M1 — Eager, lib/features/exercise/data/legacy_korean_mapping.dart 의 52개 default 매핑)
+-- 4) workout_routines/daily_routine items_json 안의 한글명에 exerciseKey 백필 (Dart 트랜잭션)
+```
+
+**TTL 24h pull-only 캐시**: 1RM 코치 진입 시 `SqliteMasterDataRepository.ensureFresh()` 호출 → SharedPreferences `master_data_last_fetched_at` 체크 → 24h 이상 경과 시 5 테이블 병렬 fetch + SQLite 전체 replace. 일반 sync 사이클(`sync_state.dart`)과 분리.
+
+**Supabase 마이그레이션**: `supabase/migrations/20260429_0001_master_exercise_data_v12.sql` — 161개 종목 + 322개 번역 + 24개 1RM 공식 시드 포함. RLS: 인증 사용자 read-only, write 정책 미부여(Studio 직접 수정만).
 
 ### v11 마이그레이션 (`exercise_templates.rest_seconds_override`)
 

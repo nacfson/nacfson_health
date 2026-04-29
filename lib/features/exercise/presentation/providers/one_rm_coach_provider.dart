@@ -6,10 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/ai/gemini_service.dart';
 import '../../../../core/training/challenge_readiness.dart';
+import '../../../../core/training/one_rm_formula.dart';
+import '../../data/legacy_korean_mapping.dart';
 import '../../data/repositories/sqlite_pr_repository.dart';
 import '../../domain/entities/pr_summary.dart';
 import '../../domain/repositories/pr_repository.dart';
 import 'exercise_provider.dart' show exerciseRecordsProvider;
+import 'master_data_provider.dart';
 
 /// PR Repository 인스턴스.
 final prRepositoryProvider = Provider<PrRepository>((ref) {
@@ -19,13 +22,30 @@ final prRepositoryProvider = Provider<PrRepository>((ref) {
 /// 1RM 코치 칩에 노출할 종목 후보 (최근 90일 볼륨 상위 8개).
 /// `exerciseRecordsProvider` 변경(세트 추가/삭제) 시 무효화.
 ///
+/// v12: Supabase 에 1RM 공식이 등록된 종목만 노출. 미등록 종목은 자동 제외.
+/// 결과 String 은 사용자가 마지막으로 본 한글/영문 이름(legacy snapshot) — UI 측에서
+/// `exerciseDisplayNameProvider` 로 다시 매핑하면 현재 locale 의 표시명을 얻는다.
+///
 /// **lifecycle**: autoDispose. 1RM 코치 풀스크린이 닫히면 즉시 dispose.
-/// 다른 탭에서 운동 세트가 추가되어도 invalidate 가 이 Provider 까지 전파되지
-/// 않는다 (이미 dispose 됨). 다음 풀스크린 진입 시 새로 쿼리.
 final topExerciseNamesProvider =
     FutureProvider.autoDispose<List<String>>((ref) async {
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
+
+  // v12: master data + 공식 등록 종목만 통과
+  try {
+    final formulaMap = await ref.watch(oneRMFormulaSpecMapProvider.future);
+    if (formulaMap.isNotEmpty) {
+      final registered = await repo.getTopRegisteredExercises(
+        registeredExerciseKeys: formulaMap.keys.toSet(),
+      );
+      return registered
+          .map((e) => e.legacyDisplayName ?? e.exerciseKey)
+          .toList();
+    }
+  } catch (_) {
+    // master data fetch 실패 시 legacy 동작 (전체 종목)
+  }
   return repo.getTopExerciseNames();
 });
 
@@ -60,6 +80,9 @@ final coachInputRepsProvider = StateProvider<int>((ref) => 5);
 /// - 칩 A→B→A 빠른 전환 시 30초 안의 재선택은 캐시 히트 (DB 쿼리 0).
 /// - 30초 경과 + listener 0 이면 dispose. 재진입 시 새 쿼리.
 /// - `exerciseRecordsProvider` 변경 시에는 keepAlive 와 무관하게 invalidate.
+///
+/// v12: master data 가 로드돼 있으면 종목별 권위 공식(Mayhew/Wathen/Brzycki/...)
+/// 사용. 미등록 종목은 Epley fallback (점진적 호환).
 final prSummaryProvider = FutureProvider.family
     .autoDispose<PrSummary, String>((ref, exerciseName) async {
   // 빠른 칩 전환 / 화면 짧은 잠시 떠남에서 재쿼리 회귀 방지
@@ -69,7 +92,37 @@ final prSummaryProvider = FutureProvider.family
 
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
-  return repo.getPrSummary(exerciseName);
+
+  // v12: 종목명 → exercise_key → formula spec 조회.
+  // 매핑 실패 시 spec=null → repository 가 Epley fallback.
+  OneRMFormulaSpec? formulaSpec;
+  try {
+    final exerciseKey = legacyKoreanToExerciseKey(exerciseName);
+    if (exerciseKey != null) {
+      final formulaMap = await ref.watch(oneRMFormulaSpecMapProvider.future);
+      formulaSpec = formulaMap[exerciseKey];
+    }
+  } catch (_) {
+    // master data 로드 실패 → Epley fallback
+  }
+
+  return repo.getPrSummary(exerciseName, formulaSpec: formulaSpec);
+});
+
+/// 선택된 종목의 1RM 공식 spec. UI 의 빠른 추정 (live e1RM) 계산에 사용.
+/// 종목 미등록이면 null → UI 가 Epley fallback 또는 칩 비표시.
+final selectedExerciseFormulaProvider =
+    FutureProvider.autoDispose<OneRMFormulaSpec?>((ref) async {
+  final selected = ref.watch(selectedCoachExerciseProvider);
+  if (selected == null) return null;
+  final exerciseKey = legacyKoreanToExerciseKey(selected);
+  if (exerciseKey == null) return null;
+  try {
+    final formulaMap = await ref.watch(oneRMFormulaSpecMapProvider.future);
+    return formulaMap[exerciseKey];
+  } catch (_) {
+    return null;
+  }
 });
 
 /// 요약 탭 RecentPrCard 용 — 상위 3개 PR.
