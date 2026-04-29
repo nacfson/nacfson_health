@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/exercise_record.dart';
+import '../providers/one_rm_coach_provider.dart';
 import './exercise_progression_sheet.dart';
 import './exercise_record_card.dart';
 import './inline_set_input.dart';
@@ -80,6 +81,12 @@ class _ExerciseGroupCardState extends ConsumerState<ExerciseGroupCard> {
     super.dispose();
   }
 
+  double? _calcDelta(({double? current, double? fourWeeksAgo})? entry) {
+    if (entry == null) return null;
+    if (entry.current == null || entry.fourWeeksAgo == null) return null;
+    return entry.current! - entry.fourWeeksAgo!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -87,12 +94,20 @@ class _ExerciseGroupCardState extends ConsumerState<ExerciseGroupCard> {
     final typeColor =
         getExerciseTypeColor(widget.exerciseType, theme.brightness);
 
+    // batch 결과에서 본 종목 entry 추출 (loading 시 null → 칩 자동 hidden)
+    final batchAsync = ref.watch(batchExerciseE1RMProvider);
+    final e1rmEntry = batchAsync.valueOrNull?[widget.exerciseName];
+    final hasChip = e1rmEntry?.current != null;
+    final hasX =
+        widget.editable && widget.onRemoveFromRoutine != null;
+    final showSecondRow = hasChip || hasX;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header — 탭 시 진행 추세 시트 오픈 (PopupMenuButton은 자체 이벤트 소비)
+          // Header — 탭 시 진행 추세 시트 오픈
           InkWell(
             onTap: () => showExerciseProgressionSheet(
               context,
@@ -101,92 +116,103 @@ class _ExerciseGroupCardState extends ConsumerState<ExerciseGroupCard> {
             ),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
             child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: typeColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(exerciseTypeIcon(widget.exerciseType),
-                      size: 20, color: AppTheme.colorNavy),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1 — icon + name/type + volume
+                  Row(
                     children: [
-                      Text(
-                        widget.exerciseName,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: typeColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(exerciseTypeIcon(widget.exerciseType),
+                            size: 20, color: AppTheme.colorNavy),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.exerciseName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              widget.exerciseType,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.outline,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        widget.exerciseType,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.outline,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${_totalVolume.toStringAsFixed(0)}kg',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (_hasExcludedSets)
+                            Text(
+                              '본세트 기준',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.outline,
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${_totalVolume.toStringAsFixed(0)}kg',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (_hasExcludedSets)
-                      Text(
-                        '본세트 기준',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: colorScheme.outline,
-                          fontSize: 10,
-                        ),
-                      ),
-                  ],
-                ),
-                PopupMenuButton<String>(
-                  tooltip: '카드 메뉴',
-                  icon: Icon(Icons.more_vert,
-                      size: 20, color: colorScheme.onSurfaceVariant),
-                  onSelected: (v) {
-                    if (v == 'remove') widget.onRemoveFromRoutine?.call();
-                    if (v == 'one_rm_coach') {
-                      context.push(
-                        '/exercise/coach/one-rm?exercise=${Uri.encodeComponent(widget.exerciseName)}',
-                      );
-                    }
-                  },
-                  itemBuilder: (_) => [
-                    if (widget.editable && widget.onRemoveFromRoutine != null)
-                      const PopupMenuItem(
-                        value: 'remove',
-                        child: Text('운동 제거'),
-                      ),
-                    PopupMenuItem(
-                      value: 'one_rm_coach',
-                      child: Row(
-                        children: const [
-                          Icon(Icons.bolt_outlined, size: 18),
-                          SizedBox(width: 8),
-                          Text('1RM 코치'),
-                        ],
-                      ),
+                  // Row 2 — chip(좌) + x(우). 둘 다 조건부, 둘 다 없으면 행 자체 미렌더.
+                  if (showSecondRow) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (hasChip)
+                          _E1RMChip(
+                            currentE1RM: e1rmEntry!.current!,
+                            deltaKg: _calcDelta(e1rmEntry),
+                            onTap: () => context.push(
+                              '/exercise/coach/one-rm?exercise=${Uri.encodeComponent(widget.exerciseName)}',
+                            ),
+                          ),
+                        const Spacer(),
+                        if (hasX)
+                          IconButton(
+                            tooltip: '운동 제거',
+                            icon: const Icon(Icons.close, size: 18),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            padding: EdgeInsets.zero,
+                            color: colorScheme.onSurfaceVariant,
+                            // 부모 _removeExerciseCard 가 record 1+ 일 때 confirm.
+                            onPressed: widget.onRemoveFromRoutine,
+                          ),
+                      ],
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
           ),
           const Divider(height: 1),
           // Sets List
@@ -412,6 +438,74 @@ class _StatItem extends StatelessWidget {
           fontFamily: 'Pretendard',
           fontSize: 11,
           color: cs.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// 헤더 Row 2 에 표시되는 e1RM 칩. 데이터가 곧 진입점.
+/// 탭 시 1RM 코치 풀스크린(해당 종목 자동 선택) 진입.
+class _E1RMChip extends StatelessWidget {
+  final double currentE1RM;
+  final double? deltaKg;
+  final VoidCallback onTap;
+  const _E1RMChip({
+    required this.currentE1RM,
+    required this.deltaKg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mint = isDark ? AppTheme.colorMintDark : AppTheme.colorMintDeep;
+    final mintTint =
+        isDark ? AppTheme.colorMintTintDark : AppTheme.colorMintTint;
+    final coral = isDark ? AppTheme.colorCoralDark : AppTheme.colorCoralDeep;
+
+    final showDelta = deltaKg != null && deltaKg!.abs() >= 0.5;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(100),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: mintTint,
+            borderRadius: BorderRadius.circular(100),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.bolt_outlined, size: 12, color: mint),
+              const SizedBox(width: 4),
+              Text(
+                'e1RM ${currentE1RM.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: mint,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (showDelta) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '${deltaKg! >= 0 ? '▲' : '▼'} ${deltaKg!.abs().toStringAsFixed(0)}kg',
+                  style: TextStyle(
+                    fontFamily: 'Pretendard',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: deltaKg! >= 0 ? mint : coral,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

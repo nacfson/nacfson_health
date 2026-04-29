@@ -15,4 +15,11 @@ abstract class PrRepository {
   /// 종목의 가장 최근 work/drop 세트의 (weight, reps). 없으면 null.
   /// warmup / failure 는 제외 — 1RM 코치 입력 초기값 용도.
   Future<({double weight, int reps})?> getLatestWorkSet(String exerciseName);
+
+  /// 카드별 e1RM 칩에 표시할 (현재 주 max e1RM, 4주 전 주 max e1RM).
+  /// 입력 종목 이름 리스트 → Map. 빈 입력 시 빈 맵. 종목 데이터 없으면 키 누락.
+  /// `getPrSummary` 와 동일한 5주치 work/drop 윈도우 + 동일 `calculateE1RM` 사용 →
+  /// 칩과 코치 화면 수치 일치 보장.
+  Future<Map<String, ({double? current, double? fourWeeksAgo})>>
+      getBatchE1RM(List<String> exerciseNames);
 }

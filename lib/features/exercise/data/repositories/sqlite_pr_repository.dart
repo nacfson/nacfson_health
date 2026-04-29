@@ -185,4 +185,48 @@ class SqlitePrRepository implements PrRepository {
       reps: r['reps'] as int,
     );
   }
+
+  @override
+  Future<Map<String, ({double? current, double? fourWeeksAgo})>>
+      getBatchE1RM(List<String> exerciseNames) async {
+    if (exerciseNames.isEmpty) return const {};
+
+    final db = await DatabaseHelper.instance.database;
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final since = nowMs - 5 * _msPerWeek;
+
+    final placeholders = List.filled(exerciseNames.length, '?').join(',');
+    final rows = await db.rawQuery(
+      'SELECT exercise_name, weight, reps, timestamp '
+      'FROM exercise_records '
+      'WHERE exercise_name IN ($placeholders) '
+      '  AND timestamp >= ? '
+      "  AND set_type IN ('work', 'drop') "
+      '  AND reps >= 1 '
+      '  AND sync_status != ?',
+      [...exerciseNames, since, SyncStatus.deleted.value],
+    );
+
+    final result = <String, ({double? current, double? fourWeeksAgo})>{};
+    for (final r in rows) {
+      final name = r['exercise_name'] as String;
+      final w = (r['weight'] as num).toDouble();
+      final reps = r['reps'] as int;
+      final ts = r['timestamp'] as int;
+
+      final e1 = calculateE1RM(w, reps);
+      final weekIdx = ((nowMs - ts) / _msPerWeek).floor();
+
+      final prev = result[name];
+      double? cur = prev?.current;
+      double? old = prev?.fourWeeksAgo;
+      if (weekIdx == 0) {
+        cur = (cur == null) ? e1 : math.max(cur, e1);
+      } else if (weekIdx == 4) {
+        old = (old == null) ? e1 : math.max(old, e1);
+      }
+      result[name] = (current: cur, fourWeeksAgo: old);
+    }
+    return result;
+  }
 }

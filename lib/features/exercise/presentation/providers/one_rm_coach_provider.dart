@@ -9,7 +9,11 @@ import '../../../../core/training/challenge_readiness.dart';
 import '../../data/repositories/sqlite_pr_repository.dart';
 import '../../domain/entities/pr_summary.dart';
 import '../../domain/repositories/pr_repository.dart';
-import 'exercise_provider.dart' show exerciseRecordsProvider;
+import 'exercise_provider.dart'
+    show
+        exerciseRecordsProvider,
+        todayExerciseCardsProvider,
+        selectedDateExerciseGroupedProvider;
 
 /// PR Repository 인스턴스.
 final prRepositoryProvider = Provider<PrRepository>((ref) {
@@ -42,6 +46,34 @@ final latestWorkSetProvider = FutureProvider.family
   ref.watch(exerciseRecordsProvider);
   final repo = ref.watch(prRepositoryProvider);
   return repo.getLatestWorkSet(exerciseName);
+});
+
+/// 카드 e1RM 칩 표시 대상 종목명 — 오늘 카드(편집 모드) ∪ 선택 날짜 그룹(과거 모드).
+/// e1RM 은 날짜 무관 전역 지표이므로 과거 카드에도 동일 칩 노출.
+///
+/// **lifecycle**: Provider (캐시). 두 의존 Provider 변경 시 자동 invalidate.
+final visibleExerciseNamesProvider = Provider<Set<String>>((ref) {
+  final today =
+      ref.watch(todayExerciseCardsProvider).map((c) => c.exerciseName);
+  final past = ref
+      .watch(selectedDateExerciseGroupedProvider)
+      .values
+      .expand((m) => m.keys);
+  return {...today, ...past};
+});
+
+/// 카드 e1RM 칩 배치 조회. exerciseRecordsProvider 변경 시 자동 invalidate.
+///
+/// **lifecycle**: autoDispose. 운동 탭이 떠 있는 동안만 유지. 카드 스크롤로 일부
+/// 카드가 viewport 를 벗어나도 동일 Provider 인스턴스 — re-query 없음.
+/// 세트 추가/삭제 시 자동 재계산 (단일 batch SQL 1회).
+final batchExerciseE1RMProvider = FutureProvider.autoDispose<
+    Map<String, ({double? current, double? fourWeeksAgo})>>((ref) async {
+  ref.watch(exerciseRecordsProvider);
+  final names = ref.watch(visibleExerciseNamesProvider).toList();
+  if (names.isEmpty) return const {};
+  final repo = ref.watch(prRepositoryProvider);
+  return repo.getBatchE1RM(names);
 });
 
 /// 1RM 코치 풀스크린에서 현재 선택된 종목명.

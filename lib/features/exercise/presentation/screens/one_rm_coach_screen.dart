@@ -15,7 +15,7 @@ import '../widgets/one_rm/quick_estimate_stepper.dart';
 
 /// 1RM 코치 풀스크린.
 ///
-/// 진입 경로: 운동 탭 AppBar [⚡] / ExerciseGroupCard ⋯ 메뉴 / ProgressionSheet 버튼 / 요약 탭 RecentPrCard.
+/// 진입 경로: 운동 탭 AppBar [⚡] / ExerciseGroupCard e1RM 칩 / ProgressionSheet 버튼 / 요약 탭 RecentPrCard.
 /// [initialExerciseName] 이 주어지면 해당 종목으로 시작.
 class OneRMCoachScreen extends ConsumerStatefulWidget {
   final String? initialExerciseName;
