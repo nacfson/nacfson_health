@@ -128,7 +128,10 @@ class RestNotificationServiceAndroid implements RestNotificationService {
   Future<void> update({
     required DateTime endAt,
     required bool isPaused,
+    int? totalSeconds,
   }) async {
+    // chronometer + when=endAt 기반이라 totalSeconds 는 사용하지 않는다
+    // (시스템이 endAt 까지의 잔여를 자동 카운트). 시그니처 일치 목적.
     if (!_initialized) return;
     final details = NotificationDetails(
       android: _details(endAt: endAt, isPaused: isPaused),

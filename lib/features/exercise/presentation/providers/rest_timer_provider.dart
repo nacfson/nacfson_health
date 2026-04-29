@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../settings/domain/entities/exercise_template.dart';
+import '../../../settings/presentation/providers/exercise_template_provider.dart';
 import '../../data/rest_notification_service.dart';
+import '../../domain/body_part_rest_defaults.dart';
 
 /// 휴식 타이머의 권위 있는 상태.
 ///
@@ -72,7 +76,8 @@ class RestTimerState {
 
 class RestTimerNotifier extends StateNotifier<RestTimerState>
     with WidgetsBindingObserver {
-  RestTimerNotifier(this._notifications) : super(const RestTimerState()) {
+  RestTimerNotifier(this._ref, this._notifications)
+      : super(const RestTimerState()) {
     _notifications.onAction = (actionId) {
       switch (actionId) {
         case RestNotificationAction.addFifteen:
@@ -84,7 +89,16 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
       }
     };
     WidgetsBinding.instance.addObserver(this);
+    // 활성 타이머 종목의 휴식 시간 override 가 변경되면 endAt 을 즉시 재계산해
+    // 외부 위젯(Live Activity / 알림)을 동기화한다.
+    _ref.listen<List<ExerciseTemplate>>(
+      exerciseTemplatesProvider,
+      _onTemplatesChanged,
+      fireImmediately: false,
+    );
   }
+
+  final Ref _ref;
 
   // ignore: avoid_renaming_method_parameters — StateNotifier.state 와 이름 충돌 회피.
   @override
@@ -155,7 +169,11 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
             ? newRemaining
             : state.totalSeconds,
       );
-      await _notifications.update(endAt: displayEnd, isPaused: true);
+      await _notifications.update(
+        endAt: displayEnd,
+        isPaused: true,
+        totalSeconds: state.totalSeconds,
+      );
       return;
     }
 
@@ -178,7 +196,11 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
       totalSeconds: newTotal,
     );
 
-    await _notifications.update(endAt: actualEnd, isPaused: false);
+    await _notifications.update(
+      endAt: actualEnd,
+      isPaused: false,
+      totalSeconds: newTotal,
+    );
     await _notifications.schedulePreAlert(endAt: actualEnd);
   }
 
@@ -195,7 +217,11 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
         clearPausedRemaining: true,
       );
       _startTicker();
-      await _notifications.update(endAt: newEnd, isPaused: false);
+      await _notifications.update(
+        endAt: newEnd,
+        isPaused: false,
+        totalSeconds: state.totalSeconds,
+      );
       await _notifications.schedulePreAlert(endAt: newEnd);
     } else {
       _ticker?.cancel();
@@ -207,6 +233,7 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
       await _notifications.update(
         endAt: state.endAt ?? DateTime.now(),
         isPaused: true,
+        totalSeconds: state.totalSeconds,
       );
       await _notifications.cancelPreAlert();
     }
@@ -255,9 +282,81 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
     _ticker?.cancel();
     super.dispose();
   }
+
+  /// 템플릿 리스트 변경 → 활성 타이머의 종목 override 가 바뀌었는지 검사.
+  /// 일치 + 값 변화 시 endAt 을 즉시 재계산해 native 위젯/알림에 push.
+  void _onTemplatesChanged(
+    List<ExerciseTemplate>? prev,
+    List<ExerciseTemplate> next,
+  ) {
+    if (!state.isActive) return;
+    final activeName = state.exerciseName;
+    if (activeName == null) return;
+
+    final updated = _findByName(next, activeName);
+    if (updated == null) return;
+    final newRest = resolveRestSeconds(updated);
+    if (newRest == null) return; // 유산소로 전환 — 활성 타이머는 그대로 유지.
+
+    final prevTemplate = prev == null ? null : _findByName(prev, activeName);
+    final oldRest =
+        prevTemplate == null ? null : resolveRestSeconds(prevTemplate);
+    if (oldRest == newRest) return;
+
+    unawaited(_applyNewRestSeconds(newRest));
+  }
+
+  static ExerciseTemplate? _findByName(
+    List<ExerciseTemplate> templates,
+    String name,
+  ) {
+    final matches = templates.where((t) => t.name == name);
+    return matches.isEmpty ? null : matches.first;
+  }
+
+  /// 활성 타이머의 totalSeconds 와 endAt 을 새 휴식 시간 기준으로 재산출.
+  /// 경과 시간이 새 값을 이미 넘었으면 1초 보장 후 _onTick 에서 자연 종료.
+  Future<void> _applyNewRestSeconds(int newRest) async {
+    final clamped = newRest.clamp(_minSeconds, _maxSeconds);
+
+    if (state.isPaused) {
+      final displayEnd = DateTime.now().add(Duration(seconds: clamped));
+      state = state.copyWith(
+        totalSeconds: clamped,
+        pausedRemaining: clamped,
+        remainingSeconds: clamped,
+      );
+      if (clamped > 5) _firedFiveSecondHaptic = false;
+      await _notifications.update(
+        endAt: displayEnd,
+        isPaused: true,
+        totalSeconds: clamped,
+      );
+      return;
+    }
+
+    final elapsed = state.totalSeconds - state.remainingSeconds;
+    final newRemaining = math.max(1, clamped - elapsed);
+    final newEndAt = DateTime.now().add(Duration(seconds: newRemaining));
+
+    if (newRemaining > 5) _firedFiveSecondHaptic = false;
+
+    state = state.copyWith(
+      endAt: newEndAt,
+      remainingSeconds: newRemaining,
+      totalSeconds: clamped,
+    );
+
+    await _notifications.update(
+      endAt: newEndAt,
+      isPaused: false,
+      totalSeconds: clamped,
+    );
+    await _notifications.schedulePreAlert(endAt: newEndAt);
+  }
 }
 
 final restTimerProvider =
     StateNotifierProvider<RestTimerNotifier, RestTimerState>(
-  (ref) => RestTimerNotifier(ref.watch(restNotificationServiceProvider)),
+  (ref) => RestTimerNotifier(ref, ref.watch(restNotificationServiceProvider)),
 );

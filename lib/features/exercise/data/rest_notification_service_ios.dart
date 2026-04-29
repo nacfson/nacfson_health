@@ -165,19 +165,22 @@ class RestNotificationServiceIOS implements RestNotificationService {
   Future<void> update({
     required DateTime endAt,
     required bool isPaused,
+    int? totalSeconds,
   }) async {
     await _initFuture;
     final id = _activityId;
     debugPrint(
-      '[LiveActivity] update called id=$id endAt=$endAt paused=$isPaused',
+      '[LiveActivity] update called id=$id endAt=$endAt paused=$isPaused total=$totalSeconds',
     );
     if (id == null) return;
     try {
-      await _bridgeChannel.invokeMethod('update', <String, Object>{
+      final payload = <String, Object>{
         'activityId': id,
         'endAtMs': endAt.millisecondsSinceEpoch.toDouble(),
         'isPaused': isPaused,
-      });
+      };
+      if (totalSeconds != null) payload['totalSeconds'] = totalSeconds;
+      await _bridgeChannel.invokeMethod('update', payload);
       debugPrint('[LiveActivity] update id=$id OK');
     } catch (e, s) {
       debugPrint('[LiveActivity] update id=$id FAILED: $e\n$s');

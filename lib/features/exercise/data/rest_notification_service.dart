@@ -24,9 +24,12 @@ abstract class RestNotificationService {
   });
 
   /// 표시 중인 위젯/알림의 종료 시각/일시정지 상태를 갱신합니다.
+  /// `totalSeconds` 가 지정되면 ContentState 의 원본 길이도 함께 갱신
+  /// (Live Activity progress 표시용). 미지정 시 기존 값 유지.
   Future<void> update({
     required DateTime endAt,
     required bool isPaused,
+    int? totalSeconds,
   });
 
   /// 위젯/알림을 종료합니다.
@@ -59,6 +62,7 @@ class NoopRestNotificationService implements RestNotificationService {
   Future<void> update({
     required DateTime endAt,
     required bool isPaused,
+    int? totalSeconds,
   }) async {}
 
   @override
