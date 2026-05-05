@@ -7,21 +7,29 @@ final weightRepositoryProvider = Provider<WeightRepository>((ref) {
   return SqliteWeightRepository();
 });
 
+/// 체중 기록 SQLite 초기 로드 상태 (StateNotifier state 와 분리하여 노출).
+final weightRecordsInitialLoadingProvider =
+    StateProvider<bool>((ref) => true);
+
 final weightRecordsProvider =
     StateNotifierProvider<WeightNotifier, List<WeightRecord>>((ref) {
   final repository = ref.watch(weightRepositoryProvider);
-  return WeightNotifier(repository);
+  return WeightNotifier(repository, ref);
 });
 
 class WeightNotifier extends StateNotifier<List<WeightRecord>> {
   final WeightRepository _repository;
+  final Ref _ref;
 
-  WeightNotifier(this._repository) : super([]) {
+  WeightNotifier(this._repository, this._ref) : super([]) {
     refresh();
   }
 
   Future<void> refresh() async {
     state = await _repository.getAll();
+    if (mounted) {
+      _ref.read(weightRecordsInitialLoadingProvider.notifier).state = false;
+    }
   }
 
   Future<void> addRecord(WeightRecord record) async {
@@ -84,6 +92,7 @@ final todayWeightProvider = Provider<WeightRecord?>((ref) {
         r.timestamp.month == today.month &&
         r.timestamp.day == today.day);
   } catch (_) {
+    // firstWhere 미매치 — 오늘 기록 없음
     return null;
   }
 });

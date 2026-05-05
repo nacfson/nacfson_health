@@ -11,6 +11,7 @@ class WeightScreen extends ConsumerWidget {
   const WeightScreen({super.key});
 
   void _openAddSheet(BuildContext context) {
+    final formKey = GlobalKey<WeightFormState>();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -19,37 +20,68 @@ class WeightScreen extends ConsumerWidget {
       // BottomNavShell 의 glassmorphic 하단 탭 바가 시트를 가리지 않는다.
       useRootNavigator: true,
       useSafeArea: true,
-      builder: (ctx) => const RecordFormSheet(
+      builder: (ctx) => RecordFormSheet(
         title: '체중 기록 추가',
-        child: WeightForm(),
+        onConfirmClose: () => _confirmDiscardIfDirty(ctx, formKey),
+        child: WeightForm(key: formKey),
       ),
     );
+  }
+
+  Future<bool> _confirmDiscardIfDirty(
+    BuildContext context,
+    GlobalKey<WeightFormState> formKey,
+  ) async {
+    final state = formKey.currentState;
+    if (state == null || !state.isDirty) return true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작성 중인 내용이 사라집니다'),
+        content: const Text('닫을까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 작성'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final latestWeight = ref.watch(latestWeightProvider);
     final todayWeight  = ref.watch(todayWeightProvider);
+    final isInitialLoading =
+        ref.watch(weightRecordsInitialLoadingProvider);
 
     return Scaffold(
       extendBody: true,
       appBar: AppBar(title: const Text('체중')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 120),
-        child: Column(
-          children: [
-            _WeightHeroCard(
-              latestWeight: latestWeight?.weight,
-              hasTodayRecord: todayWeight != null,
-              onAddTap: () => _openAddSheet(context),
+      body: (isInitialLoading && latestWeight == null)
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 120),
+              child: Column(
+                children: [
+                  _WeightHeroCard(
+                    latestWeight: latestWeight?.weight,
+                    hasTodayRecord: todayWeight != null,
+                    onAddTap: () => _openAddSheet(context),
+                  ),
+                  const SizedBox(height: 12),
+                  _BmiBar(weightKg: latestWeight?.weight),
+                  const SizedBox(height: 12),
+                  const WeightChartCard(),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            _BmiBar(weightKg: latestWeight?.weight),
-            const SizedBox(height: 12),
-            const WeightChartCard(),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -128,25 +160,33 @@ class _WeightHeroCard extends StatelessWidget {
                   ],
                 ),
                 if (!hasTodayRecord)
-                  GestureDetector(
-                    onTap: onAddTap,
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 10),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.colorMint.withOpacity(0.15),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onAddTap,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: AppTheme.colorMint.withOpacity(0.4)),
-                      ),
-                      child: const Text(
-                        '오늘 기록 추가',
-                        style: TextStyle(
-                          fontFamily: 'Pretendard',
-                          fontSize: 12,
-                          color: AppTheme.colorMint,
-                          fontWeight: FontWeight.w600,
+                        child: Container(
+                          constraints: const BoxConstraints(minHeight: 44),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.colorMint.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: AppTheme.colorMint.withOpacity(0.4)),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Text(
+                            '오늘 기록 추가',
+                            style: TextStyle(
+                              fontFamily: 'Pretendard',
+                              fontSize: 13,
+                              color: AppTheme.colorMint,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                     ),

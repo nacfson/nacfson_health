@@ -52,6 +52,13 @@ class AppTheme {
   static const Color colorWarnFg         = Color(0xFF8C6A3A);
   static const Color colorWarnFgDark     = Color(0xFFE8A860);
 
+  // ── Macro nutrition labels (탄/단/지 라벨 색) ─────────────────
+  // carbs 는 기존 catDiet (주황) 재사용. protein/fat 는 신규 토큰.
+  static const Color colorMacroProteinFg     = Color(0xFF4A8AC9);
+  static const Color colorMacroProteinFgDark = Color(0xFF6BA4DD);
+  static const Color colorMacroFatFg         = Color(0xFFC4A52A);
+  static const Color colorMacroFatFgDark     = Color(0xFFD9C152);
+
   // ── Brightness-aware helpers ─────────────────────────────────
   static Color catDiet(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? colorCatDietDark : colorCatDiet;
@@ -65,6 +72,15 @@ class AppTheme {
       Theme.of(context).brightness == Brightness.dark ? colorWarnBgDark : colorWarnBg;
   static Color warnFg(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark ? colorWarnFgDark : colorWarnFg;
+  static Color macroCarbsFg(BuildContext context) => catDiet(context);
+  static Color macroProteinFg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? colorMacroProteinFgDark
+          : colorMacroProteinFg;
+  static Color macroFatFg(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? colorMacroFatFgDark
+          : colorMacroFatFg;
 
   // ── Liquid Glass surface helpers (iOS 26 glass specular 시뮬레이션) ──
   // 의도적 brand: white 반사광은 유리 표면 효과라 cs 토큰으로 대체 불가.

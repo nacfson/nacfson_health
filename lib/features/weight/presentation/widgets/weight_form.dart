@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/weight_record.dart';
 import '../providers/weight_provider.dart';
 
@@ -9,14 +12,46 @@ class WeightForm extends ConsumerStatefulWidget {
   const WeightForm({super.key, this.initialRecord});
 
   @override
-  ConsumerState<WeightForm> createState() => _WeightFormState();
+  ConsumerState<WeightForm> createState() => WeightFormState();
 }
 
-class _WeightFormState extends ConsumerState<WeightForm> {
+class WeightFormState extends ConsumerState<WeightForm> {
+  /// 외부 (RecordFormSheet onConfirmClose) 에서 dirty 여부를 조회하기 위한 진입점.
+  bool get isDirty {
+    final current = _weightController.text.trim();
+    if (current.isEmpty) return false;
+    final initial = widget.initialRecord?.weight.toString() ?? '';
+    return current != initial || _selectedDate != _originalDate;
+  }
+
   final _weightController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   late DateTime _selectedDate;
   bool _isLoading = false;
+  Timer? _holdTimer;
+
+  void _adjustWeight(double delta) {
+    final current = double.tryParse(_weightController.text.trim()) ?? 0;
+    final next = (current + delta).clamp(0.0, 999.9);
+    final formatted =
+        next % 1 == 0 ? next.toInt().toString() : next.toStringAsFixed(1);
+    _weightController.text = formatted;
+    _weightController.selection =
+        TextSelection.collapsed(offset: formatted.length);
+  }
+
+  void _startAdjustHold(double delta) {
+    _adjustWeight(delta);
+    _holdTimer?.cancel();
+    _holdTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      _adjustWeight(delta);
+    });
+  }
+
+  void _stopAdjustHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+  }
 
   @override
   void initState() {
@@ -32,6 +67,7 @@ class _WeightFormState extends ConsumerState<WeightForm> {
 
   @override
   void dispose() {
+    _holdTimer?.cancel();
     _weightController.dispose();
     super.dispose();
   }
@@ -148,7 +184,7 @@ class _WeightFormState extends ConsumerState<WeightForm> {
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: isDateChanged
-                        ? Colors.amber.shade700
+                        ? AppTheme.warnFg(context)
                         : theme.colorScheme.outline,
                     width: isDateChanged ? 2.0 : 1.0,
                   ),
@@ -167,22 +203,44 @@ class _WeightFormState extends ConsumerState<WeightForm> {
               ),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _weightController,
-              autofocus: true,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                hintText: '0.0',
-                suffixText: 'kg',
-                border: InputBorder.none,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '체중을 입력해주세요';
-                if (double.tryParse(value) == null) return '숫자만 입력 가능합니다';
-                return null;
-              },
+            Row(
+              children: [
+                _LargeStepperButton(
+                  icon: Icons.remove,
+                  onTap: () => _adjustWeight(-0.1),
+                  onLongPressStart: () => _startAdjustHold(-0.1),
+                  onLongPressEnd: _stopAdjustHold,
+                ),
+                Expanded(
+                  child: TextFormField(
+                    controller: _weightController,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 32, fontWeight: FontWeight.bold),
+                    decoration: const InputDecoration(
+                      hintText: '0.0',
+                      suffixText: 'kg',
+                      border: InputBorder.none,
+                    ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '체중을 입력해주세요';
+                      if (double.tryParse(value) == null) {
+                        return '숫자만 입력 가능합니다';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                _LargeStepperButton(
+                  icon: Icons.add,
+                  onTap: () => _adjustWeight(0.1),
+                  onLongPressStart: () => _startAdjustHold(0.1),
+                  onLongPressEnd: _stopAdjustHold,
+                ),
+              ],
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -212,5 +270,35 @@ class _WeightFormState extends ConsumerState<WeightForm> {
           ],
         ),
       );
+  }
+}
+
+class _LargeStepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final VoidCallback onLongPressStart;
+  final VoidCallback onLongPressEnd;
+
+  const _LargeStepperButton({
+    required this.icon,
+    required this.onTap,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onLongPressStart: (_) => onLongPressStart(),
+      onLongPressEnd: (_) => onLongPressEnd(),
+      onLongPressCancel: onLongPressEnd,
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, size: 28),
+        color: cs.primary,
+        constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+      ),
+    );
   }
 }

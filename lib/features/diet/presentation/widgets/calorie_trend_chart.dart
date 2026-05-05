@@ -35,7 +35,7 @@ class CalorieTrendChart extends ConsumerWidget {
             Row(
               children: [
                 Icon(Icons.local_fire_department,
-                    color: Colors.deepOrange, size: 20),
+                    color: AppTheme.catDiet(context), size: 20),
                 const SizedBox(width: 8),
                 Text('칼로리 추세', style: theme.textTheme.titleMedium),
                 const Spacer(),

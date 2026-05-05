@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/numeric_stepper_field.dart';
 import '../../../settings/presentation/providers/exercise_template_provider.dart';
 import '../../domain/body_part_rest_defaults.dart';
 import '../../domain/entities/exercise_record.dart';
@@ -83,21 +83,29 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
 
   Future<void> _submit() async {
     if (_saving) return;
-    final weight = double.tryParse(_weightCtl.text.trim());
-    final reps = int.tryParse(_repsCtl.text.trim());
-    final rpe = double.tryParse(_rpeCtl.text.trim());
+    final weightRaw = _weightCtl.text.trim();
+    final repsRaw = _repsCtl.text.trim();
+    final rpeRaw = _rpeCtl.text.trim();
+    final weight = double.tryParse(weightRaw);
+    final reps = int.tryParse(repsRaw);
+    final rpe = double.tryParse(rpeRaw);
     if (weight == null || weight <= 0 || reps == null || reps < 1) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('중량(>0)·반복(≥1)을 입력해주세요'),
-        duration: Duration(seconds: 1),
+      final issue = (weight == null || weight <= 0)
+          ? '중량은 0보다 큰 값이어야 합니다 (입력: ${weightRaw.isEmpty ? "없음" : weightRaw})'
+          : '반복은 1회 이상이어야 합니다 (입력: ${repsRaw.isEmpty ? "없음" : repsRaw})';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(issue),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ));
       return;
     }
     if (rpe == null || rpe < 1 || rpe > 10) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('RPE는 1-10 사이 값입니다'),
-        duration: Duration(seconds: 1),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          'RPE는 1~10 사이 값입니다 (입력: ${rpeRaw.isEmpty ? "없음" : rpeRaw})',
+        ),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ));
       return;
@@ -180,31 +188,36 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: _NumField(
+            child: NumericStepperField(
               controller: _weightCtl,
               focusNode: _weightFocus,
               label: 'kg',
-              decimal: true,
+              step: 0.5,
+              min: 0,
               onSubmitted: (_) => _repsFocus.requestFocus(),
             ),
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: _NumField(
+            child: NumericStepperField(
               controller: _repsCtl,
               focusNode: _repsFocus,
               label: '회',
-              decimal: false,
+              integer: true,
+              step: 1.0,
+              min: 0,
               onSubmitted: (_) => _rpeFocus.requestFocus(),
             ),
           ),
           const SizedBox(width: 6),
           Expanded(
-            child: _NumField(
+            child: NumericStepperField(
               controller: _rpeCtl,
               focusNode: _rpeFocus,
               label: 'RPE',
-              decimal: true,
+              step: 0.5,
+              min: 1,
+              max: 10,
               onSubmitted: (_) => _submit(),
               textInputAction: TextInputAction.done,
             ),
@@ -284,44 +297,3 @@ class _SetTypeSelector extends StatelessWidget {
   }
 }
 
-class _NumField extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final String label;
-  final bool decimal;
-  final ValueChanged<String>? onSubmitted;
-  final TextInputAction textInputAction;
-
-  const _NumField({
-    required this.controller,
-    required this.focusNode,
-    required this.label,
-    required this.decimal,
-    this.onSubmitted,
-    this.textInputAction = TextInputAction.next,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(
-          decimal ? RegExp(r'[0-9.]') : RegExp(r'[0-9]'),
-        ),
-      ],
-      textAlign: TextAlign.center,
-      textInputAction: textInputAction,
-      onSubmitted: onSubmitted,
-      decoration: InputDecoration(
-        isDense: true,
-        labelText: label,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
-  }
-}

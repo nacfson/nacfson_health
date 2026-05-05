@@ -17,10 +17,36 @@ class DietForm extends ConsumerStatefulWidget {
   const DietForm({super.key, this.initialRecord});
 
   @override
-  ConsumerState<DietForm> createState() => _DietFormState();
+  ConsumerState<DietForm> createState() => DietFormState();
 }
 
-class _DietFormState extends ConsumerState<DietForm> {
+class DietFormState extends ConsumerState<DietForm> {
+  /// 외부 (RecordFormSheet onConfirmClose) 에서 dirty 여부를 조회하기 위한 진입점.
+  /// 신규 추가: 음식명·칼로리·탄단지·메모 중 하나라도 입력 → dirty.
+  /// 수정: 초기 값과 달라졌으면 dirty.
+  bool get isDirty {
+    final r = widget.initialRecord;
+    if (r == null) {
+      return _foodNameController.text.trim().isNotEmpty ||
+          _caloriesController.text.trim().isNotEmpty ||
+          _carbsController.text.trim().isNotEmpty ||
+          _proteinController.text.trim().isNotEmpty ||
+          _fatController.text.trim().isNotEmpty ||
+          _memoController.text.trim().isNotEmpty;
+    }
+    String fmt(double v) =>
+        v % 1 == 0 ? v.toInt().toString() : v.toString();
+    return _mealTypeController.text != r.mealType ||
+        _foodNameController.text.trim() != r.foodName ||
+        _caloriesController.text.trim() != r.totalCalories.toString() ||
+        _carbsController.text.trim() != fmt(r.carbs) ||
+        _proteinController.text.trim() != fmt(r.protein) ||
+        _fatController.text.trim() != fmt(r.fat) ||
+        _memoController.text != (r.memo ?? '') ||
+        _satisfaction != r.satisfaction ||
+        _timestamp != r.timestamp;
+  }
+
   final _formKey = GlobalKey<FormState>();
   final _mealTypeController = TextEditingController();
   final _foodNameController = TextEditingController();
@@ -76,6 +102,15 @@ class _DietFormState extends ConsumerState<DietForm> {
     _fatController.dispose();
     _memoController.dispose();
     super.dispose();
+  }
+
+  String? _macroValidator(String? v) {
+    final raw = v?.trim() ?? '';
+    if (raw.isEmpty) return null;
+    final n = double.tryParse(raw);
+    if (n == null) return '숫자만 입력 가능합니다 (입력: $raw)';
+    if (n < 0) return '음수는 입력할 수 없습니다 (입력: $n)';
+    return null;
   }
 
   Future<void> _pickDateTime() async {
@@ -307,8 +342,12 @@ class _DietFormState extends ConsumerState<DietForm> {
             decoration: const InputDecoration(labelText: '칼로리(kcal)'),
             keyboardType: TextInputType.number,
             validator: (v) {
-              final n = int.tryParse(v ?? '');
-              if (n == null || n < 0 || n > 9999) return '0-9999';
+              final raw = v?.trim() ?? '';
+              if (raw.isEmpty) return '칼로리를 입력해주세요';
+              final n = int.tryParse(raw);
+              if (n == null) return '숫자만 입력 가능합니다 (입력: $raw)';
+              if (n < 0) return '음수는 입력할 수 없습니다 (입력: $n)';
+              if (n > 9999) return '0~9999 사이 값을 입력해주세요 (입력: $n)';
               return null;
             },
           ),
@@ -318,48 +357,30 @@ class _DietFormState extends ConsumerState<DietForm> {
               Expanded(
                 child: TextFormField(
                   controller: _carbsController,
-                  decoration: const InputDecoration(labelText: '탄수화물(g)'),
+                  decoration: const InputDecoration(labelText: '탄수화물 g (선택)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return null;
-                    final n = double.tryParse(v);
-                    if (n == null) return '숫자 입력';
-                    if (n < 0) return '0 이상';
-                    return null;
-                  },
+                  validator: _macroValidator,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: _proteinController,
-                  decoration: const InputDecoration(labelText: '단백질(g)'),
+                  decoration: const InputDecoration(labelText: '단백질 g (선택)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return null;
-                    final n = double.tryParse(v);
-                    if (n == null) return '숫자 입력';
-                    if (n < 0) return '0 이상';
-                    return null;
-                  },
+                  validator: _macroValidator,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: _fatController,
-                  decoration: const InputDecoration(labelText: '지방(g)'),
+                  decoration: const InputDecoration(labelText: '지방 g (선택)'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return null;
-                    final n = double.tryParse(v);
-                    if (n == null) return '숫자 입력';
-                    if (n < 0) return '0 이상';
-                    return null;
-                  },
+                  validator: _macroValidator,
                 ),
               ),
             ],

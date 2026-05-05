@@ -6,6 +6,13 @@ import '../../../diet/presentation/providers/diet_provider.dart';
 import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
 
+/// 요약 화면이 의존하는 두 도메인 (운동/식단) 의 초기 로드가 끝났는지 판단.
+/// 둘 중 하나라도 로딩 중이면 true.
+final dailySummaryInitialLoadingProvider = Provider<bool>((ref) {
+  return ref.watch(exerciseRecordsInitialLoadingProvider) ||
+      ref.watch(dietRecordsInitialLoadingProvider);
+});
+
 final dailySummaryProvider = Provider<DailySummary>((ref) {
   final exercises = ref.watch(exerciseRecordsProvider);
   final diets = ref.watch(dietRecordsProvider);

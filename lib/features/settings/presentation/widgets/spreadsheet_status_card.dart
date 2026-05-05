@@ -60,35 +60,28 @@ class SpreadsheetStatusCard extends ConsumerWidget {
                 ),
               ),
             ] else ...[
-              Builder(builder: (context) {
-                final isDark = Theme.of(context).brightness == Brightness.dark;
-                final bg = isDark ? AppTheme.colorWarnBgDark : Colors.orange[50]!;
-                final border = isDark ? AppTheme.colorWarnFg : Colors.orange[300]!;
-                final iconColor = isDark ? AppTheme.colorWarnFgDark : Colors.orange[700]!;
-                final textColor = isDark ? AppTheme.colorWarnBg : Colors.orange[900]!;
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    border: Border.all(color: border),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: iconColor, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Google 계정으로 먼저 로그인해주세요',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: textColor,
-                              ),
-                        ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.warnBg(context),
+                  border: Border.all(color: AppTheme.warnFg(context)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: AppTheme.warnFg(context), size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Google 계정으로 먼저 로그인해주세요',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.warnFg(context),
+                            ),
                       ),
-                    ],
-                  ),
-                );
-              }),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ],
         ),

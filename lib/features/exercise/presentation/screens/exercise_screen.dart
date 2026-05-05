@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/sheet_state_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
+import '../../../../shared/util/snackbar.dart';
 import '../../../../shared/widgets/bottom_nav_shell.dart';
 import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/widgets/empty_state.dart';
@@ -162,12 +163,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
         .read(routinePlannerProvider.notifier)
         .removeByName(card.exerciseName);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('"${card.exerciseName}"를 오늘 루틴에서 제거했습니다'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
+    showAppSnackBar(
+      context,
+      '"${card.exerciseName}"를 오늘 루틴에서 제거했습니다',
     );
   }
 
@@ -219,13 +217,7 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
             .read(workoutRoutinesProvider.notifier)
             .savePreset(name, routine);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('"$name" 루틴이 저장되었습니다'),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          showAppSnackBar(context, '"$name" 루틴이 저장되었습니다');
         }
       }
     } finally {
@@ -238,6 +230,8 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     final selectedDate = ref.watch(selectedDateProvider);
     final isToday = ref.watch(isSelectedDateTodayProvider);
     final totalVolume = ref.watch(selectedDateTotalVolumeProvider);
+    final isInitialLoading =
+        ref.watch(exerciseRecordsInitialLoadingProvider);
 
     final cards = isToday ? ref.watch(todayExerciseCardsProvider) : null;
     final pastGrouped =
@@ -296,7 +290,14 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
                 ),
               ),
             ),
-          if (isEmpty)
+          if (isInitialLoading && isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: isToday

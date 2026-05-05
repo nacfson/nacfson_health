@@ -179,7 +179,10 @@ class WeightChartCard extends ConsumerWidget {
               final dateStr = DateFormat('MM/dd').format(date);
               return LineTooltipItem(
                 '$dateStr\n${spot.y} kg',
-                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                TextStyle(
+                  color: colorScheme.onInverseSurface,
+                  fontWeight: FontWeight.bold,
+                ),
               );
             }).toList();
           },

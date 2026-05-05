@@ -167,6 +167,10 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
 
     state = SyncState.syncing;
 
+    // SnackBar Undo 가 5초 윈도우에 걸쳐 있을 수 있는 pending delete 를
+    // sync 시작 직전에 강제 commit. 누락된 삭제가 push 되지 않는 사고 방지.
+    await _dietNotifier.commitAllPending();
+
     try {
       final result = await _syncAll(
         _supabaseService,

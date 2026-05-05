@@ -24,6 +24,18 @@ class SummaryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(dailySummaryProvider);
     final isToday = ref.watch(isSelectedDateTodayProvider);
+    final isInitialLoading =
+        ref.watch(dailySummaryInitialLoadingProvider);
+
+    if (isInitialLoading) {
+      return Scaffold(
+        extendBody: true,
+        appBar: AppBar(title: Text(isToday ? '오늘의 요약' : '요약')),
+        body: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
 
     return Scaffold(
       extendBody: true,
@@ -542,14 +554,17 @@ class _EstimatedCalorieTile extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => _showInfo(context),
-            child: Icon(
+          IconButton(
+            tooltip: '운동 칼로리 추정 안내',
+            onPressed: () => _showInfo(context),
+            icon: Icon(
               Icons.info_outline,
               size: 14,
               color: colorScheme.outline,
             ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            visualDensity: VisualDensity.compact,
           ),
           const Spacer(),
           Text(
@@ -734,8 +749,11 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
                         color: AppTheme.colorMint,
                       ),
                     )
-                  : GestureDetector(
-                      onTap: () {
+                  : IconButton(
+                      tooltip: canRefresh
+                          ? 'AI 인사이트 새로고침'
+                          : '잠시 후 다시 시도해주세요',
+                      onPressed: () {
                         if (!canRefresh) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -755,13 +773,17 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
                             .update((_) => const {});
                         ref.invalidate(healthInsightProvider);
                       },
-                      child: Icon(
+                      icon: Icon(
                         Icons.refresh_rounded,
                         color: canRefresh
                             ? cs.onSurfaceVariant
                             : cs.outlineVariant,
                         size: 18,
                       ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                          minWidth: 44, minHeight: 44),
+                      visualDensity: VisualDensity.compact,
                     ),
             ],
           ),

@@ -195,9 +195,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       FocusScope.of(context).requestFocus(_weightFocus),
                   decoration: _inputDeco(hint: '예) 175'),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return '키를 입력해주세요';
-                    final d = double.tryParse(v);
-                    if (d == null || d < 100 || d > 250) return '올바른 키를 입력해주세요';
+                    final raw = v?.trim() ?? '';
+                    if (raw.isEmpty) return '키를 입력해주세요';
+                    final d = double.tryParse(raw);
+                    if (d == null) return '숫자만 입력 가능합니다 (입력: $raw)';
+                    if (d < 100 || d > 250) {
+                      return '100~250 사이 값을 입력해주세요 (입력: $d)';
+                    }
                     return null;
                   },
                 ),
@@ -218,9 +222,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       FocusScope.of(context).requestFocus(_ageFocus),
                   decoration: _inputDeco(hint: '예) 70.5'),
                   validator: (v) {
-                    if (v == null || v.isEmpty) return '체중을 입력해주세요';
-                    final d = double.tryParse(v);
-                    if (d == null || d < 20 || d > 300) return '올바른 체중을 입력해주세요';
+                    final raw = v?.trim() ?? '';
+                    if (raw.isEmpty) return '체중을 입력해주세요';
+                    final d = double.tryParse(raw);
+                    if (d == null) return '숫자만 입력 가능합니다 (입력: $raw)';
+                    if (d < 20 || d > 300) {
+                      return '20~300 사이 값을 입력해주세요 (입력: $d)';
+                    }
                     return null;
                   },
                 ),

@@ -78,11 +78,10 @@ class DietRecordCard extends ConsumerWidget {
                             ? AppTheme.catDiet(context)
                             : colorScheme.onSurfaceVariant,
                       ),
-                      visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
-                        minWidth: 32,
-                        minHeight: 32,
+                        minWidth: 44,
+                        minHeight: 44,
                       ),
                       onPressed:
                           alreadyTemplated ? null : onSaveAsTemplate,

@@ -127,20 +127,29 @@ final exerciseRepositoryProvider = Provider<ExerciseRepository>((ref) {
   return SqliteExerciseRepository();
 });
 
+/// 운동 기록 SQLite 초기 로드 상태 (StateNotifier state 와 분리하여 노출).
+/// `_loadRecords()` 완료 시점에 false 가 되며, 이후 새 기록 추가/삭제는 영향 없음.
+final exerciseRecordsInitialLoadingProvider =
+    StateProvider<bool>((ref) => true);
+
 final exerciseRecordsProvider = StateNotifierProvider<ExerciseNotifier, List<ExerciseRecord>>((ref) {
   final repository = ref.watch(exerciseRepositoryProvider);
-  return ExerciseNotifier(repository);
+  return ExerciseNotifier(repository, ref);
 });
 
 class ExerciseNotifier extends StateNotifier<List<ExerciseRecord>> {
   final ExerciseRepository _repository;
+  final Ref _ref;
 
-  ExerciseNotifier(this._repository) : super([]) {
+  ExerciseNotifier(this._repository, this._ref) : super([]) {
     _loadRecords();
   }
 
   Future<void> _loadRecords() async {
     state = await _repository.getAll();
+    if (mounted) {
+      _ref.read(exerciseRecordsInitialLoadingProvider.notifier).state = false;
+    }
   }
 
   /// 동기화 완료 후 DB에서 최신 상태를 다시 로드합니다.

@@ -8,6 +8,7 @@ import '../../../../shared/providers/selected_date_provider.dart';
 import '../../../../shared/widgets/bottom_nav_shell.dart';
 import '../../../../shared/widgets/date_navigation_bar.dart';
 import '../../../../shared/widgets/record_form_sheet.dart';
+import '../../../../shared/util/snackbar.dart';
 import '../../../../shared/widgets/empty_state.dart';
 import '../../../settings/domain/entities/food_template.dart';
 import '../../../settings/presentation/providers/food_template_provider.dart';
@@ -43,19 +44,22 @@ class _DietScreenState extends ConsumerState<DietScreen> {
   }
 
   void _openAddSheet(BuildContext context) {
+    final formKey = GlobalKey<DietFormState>();
     openSheet(
       context: context,
       ref: ref,
       type: SheetType.diet,
       title: '식단 기록 추가',
-      child: const RecordFormSheet(
+      child: RecordFormSheet(
         title: '식단 기록 추가',
-        child: DietForm(),
+        onConfirmClose: () => _confirmDiscardIfDirty(context, formKey),
+        child: DietForm(key: formKey),
       ),
     );
   }
 
   void _openEditSheet(BuildContext context, DietRecord record) {
+    final formKey = GlobalKey<DietFormState>();
     openSheet(
       context: context,
       ref: ref,
@@ -63,7 +67,48 @@ class _DietScreenState extends ConsumerState<DietScreen> {
       title: '식단 기록 수정',
       child: RecordFormSheet(
         title: '식단 기록 수정',
-        child: DietForm(initialRecord: record),
+        onConfirmClose: () => _confirmDiscardIfDirty(context, formKey),
+        child: DietForm(key: formKey, initialRecord: record),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDiscardIfDirty(
+    BuildContext context,
+    GlobalKey<DietFormState> formKey,
+  ) async {
+    final state = formKey.currentState;
+    if (state == null || !state.isDirty) return true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작성 중인 내용이 사라집니다'),
+        content: const Text('닫을까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 작성'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  void _softDeleteWithUndo(DietRecord record) {
+    final notifier = ref.read(dietRecordsProvider.notifier);
+    notifier.softDelete(record.uuid);
+    showAppSnackBar(
+      context,
+      '삭제됨 · ${record.foodName}',
+      duration: const Duration(seconds: 5),
+      action: SnackBarAction(
+        label: '되돌리기',
+        onPressed: () => notifier.restoreSoftDelete(record.uuid),
       ),
     );
   }
@@ -75,12 +120,10 @@ class _DietScreenState extends ConsumerState<DietScreen> {
     final templates = ref.read(foodTemplatesProvider);
     if (templates.any((t) => t.name == name)) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('"$name"은(는) 이미 템플릿에 있습니다'),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
+      showAppSnackBar(
+        context,
+        '"$name"은(는) 이미 템플릿에 있습니다',
+        duration: const Duration(seconds: 1),
       );
       return;
     }
@@ -97,15 +140,12 @@ class _DietScreenState extends ConsumerState<DietScreen> {
     );
     await ref.read(foodTemplatesProvider.notifier).addTemplate(template);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('템플릿에 등록됨 · $name'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: '설정',
-          onPressed: () => context.push('/settings'),
-        ),
+    showAppSnackBar(
+      context,
+      '템플릿에 등록됨 · $name',
+      action: SnackBarAction(
+        label: '설정',
+        onPressed: () => context.push('/settings'),
       ),
     );
   }
@@ -117,6 +157,7 @@ class _DietScreenState extends ConsumerState<DietScreen> {
     final targets      = ref.watch(nutritionTargetsProvider);
     final selectedDate = ref.watch(selectedDateProvider);
     final isToday      = ref.watch(isSelectedDateTodayProvider);
+    final isInitialLoading = ref.watch(dietRecordsInitialLoadingProvider);
     final isEmpty      = grouped.isEmpty;
 
     return Scaffold(
@@ -133,7 +174,14 @@ class _DietScreenState extends ConsumerState<DietScreen> {
               isToday: isToday,
             ),
           ),
-          if (isEmpty)
+          if (isInitialLoading && isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
@@ -154,9 +202,7 @@ class _DietScreenState extends ConsumerState<DietScreen> {
                     return DietRecordCard(
                       record: record,
                       onTap: () => _openEditSheet(context, record),
-                      onDelete: () => ref
-                          .read(dietRecordsProvider.notifier)
-                          .deleteRecord(record.uuid),
+                      onDelete: () => _softDeleteWithUndo(record),
                       onSaveAsTemplate: () => _saveAsTemplate(record),
                     );
                   },

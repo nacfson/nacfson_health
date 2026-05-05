@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../shared/providers/selected_date_provider.dart';
 import '../../domain/entities/diet_record.dart';
@@ -8,20 +10,44 @@ final dietRepositoryProvider = Provider<DietRepository>((ref) {
   return SqliteDietRepository();
 });
 
+/// 식단 기록 SQLite 초기 로드 상태 (StateNotifier state 와 분리하여 노출).
+final dietRecordsInitialLoadingProvider = StateProvider<bool>((ref) => true);
+
 final dietRecordsProvider = StateNotifierProvider<DietNotifier, List<DietRecord>>((ref) {
   final repository = ref.watch(dietRepositoryProvider);
-  return DietNotifier(repository);
+  return DietNotifier(repository, ref);
 });
 
 class DietNotifier extends StateNotifier<List<DietRecord>> {
   final DietRepository _repository;
+  final Ref _ref;
 
-  DietNotifier(this._repository) : super([]) {
+  /// SnackBar Undo 가 가능한 5초 동안 메모리에서만 제거된 레코드.
+  /// 5초 경과 시 [_pendingDeleteTimers] 가 실제 DB delete 를 호출하고 비움.
+  final Map<String, DietRecord> _pendingDeletes = {};
+  final Map<String, Timer> _pendingDeleteTimers = {};
+
+  static const _undoWindow = Duration(seconds: 5);
+
+  DietNotifier(this._repository, this._ref) : super([]) {
     _loadRecords();
+  }
+
+  @override
+  void dispose() {
+    for (final t in _pendingDeleteTimers.values) {
+      t.cancel();
+    }
+    _pendingDeleteTimers.clear();
+    _pendingDeletes.clear();
+    super.dispose();
   }
 
   Future<void> _loadRecords() async {
     state = await _repository.getAll();
+    if (mounted) {
+      _ref.read(dietRecordsInitialLoadingProvider.notifier).state = false;
+    }
   }
 
   /// 동기화 완료 후 DB에서 최신 상태를 다시 로드합니다.
@@ -42,6 +68,49 @@ class DietNotifier extends StateNotifier<List<DietRecord>> {
   Future<void> deleteRecord(String id) async {
     await _repository.delete(id);
     state = state.where((r) => r.uuid != id).toList();
+  }
+
+  /// 메모리에서만 즉시 제거하고 5초 안에 [restoreSoftDelete] 호출 시 복원 가능.
+  /// 5초 후 자동으로 실제 DB delete 호출. UI 는 SnackBar action="되돌리기" 를 함께 노출한다.
+  void softDelete(String id) {
+    final target = state.firstWhere(
+      (r) => r.uuid == id,
+      orElse: () => throw StateError('record not found: $id'),
+    );
+    _pendingDeletes[id] = target;
+    state = state.where((r) => r.uuid != id).toList();
+    _pendingDeleteTimers[id]?.cancel();
+    _pendingDeleteTimers[id] = Timer(_undoWindow, () {
+      _commitOne(id);
+    });
+  }
+
+  /// 사용자가 "되돌리기" 를 누른 경우. timer 취소 후 state 에 다시 삽입.
+  void restoreSoftDelete(String id) {
+    final pending = _pendingDeletes.remove(id);
+    _pendingDeleteTimers.remove(id)?.cancel();
+    if (pending == null) return;
+    state = _sortDesc([...state, pending]);
+  }
+
+  /// 동기화 진입점에서 호출. 모든 pending 을 즉시 commit 하여 sync 누락 방지.
+  Future<void> commitAllPending() async {
+    final ids = _pendingDeletes.keys.toList();
+    for (final id in ids) {
+      _pendingDeleteTimers.remove(id)?.cancel();
+      await _commitOne(id);
+    }
+  }
+
+  Future<void> _commitOne(String id) async {
+    if (!_pendingDeletes.containsKey(id)) return;
+    _pendingDeletes.remove(id);
+    _pendingDeleteTimers.remove(id);
+    try {
+      await _repository.delete(id);
+    } catch (_) {
+      // 삭제 실패 시 다음 sync 가 정정. 사용자 액션은 이미 끝남.
+    }
   }
 
   /// `getAll()` 의 정렬 규약(timestamp DESC) 을 in-memory 갱신에서도 유지.

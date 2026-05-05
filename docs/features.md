@@ -1,11 +1,34 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-04-29  
+> **마지막 업데이트**: 2026-05-05 (v12-3)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
+
+### v12-3 (2026-05) — UI/UX HIGH 7건 (다크 모드/입력 흐름/실수 복구)
+- [x] 다크 모드 색상 하드코딩 정리 — `app_theme.dart` 매크로 토큰 (`macroCarbsFg`/`macroProteinFg`/`macroFatFg`) 신설 + 7개 위젯의 `Colors.white/orange/blue/yellow/amber` → `AppTheme` 헬퍼 (`weight_chart_card` 툴팁, `calorie_trend_chart` 아이콘, `analysis_result_sheet` 신뢰도 배너, `spreadsheet_status_card` 라이트 분기 비대칭 해소, `diet_target_card` 매크로 라벨, `weight_form` 날짜 강조)
+- [x] 입력 검증 메시지 — 현재 입력값 + 권장 범위 명시 (`diet_form` 칼로리/탄단지, `inline_set_input` 중량/반복/RPE, `onboarding_screen` 키/체중 톤 통일)
+- [x] 터치 타겟 44x44 — `diet_record_card` 템플릿 등록 IconButton constraints 32→44, `summary_screen` 정보·새로고침 GestureDetector→IconButton(tooltip), `weight_screen` "오늘 기록 추가" InkWell + minHeight 44
+- [x] 시트 swipe-down 손실 경고 — `DietForm.isDirty` getter + `DietFormState` public 화 + `diet_screen` 호출처 `_confirmDiscardIfDirty` (WeightForm 은 v12-2 에서 적용 완료)
+- [x] 로딩 상태 표시 — `xxxRecordsInitialLoadingProvider` (운동/식단/체중) + `dailySummaryInitialLoadingProvider` (derived) 신설. 4개 화면에서 spinner 분기 (콜드 스타트 시 빈 리스트 깜빡임 제거)
+- [x] `NumericStepperField` 신규 위젯 — long-press 100ms 가속, `min`/`max` 클램프, `inline_set_input` kg(0.5)/회(1)/RPE(0.5) 적용. `weight_form` 큰 폰트 유지 + 자체 `_LargeStepperButton` ±0.1kg
+- [x] 식단 삭제 후 SnackBar Undo (5초) — `DietNotifier.softDelete`/`restoreSoftDelete`/`commitAllPending` + Timer 캐시. `performSync()` 진입점에서 `commitAllPending` 강제 호출로 sync 누락 방지. `diet_screen` swipe delete 적용
+- [~] 운동 도메인 Undo — `deleteSetAndRenumber` 가 set 번호 일괄 재정렬을 동반해 reverse 복잡. 다음 라운드 분리 (현재 confirmDialog 유지)
+
+### v12-2 (2026-05) — B/C 그룹 audit (품질 보강)
+- [x] 빈 `catch (_)` 무주석 0건 — `main.dart` / `food_vision_provider` / `one_rm_formula` / `weight_provider` / `activity_summary_card` / `health_data_source` 7건 정리 (`docs/error-handling.md` §의도적 빈 catch 가이드 준수)
+- [x] Master data fetch 5분 attempt throttle (`SqliteMasterDataRepository._lastAttemptKey`) — 첫 설치 + 오프라인 시 무한 네트워크 호출 차단
+- [x] 휴식 타이머 stale Live Activity race 가드 — `RestTimerNotifier.start()/stop()` 의 `_notifications.end()` try-catch + 진행 보장
+- [x] `RecordFormSheet` 미저장 경고 API — `onConfirmClose` 콜백 + `PopScope` (system back/swipe-down 도 가드)
+- [x] `WeightForm.isDirty` getter + `WeightFormState` public 화 — `weight_input_card` / `weight_screen` 두 호출처에서 dirty 시 AlertDialog
+- [x] `showAppSnackBar` 헬퍼 (`lib/shared/util/snackbar.dart`) — `clearSnackBars` + floating 통일. `diet_screen` / `photo_analysis_card` / `exercise_screen` 6곳 교체
+- [x] `exercise_chips` GestureDetector `Semantics(button, selected, label)` — 1RM 코치 종목 칩 VoiceOver/TalkBack 인식
+- [x] `legacy_korean_mapping_test.dart` — 한글명 → exercise_key 매핑 회귀 테스트 12건 (null/공백/대표 종목/스네이크케이스/카테고리/SQL 헬퍼)
+- [x] `weight_form` 날짜 강조 색 — `Colors.amber.shade700` → `AppTheme.warnFg(context)` 헬퍼화
+- [~] C1 다른 폼 (DietForm / DirectRoutineInputDialog / ExerciseTemplateCard 추가 탭 / FoodTemplate) — 같은 패턴 점진 마이그레이션
+- [~] C4 나머지 호출처 (validation 단발성) — `inline_set_input` / `weight_form` / `activity_permission_card` 등 점진 마이그레이션
 
 ### v12 (2026-04-29) — 다국어 + 종목별 권위 1RM 공식
 - [x] 운동 마스터 데이터 다국어 지원 (`exercise_definitions` + `exercise_translations` ko/en, 161개 표준 웨이트 종목 + 322개 번역)

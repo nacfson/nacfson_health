@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/food_analysis_result.dart';
 
 /// Gemini Vision 분석 결과를 사용자에게 확인·편집 받는 BottomSheet.
@@ -172,7 +173,7 @@ class _AnalysisResultSheetState extends State<_AnalysisResultSheet> {
                             style: TextStyle(
                               fontSize: 13,
                               color: lowConfidence
-                                  ? Colors.orange
+                                  ? AppTheme.warnFg(context)
                                   : cs.onSurfaceVariant,
                               fontWeight: lowConfidence
                                   ? FontWeight.w600
@@ -201,15 +202,15 @@ class _AnalysisResultSheetState extends State<_AnalysisResultSheet> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.08),
+                      color: AppTheme.warnBg(context).withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                          color: Colors.orange.withValues(alpha: 0.3)),
+                          color: AppTheme.warnFg(context).withValues(alpha: 0.4)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline,
-                            size: 18, color: Colors.orange),
+                        Icon(Icons.info_outline,
+                            size: 18, color: AppTheme.warnFg(context)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

@@ -65,6 +65,8 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 | `docs/changelog-v11.md` | v11 변경 로그 (`rest_seconds_override` + 부위별 휴식 + 템플릿 카드 UX 개편 + Supabase 마이그레이션 사고 회고) |
 | `docs/changelog-v12.md` | v12 변경 로그 (다국어 ko/en + 종목별 권위 1RM 공식 + admin-curated 운동 마스터 데이터 + TTL 24h 캐시) |
 | `docs/changelog-v12-1.md` | v12-1 변경 로그 (보안 하드닝 — dart-define 전환 + iOS OAuth ID + iOS 휴식 알림 안정화 + ExercisePickerField 통합 + 1RM 빠른 추정 카드 제거) |
+| `docs/changelog-v12-2.md` | v12-2 변경 로그 (B/C 그룹 audit — 빈 catch 정리 + master data throttle + 휴식 타이머 race 가드 + RecordFormSheet onConfirmClose + showAppSnackBar + Semantics + legacy_korean_mapping 회귀 테스트) |
+| `docs/changelog-v12-3.md` | v12-3 변경 로그 (UI/UX HIGH 7건 — 다크 토큰 매크로 + 검증 메시지 친절화 + 터치 타겟 44 + DietForm swipe-down 경고 + 로딩 상태 spinner + NumericStepperField + 식단 SnackBar Undo) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 
 ## Git 환경 설정

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/nutrition/nutrition_calculator.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/sync/sync_state.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../features/weight/presentation/providers/weight_provider.dart';
 import '../../../../shared/providers/user_profile_provider.dart';
 import '../../../../shared/widgets/error_overlay.dart';
@@ -284,7 +285,7 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
                       controller: _carbsCtrl,
                       label: '탄수화물',
                       unit: 'g',
-                      color: Colors.orange[400],
+                      color: AppTheme.macroCarbsFg(context),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -293,7 +294,7 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
                       controller: _proteinCtrl,
                       label: '단백질',
                       unit: 'g',
-                      color: Colors.blue[400],
+                      color: AppTheme.macroProteinFg(context),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -302,7 +303,7 @@ class _DietTargetCardState extends ConsumerState<DietTargetCard> {
                       controller: _fatCtrl,
                       label: '지방',
                       unit: 'g',
-                      color: Colors.yellow[700],
+                      color: AppTheme.macroFatFg(context),
                     ),
                   ),
                 ],
