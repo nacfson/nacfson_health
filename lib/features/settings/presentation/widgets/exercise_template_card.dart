@@ -5,10 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 import '../../../exercise/domain/body_part_rest_defaults.dart';
+import '../../../exercise/presentation/widgets/exercise_picker_field.dart';
 import '../../domain/entities/exercise_template.dart';
 import '../providers/exercise_template_provider.dart';
-
-const _exerciseTypes = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
 
 enum _TemplateTab { search, add }
 
@@ -33,16 +32,13 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
   String _searchQuery = '';
   bool _searchFocused = false;
 
-  // 추가 탭 state
-  late final TextEditingController _addNameCtrl;
-  String _addName = '';
-  String? _selectedExerciseTypeForAdd;
+  // 추가 탭 state — picker 의 초기 검색어 (검색 탭에서 prefill 시 사용)
+  String? _addInitialQuery;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
-    _addNameCtrl = TextEditingController();
     _searchFocusNode = FocusNode()..addListener(_handleSearchFocusChange);
   }
 
@@ -51,7 +47,6 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     _searchFocusNode.removeListener(_handleSearchFocusChange);
     _searchFocusNode.dispose();
     _searchCtrl.dispose();
-    _addNameCtrl.dispose();
     super.dispose();
   }
 
@@ -65,47 +60,36 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
     setState(() {
       _tab = tab;
       if (prefillName != null) {
-        _addNameCtrl.text = prefillName;
-        _addNameCtrl.selection = TextSelection.fromPosition(
-          TextPosition(offset: prefillName.length),
-        );
-        _addName = prefillName;
+        _addInitialQuery = prefillName;
       }
     });
   }
 
-  Future<void> _addTemplate() async {
-    final name = _addName.trim();
-    if (name.isEmpty) {
-      ErrorOverlay.show(title: '입력 오류', message: '운동 이름을 입력해주세요.');
-      return;
-    }
-    final type = _selectedExerciseTypeForAdd;
-    if (type == null) {
-      ErrorOverlay.show(title: '입력 오류', message: '운동 유형을 선택해주세요.');
-      return;
-    }
-
+  Future<void> _addFromPicker(ExercisePickResult picked) async {
     final templates = ref.read(exerciseTemplatesProvider);
-    if (templates.any((t) => t.name == name)) {
-      // 버튼 disabled 가드를 우회한 경우의 안전망.
-      ErrorOverlay.show(title: '중복 오류', message: '이미 보유한 템플릿입니다.');
+    if (templates.any((t) => t.name == picked.displayName)) {
+      ErrorOverlay.show(
+        title: '중복',
+        message: '"${picked.displayName}" 은(는) 이미 등록된 템플릿입니다.',
+      );
       return;
     }
-
     try {
       await ref
           .read(exerciseTemplatesProvider.notifier)
-          .addTemplate(name, type);
-      _addNameCtrl.clear();
+          .addTemplate(picked.displayName, picked.legacyExerciseType);
       if (mounted) {
-        setState(() {
-          _addName = '';
-          _selectedExerciseTypeForAdd = null;
-        });
+        setState(() => _addInitialQuery = null);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${picked.displayName}" 템플릿이 추가되었습니다'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('ExerciseTemplateCard._addTemplate error: $e');
+      debugPrint('ExerciseTemplateCard._addFromPicker error: $e');
       if (rootNavigatorKey.currentState?.overlay != null) {
         ErrorOverlay.show(title: '저장 실패', message: '템플릿 추가 중 오류가 발생했습니다: $e');
       }
@@ -317,86 +301,37 @@ class _ExerciseTemplateCardState extends ConsumerState<ExerciseTemplateCard> {
 
   Widget _buildAddTab(ThemeData theme, List<ExerciseTemplate> templates) {
     final cs = theme.colorScheme;
-    final trimmedName = _addName.trim();
-    final isNameEmpty = trimmedName.isEmpty;
-    final isDuplicate =
-        !isNameEmpty && templates.any((t) => t.name == trimmedName);
-    final isTypeEmpty = _selectedExerciseTypeForAdd == null;
-    final canSubmit = !isNameEmpty && !isDuplicate && !isTypeEmpty;
-
-    String? helperText;
-    Color? helperColor;
-    if (isDuplicate) {
-      helperText = '이미 보유한 템플릿입니다.';
-      helperColor = cs.error;
-    } else if (isNameEmpty) {
-      helperText = '운동 이름과 부위를 선택하세요.';
-      helperColor = cs.onSurfaceVariant;
-    } else if (isTypeEmpty) {
-      helperText = '부위를 선택하면 추가 버튼이 활성화됩니다.';
-      helperColor = cs.onSurfaceVariant;
-    }
+    final disabledKeys = <String>{
+      // 이미 보유한 템플릿은 displayName 기준이므로 picker disabledKeys 에 직접
+      // exerciseKey 매핑이 어렵다. 대신 _addFromPicker 단계에서 displayName 중복 체크.
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TextField(
-          controller: _addNameCtrl,
-          decoration: InputDecoration(
-            hintText: '운동 이름 입력',
-            prefixIcon: const Icon(Icons.fitness_center, size: 20),
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            errorText: isDuplicate ? '이미 보유한 템플릿입니다.' : null,
-          ),
-          onChanged: (v) => setState(() => _addName = v),
-          onSubmitted: (_) {
-            if (canSubmit) _addTemplate();
-          },
-        ),
-        const SizedBox(height: 12),
         Text(
-          '부위',
-          style: theme.textTheme.labelMedium?.copyWith(
+          '등록된 운동만 템플릿으로 추가할 수 있습니다. 부위는 자동으로 분류됩니다.',
+          style: theme.textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: [
-            for (final type in _exerciseTypes)
-              ChoiceChip(
-                label: Text(type),
-                selected: _selectedExerciseTypeForAdd == type,
-                onSelected: (v) {
-                  setState(() {
-                    _selectedExerciseTypeForAdd = v ? type : null;
-                  });
-                },
-              ),
-          ],
+        const SizedBox(height: 8),
+        ExercisePickerField(
+          key: ValueKey(_addInitialQuery ?? ''),
+          initialQuery: _addInitialQuery,
+          disabledKeys: disabledKeys,
+          hintText: '운동 이름을 입력하세요 (예: 벤치프레스)',
+          onPicked: _addFromPicker,
         ),
-        if (helperText != null && !isDuplicate) ...[
+        if (templates.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            helperText,
-            style: theme.textTheme.bodySmall?.copyWith(color: helperColor),
+            '현재 ${templates.length}개의 템플릿이 등록되어 있습니다.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
           ),
         ],
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: canSubmit ? _addTemplate : null,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('추가'),
-          ),
-        ),
       ],
     );
   }

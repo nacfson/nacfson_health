@@ -1,115 +1,73 @@
 import 'package:flutter/material.dart';
 
-const _exerciseTypes = ['가슴', '등', '하체', '어깨', '팔', '코어', '유산소', '기타'];
+import 'exercise_picker_field.dart';
 
+/// 사용자가 picker 에서 선택한 등록 종목 정보.
+/// `exerciseKey` 는 향후 RoutineItem 백필용으로 함께 보관한다.
 class DirectRoutineInput {
   final String name;
   final String type;
-  const DirectRoutineInput({required this.name, required this.type});
+  final String exerciseKey;
+  const DirectRoutineInput({
+    required this.name,
+    required this.type,
+    required this.exerciseKey,
+  });
 }
 
 Future<DirectRoutineInput?> showDirectRoutineInputDialog(
   BuildContext context, {
-  String? initialType,
+  String? initialQuery,
 }) {
   return showDialog<DirectRoutineInput>(
     context: context,
-    builder: (_) => _DirectRoutineInputDialog(initialType: initialType),
+    builder: (_) => _DirectRoutineInputDialog(initialQuery: initialQuery),
   );
 }
 
-class _DirectRoutineInputDialog extends StatefulWidget {
-  final String? initialType;
-  const _DirectRoutineInputDialog({this.initialType});
-
-  @override
-  State<_DirectRoutineInputDialog> createState() =>
-      _DirectRoutineInputDialogState();
-}
-
-class _DirectRoutineInputDialogState extends State<_DirectRoutineInputDialog> {
-  final _nameCtrl = TextEditingController();
-  String? _type;
-
-  @override
-  void initState() {
-    super.initState();
-    _type = widget.initialType;
-    _nameCtrl.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    super.dispose();
-  }
-
-  String _normalizedName() =>
-      _nameCtrl.text.trim().replaceAll(RegExp(r'\s+'), ' ');
-
-  bool get _canSubmit => _normalizedName().isNotEmpty && _type != null;
-
-  void _submit() {
-    if (!_canSubmit) return;
-    Navigator.pop(
-      context,
-      DirectRoutineInput(name: _normalizedName(), type: _type!),
-    );
-  }
+class _DirectRoutineInputDialog extends StatelessWidget {
+  final String? initialQuery;
+  const _DirectRoutineInputDialog({this.initialQuery});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AlertDialog(
-      title: const Text('새 운동 추가'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _nameCtrl,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: '운동 이름',
-              hintText: '예: 인클라인 덤벨 프레스',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
+      title: const Text('운동 추가'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '등록된 운동만 추가할 수 있습니다.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            decoration: InputDecoration(
-              labelText: '운동 유형',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+            const SizedBox(height: 12),
+            ExercisePickerField(
+              autofocus: true,
+              initialQuery: initialQuery,
+              onPicked: (result) {
+                Navigator.pop(
+                  context,
+                  DirectRoutineInput(
+                    name: result.displayName,
+                    type: result.legacyExerciseType,
+                    exerciseKey: result.exerciseKey,
+                  ),
+                );
+              },
             ),
-            initialValue: _type,
-            items: _exerciseTypes
-                .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                .toList(),
-            onChanged: (v) => setState(() => _type = v),
-          ),
-        ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: _canSubmit ? _submit : null,
-          child: const Text('저장'),
         ),
       ],
     );

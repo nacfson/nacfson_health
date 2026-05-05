@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/training/challenge_readiness.dart';
-import '../../../../core/training/one_rm_calculator.dart';
-import '../../../../core/training/one_rm_formula.dart';
 import '../../domain/entities/pr_summary.dart';
 import '../providers/master_data_provider.dart';
 import '../providers/one_rm_coach_provider.dart';
@@ -13,7 +11,6 @@ import '../widgets/one_rm/coach_note_card.dart';
 import '../widgets/one_rm/current_e1rm_card.dart';
 import '../widgets/one_rm/exercise_chips.dart';
 import '../widgets/one_rm/percent_of_one_rm_table.dart';
-import '../widgets/one_rm/quick_estimate_stepper.dart';
 
 /// 1RM 코치 풀스크린.
 ///
@@ -56,28 +53,10 @@ class _OneRMCoachScreenState extends ConsumerState<OneRMCoachScreen> {
     }
   }
 
-  /// 종목 선택 변경 시 입력값을 그 종목의 최근 work/drop 세트로 reset.
-  /// 데이터가 없으면 기존 입력값 유지 (이전 사용자 조정값을 강제 되돌리지 않음).
-  Future<void> _applyLatestSetToInputs(String exerciseName) async {
-    final latest =
-        await ref.read(latestWorkSetProvider(exerciseName).future);
-    if (!mounted || latest == null) return;
-    ref.read(coachInputWeightProvider.notifier).state = latest.weight;
-    ref.read(coachInputRepsProvider.notifier).state = latest.reps;
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final selected = ref.watch(selectedCoachExerciseProvider);
-    final inputWeight = ref.watch(coachInputWeightProvider);
-    final inputReps = ref.watch(coachInputRepsProvider);
-
-    // 종목 변경 시 입력값 1회 reset. ExerciseChips 의 ensureVisible 은 위젯 자체 listen.
-    ref.listen<String?>(selectedCoachExerciseProvider, (prev, next) {
-      if (next == null || next == prev) return;
-      _applyLatestSetToInputs(next);
-    });
 
     return Scaffold(
       appBar: AppBar(
@@ -108,11 +87,7 @@ class _OneRMCoachScreenState extends ConsumerState<OneRMCoachScreen> {
                 ),
               )
             else
-              _Body(
-                exerciseName: selected,
-                inputWeight: inputWeight,
-                inputReps: inputReps,
-              ),
+              _Body(exerciseName: selected),
           ],
         ),
       ),
@@ -122,13 +97,7 @@ class _OneRMCoachScreenState extends ConsumerState<OneRMCoachScreen> {
 
 class _Body extends ConsumerWidget {
   final String exerciseName;
-  final double inputWeight;
-  final int inputReps;
-  const _Body({
-    required this.exerciseName,
-    required this.inputWeight,
-    required this.inputReps,
-  });
+  const _Body({required this.exerciseName});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -157,28 +126,14 @@ class _Body extends ConsumerWidget {
           recentFailureCount: summary.recentFailureCount,
         ));
 
-        // v12: 종목별 권위 공식이 있으면 그걸로 live e1RM 계산. 없으면 Epley fallback.
-        final formulaAsync = ref.watch(selectedExerciseFormulaProvider);
-        final OneRMFormulaSpec? spec = formulaAsync.valueOrNull;
-        final double live1RM = spec != null
-            ? spec.calculate(inputWeight, inputReps)
-            : calculateE1RM(inputWeight, inputReps);
+        final e1RM = summary.currentE1RM;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CurrentE1RMCard(
-                summary: summary,
-                inputWeight: inputWeight,
-                inputReps: inputReps,
-              ),
-              const SizedBox(height: 18),
-
-              _SectionLabel('빠른 추정'),
-              const SizedBox(height: 8),
-              const QuickEstimateStepper(),
+              CurrentE1RMCard(summary: summary),
               const SizedBox(height: 18),
 
               _SectionLabel('1RM 도전 가이드'),
@@ -188,10 +143,25 @@ class _Body extends ConsumerWidget {
 
               _SectionLabel('% of 1RM 환산표'),
               const SizedBox(height: 8),
-              PercentOfOneRMTable(
-                e1RM: summary.currentE1RM ?? live1RM,
-                currentReps: inputReps,
-              ),
+              if (e1RM != null)
+                PercentOfOneRMTable(e1RM: e1RM)
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border:
+                        Border.all(color: cs.outlineVariant, width: 0.5),
+                  ),
+                  child: Text(
+                    '운동 기록을 추가하면 환산표가 표시됩니다.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 18),
 
               if (summary.currentE1RM != null) ...[
@@ -201,8 +171,6 @@ class _Body extends ConsumerWidget {
                     currentE1RM: summary.currentE1RM!,
                     deltaKg: summary.deltaKg,
                     readiness: readiness.level,
-                    lastSetWeight: inputWeight,
-                    lastSetReps: inputReps,
                   ),
                 ),
                 const SizedBox(height: 14),

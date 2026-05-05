@@ -101,7 +101,10 @@
 |------|------|
 | 1RM 코치 종목 칩 | Supabase 에 1RM 공식이 등록된 종목만 노출 (formulaSpecMap 필터). 미등록 종목은 칩 자체 비표시 |
 | 1RM 코치 e1RM 계산 | 종목별 권위 공식 사용 (Mayhew/Wathen/Brzycki). 미등록 종목은 Epley fallback (점진적 호환) |
-| % of 1RM 환산표 | live e1RM 도 종목별 공식으로 계산 |
+| % of 1RM 환산표 | `summary.currentE1RM` 기반으로만 표시. e1RM 데이터 없으면 안내 문구로 대체 |
+| 1RM 코치 빠른 추정 카드 | **제거** — `currentE1RM` 이 이미 5주 max 로 산출되어 중복. `coachInputWeight/Reps/latestWorkSet/selectedExerciseFormula` Provider 도 함께 정리 |
+| 운동 추가 다이얼로그 | 자유 텍스트 입력 차단 → `ExercisePickerField` 로 전환. `exercise_definitions` 에 등록된 종목만 선택 가능 + 부위(`exerciseType`) 자동 분류 |
+| 운동 템플릿 추가 (설정) | `ExercisePickerField` 로 통합. 이름 자유 입력 + 부위 ChoiceChip 제거. 검색 결과 0 시 추가 탭으로 picker prefill |
 | 카드 표시명 | (향후 v13에서 locale별 번역 표시 적용 예정) |
 
 ---
@@ -119,9 +122,8 @@
 ## 향후 (v13+)
 
 - ja/zh-CN 등 추가 locale (Supabase에 admin이 INSERT)
-- 사용자 커스텀 종목 입력 차단 + 종목 제안 기능
 - 기존 사용자 데이터 매핑 누락 정정 UX (exercise_key=NULL → 표준 종목 매핑 마법사)
-- 검색 alias 활용 (예: ko "벤프" 입력 → bench_press 매칭)
+- `RoutineItem` / `ExerciseTemplate` 에 `exerciseKey` 필드 정식 도입 (현재는 displayName 만 저장)
 - 모든 화면의 운동명 표시를 `exerciseDisplayNameProvider` 로 일관 적용
 
 ---

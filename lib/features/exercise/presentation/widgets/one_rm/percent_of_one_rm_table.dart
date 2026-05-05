@@ -4,14 +4,11 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/training/one_rm_calculator.dart';
 
 /// % of 1RM 환산표. 100~65% (8행).
-/// 현재 입력 reps 와 일치하는 행을 mint 강조 색으로 표시.
 class PercentOfOneRMTable extends StatelessWidget {
   final double e1RM;
-  final int currentReps;
   const PercentOfOneRMTable({
     super.key,
     required this.e1RM,
-    required this.currentReps,
   });
 
   static const _rows = <(int, int)>[
@@ -45,7 +42,6 @@ class PercentOfOneRMTable extends StatelessWidget {
               percent: _rows[i].$1,
               reps: _rows[i].$2,
               weight: weightForPercentage(e1RM, _rows[i].$1),
-              highlight: currentReps == _rows[i].$2,
               mint: mint,
               isLast: i == _rows.length - 1,
             ),
@@ -59,14 +55,12 @@ class _Row extends StatelessWidget {
   final int percent;
   final int reps;
   final double weight;
-  final bool highlight;
   final Color mint;
   final bool isLast;
   const _Row({
     required this.percent,
     required this.reps,
     required this.weight,
-    required this.highlight,
     required this.mint,
     required this.isLast,
   });
@@ -95,7 +89,7 @@ class _Row extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: highlight ? mint : cs.onSurface,
+                color: cs.onSurface,
                 letterSpacing: -0.3,
               ),
             ),
@@ -113,14 +107,7 @@ class _Row extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Container(
                   decoration: BoxDecoration(
-                    gradient: highlight
-                        ? LinearGradient(
-                            colors: [mint, mint.withValues(alpha: 0.7)],
-                          )
-                        : null,
-                    color: highlight
-                        ? null
-                        : cs.outlineVariant.withValues(alpha: 0.8),
+                    color: mint.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(3),
                   ),
                 ),
@@ -136,7 +123,7 @@ class _Row extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: highlight ? cs.onSurface : cs.onSurfaceVariant,
+                color: cs.onSurfaceVariant,
                 letterSpacing: -0.2,
               ),
             ),

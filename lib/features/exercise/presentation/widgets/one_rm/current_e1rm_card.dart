@@ -9,14 +9,10 @@ import '../../../domain/entities/pr_summary.dart';
 /// 데이터가 부족한 경우(currentE1RM == null)는 안내 문구로 대체.
 class CurrentE1RMCard extends StatelessWidget {
   final PrSummary summary;
-  final double inputWeight;
-  final int inputReps;
 
   const CurrentE1RMCard({
     super.key,
     required this.summary,
-    required this.inputWeight,
-    required this.inputReps,
   });
 
   @override
@@ -155,7 +151,7 @@ class CurrentE1RMCard extends StatelessWidget {
           if (cur != null) ...[
             const SizedBox(height: 4),
             Text(
-              '${inputWeight.toStringAsFixed(1)}kg × $inputReps회 기준',
+              '최근 5주 최고 추정',
               style: TextStyle(
                 fontSize: 12,
                 color: cs.onSurfaceVariant,

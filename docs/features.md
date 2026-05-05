@@ -16,7 +16,8 @@
 - [x] 기존 사용자 데이터 마이그레이션 — `exercise_records`/`exercise_templates`/`workout_routines.items_json`/`daily_routine.items_json` 의 한글명 → `exercise_key` 자동 매핑 (M1 Eager, 52개 default 종목)
 - [x] 1RM 코치가 종목별 권위 공식으로 e1RM 계산 (등록 종목 한정, 미등록은 Epley fallback)
 - [x] 1RM 코치 종목 칩 — 공식 등록 종목만 노출 (`topExerciseNamesProvider` + `oneRMFormulaSpecMapProvider` 필터)
-- [~] 사용자 커스텀 종목 입력 차단 (UI 측 변경은 v13으로 이월 — admin-curated 마스터로 충분히 커버)
+- [x] 사용자 커스텀 종목 입력 차단 — `ExercisePickerField` 공용 위젯으로 운동 추가 다이얼로그 + 운동 템플릿 추가 탭 통합. `exercise_definitions` 등록 종목만 선택 가능, 부위는 자동 분류
+- [x] 1RM 코치 빠른 추정 카드 제거 — `currentE1RM` (5주 max) 와 중복이라 정리. `coachInputWeight/Reps/latestWorkSet/selectedExerciseFormula` Provider 도 함께 삭제
 - [~] 모든 화면의 운동명 locale별 표시 (구조 완료, 전 화면 적용은 v13)
 
 
@@ -204,10 +205,10 @@
   - 셀 탭 → `selectedDateProvider` + `/exercise` 라우팅
   - 요약 탭 최상단 배치
 - [x] **1RM 코치** 풀스크린 (`/exercise/coach/one-rm`, `OneRMCoachScreen`)
-  - 종목 칩(최근 90일 볼륨 상위 8) + 메인 카드(Epley e1RM + 5주 추세 스파크라인 + 4주 전 대비 변화량)
-  - 빠른 추정 스테퍼(중량 ±2.5kg / 횟수 ±1) + 입력 신뢰도 배지
+  - 종목 칩(최근 90일 볼륨 상위 8) + 메인 카드(권위 공식/Epley e1RM + 5주 추세 스파크라인 + 4주 전 대비 변화량)
+  - ~~빠른 추정 스테퍼(중량 ±2.5kg / 횟수 ±1) + 입력 신뢰도 배지~~ — v12 정리에서 제거 (5주 max e1RM 과 중복)
   - **1RM 도전 가이드 카드** — 신호등(녹/황/적/회). "현재 능력으로 봤을 때 도전이 적절한 시점인지" 진단(트레이너 처방 X)<br/>   &nbsp;&nbsp;&nbsp;&nbsp;판단 입력: 5주 e1RM 추세 + 최근 7일 work 세트 수 + 최근 7일 RPE 평균 + 최근 14일 failure 세트 수
-  - % of 1RM 환산표 (100~65%, 8행) — 현재 reps 행 강조
+  - % of 1RM 환산표 (100~65%, 8행). e1RM 데이터가 없으면 안내 문구로 대체
   - **AI 코치 노트** (Gemini, 100자 이내, 처방·진단 금지) — `oneRmNote_{exercise}_{level}_{yyyymmdd}` SharedPreferences 캐시
   - 진입점 3곳: 운동 탭 AppBar `bolt` IconButton / `ExerciseGroupCard ⋯` 메뉴 / `ExerciseProgressionSheet` 하단 `1RM 코치 보기` 버튼 / 요약 탭 `RecentPrCard`
   - 데이터 부족(currentE1RM null) 케이스 처리 — 변화량 배지 숨김, 회색 신호등, "데이터 부족" 안내
