@@ -171,6 +171,7 @@ class _NacfsonHealthAppWithSyncState
     try {
       if (!Platform.isIOS) return;
     } catch (_) {
+      // Platform 접근 실패 (테스트/desktop 등) — 홈 위젯 동기화 비활성
       return;
     }
 

@@ -235,6 +235,7 @@ class HealthDataSourceImpl implements HealthDataSource {
     try {
       return Platform.isIOS || Platform.isAndroid;
     } catch (_) {
+      // Platform 접근 실패 (web 등) — 미지원
       return false;
     }
   }

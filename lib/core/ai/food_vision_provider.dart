@@ -37,6 +37,7 @@ class FoodVisionCallCountNotifier extends StateNotifier<Map<String, int>> {
       final decoded = json.decode(raw) as Map<String, dynamic>;
       return decoded.map((k, v) => MapEntry(k, (v as num).toInt()));
     } catch (_) {
+      // 손상된 JSON 캐시 — 비우고 새로 시작
       return {};
     }
   }

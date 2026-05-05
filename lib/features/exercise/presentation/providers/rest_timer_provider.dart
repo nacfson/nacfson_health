@@ -127,8 +127,14 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
     _firedFiveSecondHaptic = false;
 
     // 이전에 활성 타이머가 있었다면 네이티브 위젯/알림을 정리한 뒤 새 위젯을 띄운다.
+    // 빠른 start→stop→start 반복이나 네이티브 응답 지연 시 stale Live Activity
+    // 가 잔존하지 않도록, end() 실패는 무시하고 새 show() 로 진행한다.
     if (state.isActive) {
-      await _notifications.end();
+      try {
+        await _notifications.end();
+      } catch (e) {
+        debugPrint('rest timer 이전 알림 정리 실패: $e');
+      }
     }
 
     final endAt = DateTime.now().add(Duration(seconds: clamped));
@@ -243,8 +249,17 @@ class RestTimerNotifier extends StateNotifier<RestTimerState>
     _ticker?.cancel();
     _ticker = null;
     state = const RestTimerState();
-    await _notifications.cancelPreAlert();
-    await _notifications.end();
+    try {
+      await _notifications.cancelPreAlert();
+    } catch (e) {
+      debugPrint('rest timer pre-alert 취소 실패: $e');
+    }
+    try {
+      await _notifications.end();
+    } catch (e) {
+      // 네이티브 정리 실패해도 state 는 비웠으므로 다음 start() 가 자체 정리.
+      debugPrint('rest timer end 실패: $e');
+    }
   }
 
   void _startTicker() {

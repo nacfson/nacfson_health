@@ -17,6 +17,7 @@ class WeightInputCard extends ConsumerWidget {
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: InkWell(
         onTap: () {
+          final formKey = GlobalKey<WeightFormState>();
           showModalBottomSheet(
             context: context,
             isScrollControlled: true,
@@ -27,7 +28,8 @@ class WeightInputCard extends ConsumerWidget {
             useSafeArea: true,
             builder: (context) => RecordFormSheet(
               title: '체중 수정',
-              child: WeightForm(initialRecord: todayWeight),
+              onConfirmClose: () => _confirmDiscardIfDirty(context, formKey),
+              child: WeightForm(key: formKey, initialRecord: todayWeight),
             ),
           );
         },
@@ -69,5 +71,31 @@ class WeightInputCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<bool> _confirmDiscardIfDirty(
+    BuildContext context,
+    GlobalKey<WeightFormState> formKey,
+  ) async {
+    final state = formKey.currentState;
+    if (state == null || !state.isDirty) return true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('작성 중인 내용이 사라집니다'),
+        content: const Text('닫을까요?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('계속 작성'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 }

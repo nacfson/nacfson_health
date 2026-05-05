@@ -32,6 +32,7 @@ class ActivitySummaryCard extends ConsumerWidget {
         return const SizedBox.shrink();
       }
     } catch (_) {
+      // Platform 접근 실패 (web/desktop) — 카드 비표시
       return const SizedBox.shrink();
     }
 
@@ -159,6 +160,7 @@ class _AmbiguousEmptyBody extends StatelessWidget {
             '다른 피트니스 앱(삼성 헬스, Google Fit 등)이 활동 데이터를 기록하고 있는지 확인해보세요.';
       }
     } catch (_) {
+      // Platform 분기 실패 — 일반 안내로 fallback
       settingsHint = '권한 또는 데이터 기록 상태를 확인해보세요.';
     }
 

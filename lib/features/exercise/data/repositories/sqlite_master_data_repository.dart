@@ -12,7 +12,9 @@ import '../../domain/repositories/master_data_repository.dart';
 /// `MasterDataRepository` 구현. SQLite + Supabase + SharedPreferences TTL.
 class SqliteMasterDataRepository implements MasterDataRepository {
   static const _ttlMs = 24 * 60 * 60 * 1000; // 24h
+  static const _attemptThrottleMs = 5 * 60 * 1000; // 5분
   static const _lastFetchedKey = 'master_data_last_fetched_at';
+  static const _lastAttemptKey = 'master_data_last_fetch_attempt_at';
 
   final DatabaseHelper _dbHelper;
   SqliteMasterDataRepository({DatabaseHelper? dbHelper})
@@ -28,6 +30,16 @@ class SqliteMasterDataRepository implements MasterDataRepository {
     if (!forceRefresh && lastMs != null && (now - lastMs) < _ttlMs) {
       return; // TTL within 24h
     }
+
+    // 오프라인 등으로 fetch 가 실패했을 때 5분 내 재시도 차단.
+    // 첫 설치 + 오프라인 상태에서 화면 진입마다 무한 네트워크 호출하는 비용을 막는다.
+    if (!forceRefresh) {
+      final lastAttemptMs = prefs.getInt(_lastAttemptKey);
+      if (lastAttemptMs != null && (now - lastAttemptMs) < _attemptThrottleMs) {
+        return;
+      }
+    }
+    await prefs.setInt(_lastAttemptKey, now);
 
     try {
       final results = await Future.wait<List<dynamic>>([

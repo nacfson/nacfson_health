@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/ai/food_vision_provider.dart';
 import '../../../../core/ai/image_processor.dart';
+import '../../../../shared/util/snackbar.dart';
 import '../../domain/entities/food_analysis_result.dart';
 import 'analysis_result_sheet.dart';
 
@@ -155,13 +156,7 @@ class _PhotoAnalysisCardState extends ConsumerState<PhotoAnalysisCard> {
 
   void _showSnackBar(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showAppSnackBar(context, message);
   }
 
   Future<void> _showSourcePicker() async {

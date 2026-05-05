@@ -103,33 +103,38 @@ class _ExerciseChipsState extends ConsumerState<ExerciseChips> {
               final isSelected = name == selected;
               return KeyedSubtree(
                 key: key,
-                child: GestureDetector(
-                  onTap: () => ref
-                      .read(selectedCoachExerciseProvider.notifier)
-                      .state = name,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? cs.inverseSurface : cs.surface,
-                      borderRadius: BorderRadius.circular(100),
-                      border: Border.all(
-                        color: isSelected
-                            ? Colors.transparent
-                            : cs.outlineVariant,
-                        width: 1,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                child: Semantics(
+                  button: true,
+                  selected: isSelected,
+                  label: name,
+                  child: GestureDetector(
+                    onTap: () => ref
+                        .read(selectedCoachExerciseProvider.notifier)
+                        .state = name,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? cs.inverseSurface : cs.surface,
+                        borderRadius: BorderRadius.circular(100),
+                        border: Border.all(
                           color: isSelected
-                              ? cs.onInverseSurface
-                              : cs.onSurface,
+                              ? Colors.transparent
+                              : cs.outlineVariant,
+                          width: 1,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isSelected
+                                ? cs.onInverseSurface
+                                : cs.onSurface,
+                          ),
                         ),
                       ),
                     ),

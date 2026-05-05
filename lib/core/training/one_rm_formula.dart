@@ -42,6 +42,7 @@ sealed class OneRMFormulaSpec {
           return null;
       }
     } catch (_) {
+      // coefficients 파싱 실패 → spec 미적용, 호출자가 Epley fallback
       return null;
     }
   }
