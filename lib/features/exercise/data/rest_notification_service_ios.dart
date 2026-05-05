@@ -47,7 +47,6 @@ class RestNotificationServiceIOS implements RestNotificationService {
 
   String? _activityId;
   bool _notificationsInitialized = false;
-  bool _permissionRequested = false;
   // ignore: unused_field
   RestNotificationActionHandler? _actionHandler;
 
@@ -81,8 +80,10 @@ class RestNotificationServiceIOS implements RestNotificationService {
     final ios = _notifications.resolvePlatformSpecificImplementation<
         IOSFlutterLocalNotificationsPlugin>();
     if (ios == null) return false;
-    if (_permissionRequested) return true;
-    _permissionRequested = true;
+    final status = await ios.checkPermissions();
+    if (status?.isAlertEnabled == true && status?.isSoundEnabled == true) {
+      return true;
+    }
     final granted = await ios.requestPermissions(alert: true, sound: true);
     return granted ?? false;
   }
@@ -223,14 +224,14 @@ class RestNotificationServiceIOS implements RestNotificationService {
         presentAlert: true,
         presentBanner: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.timeSensitive,
+        interruptionLevel: InterruptionLevel.active,
       ),
     );
 
     final now = DateTime.now();
     final preAt = endAt.subtract(const Duration(seconds: 5));
-    if (preAt.isAfter(now)) {
-      try {
+    try {
+      if (preAt.isAfter(now.add(const Duration(milliseconds: 500)))) {
         await _notifications.zonedSchedule(
           _preAlertId,
           '휴식 5초 남음',
@@ -241,9 +242,18 @@ class RestNotificationServiceIOS implements RestNotificationService {
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
-      } catch (e, s) {
-        debugPrint('[LiveActivity] schedulePreAlert 5s FAILED: $e\n$s');
+      } else if (endAt.isAfter(now)) {
+        // preAt 이 이미 지났거나 0.5s 이내. zonedSchedule race 누락 방지를 위해
+        // 즉시 발송하여 5초 안내를 보장.
+        await _notifications.show(
+          _preAlertId,
+          '휴식 5초 남음',
+          '곧 다음 세트를 시작합니다',
+          details,
+        );
       }
+    } catch (e, s) {
+      debugPrint('[LiveActivity] schedulePreAlert FAILED: $e\n$s');
     }
   }
 
