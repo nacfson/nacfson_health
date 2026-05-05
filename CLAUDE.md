@@ -64,6 +64,7 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 | `docs/changelog-v7.md` | v7 변경 로그 (Google Sheets → Supabase 전환) |
 | `docs/changelog-v11.md` | v11 변경 로그 (`rest_seconds_override` + 부위별 휴식 + 템플릿 카드 UX 개편 + Supabase 마이그레이션 사고 회고) |
 | `docs/changelog-v12.md` | v12 변경 로그 (다국어 ko/en + 종목별 권위 1RM 공식 + admin-curated 운동 마스터 데이터 + TTL 24h 캐시) |
+| `docs/changelog-v12-1.md` | v12-1 변경 로그 (보안 하드닝 — dart-define 전환 + iOS OAuth ID + iOS 휴식 알림 안정화 + ExercisePickerField 통합 + 1RM 빠른 추정 카드 제거) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 
 ## Git 환경 설정
