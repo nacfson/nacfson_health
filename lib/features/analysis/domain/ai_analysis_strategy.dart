@@ -1,5 +1,6 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+import '../../../core/config/app_env.dart';
 
 abstract class AiAnalysisStrategy {
   Future<String> analyze(String promptData);
@@ -12,7 +13,7 @@ class GeminiAnalysisStrategy implements AiAnalysisStrategy {
   GeminiAnalysisStrategy()
       : _model = GenerativeModel(
           model: 'gemini-1.5-flash',
-          apiKey: dotenv.env['GEMINI_API_KEY'] ?? '',
+          apiKey: AppEnv.geminiApiKey,
         );
 
   @override

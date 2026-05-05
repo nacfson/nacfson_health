@@ -36,7 +36,9 @@ class _DietScreenState extends ConsumerState<DietScreen> {
   void dispose() {
     try {
       ref.read(fabActionProvider.notifier).state = null;
-    } catch (_) {}
+    } catch (_) {
+      // dispose 시점에 ref 가 이미 무효화된 경우 무시 (정리 작업 실패는 영향 없음)
+    }
     super.dispose();
   }
 

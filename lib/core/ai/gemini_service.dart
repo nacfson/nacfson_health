@@ -2,8 +2,9 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+
+import '../config/app_env.dart';
 
 import '../../features/activity/domain/entities/daily_activity.dart';
 import '../../features/diet/domain/entities/food_analysis_result.dart';
@@ -26,7 +27,7 @@ class GeminiService {
   late final GenerativeModel _chatModel;
 
   GeminiService() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final apiKey = AppEnv.geminiApiKey;
     _model = GenerativeModel(
       model: 'gemini-2.5-flash-lite',
       apiKey: apiKey,
@@ -60,7 +61,7 @@ class GeminiService {
     required List<WeightRecord> recentWeights,
     DailyActivity? activity,
   }) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final apiKey = AppEnv.geminiApiKey;
     if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
       return 'Gemini API 키를 설정 화면(.env)에 입력해주세요.';
     }
@@ -172,7 +173,7 @@ class GeminiService {
   /// 최소화합니다. 응답이 JSON이 아니거나 스키마가 어긋나면
   /// [FormatException]을 던집니다.
   Future<FoodAnalysisResult> analyzeFoodImage(Uint8List jpegBytes) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final apiKey = AppEnv.geminiApiKey;
     if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
       throw StateError('GEMINI_API_KEY_MISSING');
     }
@@ -245,7 +246,7 @@ items가 비어 있어도 됩니다(단일 음식 또는 isFood=false인 경우)
     required List<ChatMessage> history,
     required HealthContext healthContext,
   }) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final apiKey = AppEnv.geminiApiKey;
     if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
       throw StateError('GEMINI_API_KEY_MISSING');
     }
@@ -326,10 +327,8 @@ ${ctx.toPromptContext()}
     required double currentE1RM,
     required double? deltaKg,
     required ReadinessLevel readiness,
-    required double lastSetWeight,
-    required int lastSetReps,
   }) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+    final apiKey = AppEnv.geminiApiKey;
     if (apiKey.isEmpty || apiKey == 'your_gemini_api_key_here') {
       return 'Gemini API 키를 설정해 주세요.';
     }
@@ -356,7 +355,6 @@ ${ctx.toPromptContext()}
 【데이터】
 - 종목: $exerciseName
 - 추정 1RM: ${currentE1RM.toStringAsFixed(0)}kg (4주 전 대비 $delta)
-- 최근 세트: ${lastSetWeight.toStringAsFixed(1)}kg × $lastSetReps회
 - 도전 신호등: $levelLabel
 
 위 데이터를 기반으로 한국어 1~2문장으로만 출력하세요.''';

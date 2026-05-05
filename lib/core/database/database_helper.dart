@@ -328,13 +328,17 @@ class DatabaseHelper {
           ALTER TABLE user_profiles
           ADD COLUMN activity_level TEXT NOT NULL DEFAULT 'moderate'
         ''');
-      } catch (_) {}
+      } catch (_) {
+        // 이미 존재
+      }
       try {
         await db.execute('''
           ALTER TABLE user_profiles
           ADD COLUMN training_intensity TEXT NOT NULL DEFAULT 'moderate'
         ''');
-      } catch (_) {}
+      } catch (_) {
+        // 이미 존재
+      }
       // age_group → age 값 백필 (중앙값). age 가 여전히 기본값 30 인 레코드에만 덮어쓴다.
       const midpoints = {'20s': 25, '30s': 35, '40s': 45, '50s+': 55};
       for (final entry in midpoints.entries) {

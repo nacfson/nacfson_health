@@ -3,13 +3,13 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/ai/food_vision_provider.dart';
+import 'core/config/app_env.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
 import 'core/widget/home_widget_service.dart';
@@ -31,11 +31,9 @@ import 'features/settings/presentation/providers/food_template_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: '.env');
-
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+    url: AppEnv.supabaseUrl,
+    anonKey: AppEnv.supabaseAnonKey,
   );
 
   final prefs = await SharedPreferences.getInstance();
@@ -203,18 +201,18 @@ class _NacfsonHealthAppWithSyncState
     // 1. 영양: 합계 또는 목표 둘 중 하나라도 변하면 갱신
     ref.listenManual(
       todayDietSummaryProvider,
-      (_, __) => pushNutrition(),
+      (_, _) => pushNutrition(),
       fireImmediately: true,
     );
     ref.listenManual(
       nutritionTargetsProvider,
-      (_, __) => pushNutrition(),
+      (_, _) => pushNutrition(),
     );
 
     // 2. 운동 잔디: 본세트 볼륨 맵 변경 시 갱신
     ref.listenManual(
       heatmapDataProvider,
-      (_, __) => pushHeatmap(),
+      (_, _) => pushHeatmap(),
       fireImmediately: true,
     );
   }

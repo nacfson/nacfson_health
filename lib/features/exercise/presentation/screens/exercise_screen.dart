@@ -41,7 +41,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
   void dispose() {
     try {
       ref.read(fabActionProvider.notifier).state = null;
-    } catch (_) {}
+    } catch (_) {
+      // dispose 시점에 ref 가 이미 무효화된 경우 무시 (정리 작업 실패는 영향 없음)
+    }
     super.dispose();
   }
 
@@ -70,7 +72,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     } finally {
       try {
         ref.read(activeSheetProvider.notifier).state = null;
-      } catch (_) {}
+      } catch (_) {
+        // 위젯이 이미 dispose 되어 ref 무효 — 시트 상태 정리 실패는 다음 진입 시 자연 복구됨
+      }
     }
   }
 
@@ -174,7 +178,9 @@ class _ExerciseScreenState extends ConsumerState<ExerciseScreen> {
     } finally {
       try {
         ref.read(activeSheetProvider.notifier).state = null;
-      } catch (_) {}
+      } catch (_) {
+        // 위젯이 이미 dispose 되어 ref 무효 — 시트 상태 정리 실패는 다음 진입 시 자연 복구됨
+      }
     }
   }
 

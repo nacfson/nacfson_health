@@ -312,24 +312,30 @@ class _MyFormState extends ConsumerState<MyForm> {
 
 **증상**: 요약 화면에서 "AI 분석 중 오류가 발생했습니다." 표시
 
+**환경 변수 주입 방식 (v12.1+)**: `flutter_dotenv` 의 asset 번들 방식은 IPA/APK 디컴파일 시 키가 평문 노출되는 위험이 있어 폐기. 모든 키(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY`)는 빌드 시점 `--dart-define-from-file=.env` 로 주입한다. 단일 진입점은 `lib/core/config/app_env.dart`.
+
 **체크리스트**:
 
 ```bash
 # 1. .env 파일 존재 여부 확인
-cat "/Users/hyungjuyu/Projects/Flutter/nacfson_health copy/.env"
-# → GEMINI_API_KEY=... 형태여야 함
+cat .env
+# → SUPABASE_URL=... / SUPABASE_ANON_KEY=... / GEMINI_API_KEY=... 형태여야 함
 
-# 2. pubspec.yaml assets에 .env 등록 여부 확인
-grep -A5 "assets:" pubspec.yaml
+# 2. 빌드 명령에 --dart-define-from-file=.env 가 포함됐는지 확인
+grep DEFINES Makefile
 
-# 3. 앱 콘솔에서 에러 로그 확인
-# flutter run -d macos 실행 후 터미널에서 "[GeminiService] Error:" 라인 확인
+# 3. flutter run / build 시 동일 플래그 전달
+flutter run --debug -d iphone --dart-define-from-file=.env
+
+# 4. 앱 콘솔에서 에러 로그 확인
+#    flutter run 실행 후 터미널에서 "[GeminiService] ${e.runtimeType}:" 라인 확인
 ```
 
-**API 키 갱신**: https://aistudio.google.com/app/apikey 에서 키 재발급 후 `.env` 교체
+**API 키 갱신**: https://aistudio.google.com/app/apikey 에서 키 재발급 후 `.env` 교체. asset 번들이 아니므로 재빌드 필요.
 
 **규칙**:
-- `.env`는 `.gitignore`에 등록 (커밋 금지)
+- `.env`는 `.gitignore`에 등록 (커밋 금지) **+ pubspec.yaml asset 으로도 등록 금지**
+- 환경 변수는 `AppEnv.supabaseUrl` / `AppEnv.geminiApiKey` 등 `AppEnv` 진입점으로만 접근. `dotenv.env[...]` 직접 호출 금지 (의존성 자체를 제거함)
 - `GeminiService` catch 블록은 `debugPrint('[GeminiService] ${e.runtimeType}: $e')` 로 runtimeType 함께 기록하고 **반드시 `rethrow`** 하여 `AsyncValue.error` 로 전파할 것. 문자열 fallback 반환은 UI 에러 분기를 죽이고 원인 진단을 불가능하게 만든다.
 - API 키 오류와 네트워크 오류를 구분하려면 `e.toString()`에서 `"API_KEY"` 또는 `"403"` 확인
 
@@ -769,6 +775,36 @@ log stream --predicate 'eventMessage contains "[LiveActivity]"'
 - 권한 거부 시: `RestNotificationServiceAndroid.show()`가 null 반환, 인앱 미니바는 정상 동작.
 - Android 8.0 미만: 채널 미지원이라 importance 무시. minSdk 21 이상이면 안전.
 - 앱 강제 종료 시: 알림도 함께 사라짐 (Foreground Service 미사용 — 백로그 참조).
+
+---
+
+## 15-1. 휴식 타이머 — iOS pre-alert 알림 (백그라운드/잠금화면)
+
+휴식 종료 5초 전 로컬 알림이 백그라운드/잠금화면에서 발송되려면 **timeSensitive entitlement + UNUserNotificationCenter delegate** 두 가지가 필수다. 둘 중 하나라도 빠지면 iOS 가 알림을 강등/차단한다.
+
+**필수 설정**:
+1. `ios/Runner/Runner.entitlements` 에 `com.apple.developer.usernotifications.time-sensitive` = `true`
+   - Apple 사전 승인 불필요 (critical-alert 와 다름). Personal team 도 사용 가능.
+   - 누락 시 `interruptionLevel: timeSensitive` 가 silently `active` 로 강등 → Focus 모드/잠금화면 차단.
+2. `ios/Runner/AppDelegate.swift` 에 `UNUserNotificationCenter.current().delegate = self` + `willPresent` override 로 `[.banner, .sound, .list]` 반환.
+   - 누락 시 foreground 진입 케이스에서 알림 미표시.
+
+**검증**:
+| 항목 | 확인 방법 |
+|------|-----------|
+| entitlement 빌드 산출물 포함 | `codesign -d --entitlements - <앱>.app` 출력에 `time-sensitive` 키 존재 |
+| 시스템 토글 노출 | `Settings → Nacfson Health → Notifications` 에 **Time Sensitive Notifications** 토글 노출 |
+| 백그라운드 발송 | 60초 휴식 시작 → 홈 버튼 → 55초 후 banner+sound |
+| 잠금화면 발송 | 60초 휴식 시작 → 측면 버튼으로 화면 끔 → 55초 후 잠금화면 banner+sound |
+| Focus 모드 통과 | Focus(집중모드) ON → 잠금 후 동일 시나리오 → 통과해야 정상 |
+| 권한 거부 → 재허가 | 시스템 설정에서 알림 OFF → 휴식 시작(미발송) → 시스템 설정에서 ON → 다음 휴식부터 정상 |
+
+**자주 발생하는 함정**:
+- **시뮬레이터는 백그라운드/잠금 알림이 신뢰 불가** — 반드시 실기기로 검증.
+- **무음 모드(Silent switch / 시스템 무음 ON)** 에서는 사운드 없음. critical-alert 가 필요한데 Apple 별도 심사라서 헬스/피트니스 카테고리 승인 어려움 → 추가 안 함. 사용자 안내로 우회.
+- **에어팟 라우팅** 은 iOS 가 자동 처리 (시스템 알림 사운드는 active audio route 따라감). 별도 코드 불필요.
+- **`_permissionRequested` 플래그 캐시 안티패턴**: 한 번 요청했다는 사실과 권한 부여 사실은 별개. 매 호출마다 `IOSFlutterLocalNotificationsPlugin.checkPermissions()` 로 실제 상태 조회할 것.
+- **`preAt.isAfter(now)` 가드 race**: 휴식이 매우 짧거나 MethodChannel 지연으로 `preAt` 이 즉시 과거가 되면 `zonedSchedule` 이 스킵됨. 0.5s 미만이면 `_notifications.show()` 즉시 발송으로 fallback.
 
 ---
 

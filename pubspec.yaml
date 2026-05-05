@@ -28,9 +28,6 @@ dependencies:
   # Supabase
   supabase_flutter: ^2.8.4
 
-  # 환경 변수
-  flutter_dotenv: ^5.2.1
-
   # URL 런처 (OAuth 브라우저 오픈)
   url_launcher: ^6.3.1
 
@@ -84,8 +81,6 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
-  assets:
-    - .env
   fonts:
     - family: Pretendard
       fonts:
