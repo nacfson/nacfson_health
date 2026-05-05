@@ -38,7 +38,7 @@ class ActivitySummaryCard extends ConsumerWidget {
     final authAsync = ref.watch(activityAuthStatusProvider);
     return authAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (status) {
         if (status == ActivityAuthStatus.unsupported) {
           return const SizedBox.shrink();

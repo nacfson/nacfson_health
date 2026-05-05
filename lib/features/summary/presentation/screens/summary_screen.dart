@@ -666,7 +666,7 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
             kInsightRefreshDebounceSeconds;
 
     int remainingSeconds = 0;
-    if (!canRefresh && lastRefresh != null) {
+    if (!canRefresh) {
       remainingSeconds = kInsightRefreshDebounceSeconds -
           DateTime.now().difference(lastRefresh).inSeconds;
       _scheduleTickerIfNeeded();

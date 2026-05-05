@@ -349,7 +349,7 @@ class _ProgressionChart extends ConsumerWidget {
               barWidth: 2.5,
               dotData: FlDotData(
                 show: true,
-                getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+                getDotPainter: (spot, _, _, _) => FlDotCirclePainter(
                   radius: 3,
                   color: AppTheme.colorMint,
                   strokeWidth: 1.5,

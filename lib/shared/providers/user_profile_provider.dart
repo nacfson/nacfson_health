@@ -8,7 +8,7 @@ const _kOnboardingKey = 'onboarding_done';
 
 class HeightNotifier extends StateNotifier<double> {
   /// [initial]: main.dart에서 미리 로드한 값 (없으면 1.70)
-  HeightNotifier([double initial = 1.70]) : super(initial);
+  HeightNotifier([super.initial = 1.70]);
 
   Future<void> setHeight(double heightM) async {
     state = heightM;
@@ -25,7 +25,7 @@ final heightMProvider = StateNotifierProvider<HeightNotifier, double>(
 
 class OnboardingNotifier extends StateNotifier<bool> {
   /// [initial]: main.dart에서 미리 로드한 값 (없으면 false)
-  OnboardingNotifier([bool initial = false]) : super(initial);
+  OnboardingNotifier([super.initial = false]);
 
   Future<void> complete() async {
     state = true;
