@@ -78,6 +78,19 @@
 	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
+		<!-- 홈스크린 위젯 탭 → 앱 진입용 자체 URL 스킴
+		     ios/NacfsonHealthWidget/*.swift 의 .widgetURL(...) 와 일치해야 한다.
+		     예: nacfsonhealth://summary, nacfsonhealth://diet -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.nacfson.nacfsonHealth.widget</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nacfsonhealth</string>
+			</array>
+		</dict>
 		<!-- Supabase 인증 콜백용 URL 스킴 -->
 		<dict>
 			<key>CFBundleTypeRole</key>
