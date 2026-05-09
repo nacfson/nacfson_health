@@ -63,7 +63,16 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
       _selectedType = SetType.work;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _weightFocus.requestFocus();
+      if (!mounted) return;
+      _weightFocus.requestFocus();
+      // 카드가 화면 하단 가까이 있을 때 키보드가 올라오면 입력 행이 가려진다.
+      // 부모 CustomScrollView 가 자동으로 입력 행을 화면 중앙으로 끌어오도록 보장.
+      Scrollable.ensureVisible(
+        context,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -175,72 +184,93 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    // 2행 레이아웃 — 한 행에 [세트타입][- kg +][- 회 +][- RPE +][✓][✗] 을 모두 욱여넣으면
+    // iPhone 13 mini(375pt) 같은 좁은 화면에서 카드 가용 폭(~335)을 넘어 TextField 가
+    // 0폭으로 압축되며 ± 버튼들만 인접해 보이는 시각 버그가 발생한다 (v12-3 회귀).
+    // 첫 줄: [세트타입]                    [✓ 저장][✗ 닫기]
+    // 둘째 줄: [- kg +] [- 회 +] [- RPE +]
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 10),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SetTypeSelector(
-            value: _selectedType,
-            onChanged: (t) => setState(() => _selectedType = t),
+          Row(
+            children: [
+              _SetTypeSelector(
+                value: _selectedType,
+                onChanged: (t) => setState(() => _selectedType = t),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: _isEdit ? '수정 저장' : '세트 저장',
+                iconSize: 22,
+                color: cs.primary,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                visualDensity: VisualDensity.compact,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle),
+                onPressed: _saving ? null : _submit,
+              ),
+              IconButton(
+                tooltip: '닫기',
+                iconSize: 20,
+                color: cs.onSurfaceVariant,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close),
+                onPressed: _saving ? null : widget.onClose,
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: NumericStepperField(
-              controller: _weightCtl,
-              focusNode: _weightFocus,
-              label: 'kg',
-              step: 0.5,
-              min: 0,
-              onSubmitted: (_) => _repsFocus.requestFocus(),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: NumericStepperField(
-              controller: _repsCtl,
-              focusNode: _repsFocus,
-              label: '회',
-              integer: true,
-              step: 1.0,
-              min: 0,
-              onSubmitted: (_) => _rpeFocus.requestFocus(),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: NumericStepperField(
-              controller: _rpeCtl,
-              focusNode: _rpeFocus,
-              label: 'RPE',
-              step: 0.5,
-              min: 1,
-              max: 10,
-              onSubmitted: (_) => _submit(),
-              textInputAction: TextInputAction.done,
-            ),
-          ),
-          IconButton(
-            tooltip: _isEdit ? '수정 저장' : '세트 저장',
-            iconSize: 22,
-            color: cs.primary,
-            icon: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check_circle),
-            onPressed: _saving ? null : _submit,
-          ),
-          IconButton(
-            tooltip: '닫기',
-            iconSize: 20,
-            color: cs.onSurfaceVariant,
-            icon: const Icon(Icons.close),
-            onPressed: _saving ? null : widget.onClose,
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: NumericStepperField(
+                  controller: _weightCtl,
+                  focusNode: _weightFocus,
+                  label: 'kg',
+                  step: 0.5,
+                  min: 0,
+                  onSubmitted: (_) => _repsFocus.requestFocus(),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: NumericStepperField(
+                  controller: _repsCtl,
+                  focusNode: _repsFocus,
+                  label: '회',
+                  integer: true,
+                  step: 1.0,
+                  min: 0,
+                  onSubmitted: (_) => _rpeFocus.requestFocus(),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: NumericStepperField(
+                  controller: _rpeCtl,
+                  focusNode: _rpeFocus,
+                  label: 'RPE',
+                  step: 0.5,
+                  min: 1,
+                  max: 10,
+                  onSubmitted: (_) => _submit(),
+                  textInputAction: TextInputAction.done,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -259,12 +289,13 @@ class _SetTypeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      constraints: const BoxConstraints(minWidth: 52),
+      // 한 글자 라벨(웜/본/드/실) + 화살표 → 44 면 충분.
+      constraints: const BoxConstraints(minWidth: 44),
       decoration: BoxDecoration(
         border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<SetType>(
           value: value,

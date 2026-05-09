@@ -176,7 +176,9 @@ class _StepperButton extends StatelessWidget {
         onPressed: onTap,
         icon: Icon(icon, size: 18),
         padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 44),
+        // 인라인 세트 입력 행이 한 줄에 ± 버튼 6개 + 타입 선택 + 저장/닫기까지
+        // 모두 들어가야 하므로 최소 폭을 32 로 낮춤. 터치 타겟 44 는 세로축으로 유지.
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 44),
         color: enabled ? cs.primary : cs.outlineVariant,
         visualDensity: VisualDensity.compact,
       ),
