@@ -193,9 +193,16 @@ class _TemplatePickerSheetState<T>
                       TextButton.icon(
                         icon: const Icon(Icons.edit_outlined, size: 18),
                         label: Text(widget.directInputLabel),
-                        onPressed: () {
+                        onPressed: () async {
+                          // BottomSheet exit 애니메이션이 끝난 다음에 후속 다이얼로그를 push.
+                          // 동기 호출 시 시트 슬라이드다운 + 다이얼로그 페이드인 + 키보드 슬라이드업이
+                          // 동시 재생되어 UI 가 겹쳐 보임 (race).
+                          final action = widget.onDirectInput;
                           Navigator.pop(context);
-                          widget.onDirectInput!();
+                          if (action != null) {
+                            await Future.delayed(const Duration(milliseconds: 220));
+                            action();
+                          }
                         },
                       ),
                     IconButton(

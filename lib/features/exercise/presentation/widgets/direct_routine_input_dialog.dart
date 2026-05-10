@@ -48,7 +48,10 @@ class _DirectRoutineInputDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             ExercisePickerField(
-              autofocus: true,
+              // 다이얼로그 enter 애니메이션과 키보드 enter 가 동시에 재생되면
+              // 칩 리스트/입력창이 겹쳐 보이므로 자동 포커스 비활성화.
+              // 사용자가 검색창을 탭할 때만 키보드 등장.
+              autofocus: false,
               initialQuery: initialQuery,
               onPicked: (result) {
                 Navigator.pop(

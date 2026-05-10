@@ -13,7 +13,8 @@ import 'package:flutter/services.dart';
 class NumericStepperField extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
-  final String label;
+  // 외부에서 별도 Text 로 라벨을 붙이는 케이스(inline_set_input)는 null 로 비활성.
+  final String? label;
   final String? suffix;
   final double step;
   final double? min;
@@ -21,11 +22,12 @@ class NumericStepperField extends StatefulWidget {
   final bool integer;
   final TextInputAction textInputAction;
   final ValueChanged<String>? onSubmitted;
+  final bool showSteppers;
 
   const NumericStepperField({
     super.key,
     required this.controller,
-    required this.label,
+    this.label,
     this.focusNode,
     this.suffix,
     this.step = 1.0,
@@ -34,6 +36,7 @@ class NumericStepperField extends StatefulWidget {
     this.integer = false,
     this.textInputAction = TextInputAction.next,
     this.onSubmitted,
+    this.showSteppers = true,
   });
 
   @override
@@ -97,6 +100,55 @@ class _NumericStepperFieldState extends State<NumericStepperField> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final field = TextField(
+      controller: widget.controller,
+      focusNode: widget.focusNode,
+      keyboardType: TextInputType.numberWithOptions(decimal: !widget.integer),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(
+          widget.integer ? RegExp(r'[0-9]') : RegExp(r'[0-9.]'),
+        ),
+      ],
+      textAlign: TextAlign.center,
+      textAlignVertical: TextAlignVertical.center,
+      textInputAction: widget.textInputAction,
+      onSubmitted: widget.onSubmitted,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(
+        isDense: true,
+        labelText: widget.label,
+        // 라벨이 있을 때만 floating 항상 표시. 외부 Text 라벨을 쓰는 케이스는 null.
+        floatingLabelBehavior: widget.label == null
+            ? FloatingLabelBehavior.never
+            : FloatingLabelBehavior.always,
+        // suffixText 는 Flutter 의 textAlign:center + suffixText 정렬 버그
+        // (flutter#23202 / #78308) 로 좁은 필드에서 cursor·텍스트 가시성이 깨진다.
+        // Widget 인 `suffix` 슬롯을 쓰면 InputDecorator 가 별도 베이스라인으로
+        // 렌더해 입력 영역을 침범하지 않는다.
+        suffix: widget.suffix == null
+            ? null
+            : Text(
+                widget.suffix!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: cs.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: cs.outlineVariant),
+        ),
+      ),
+    );
+    if (!widget.showSteppers) {
+      return field;
+    }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -107,38 +159,7 @@ class _NumericStepperFieldState extends State<NumericStepperField> {
               _canDecrement ? () => _startHold(-widget.step) : null,
           onLongPressEnd: _stopHold,
         ),
-        Expanded(
-          child: TextField(
-            controller: widget.controller,
-            focusNode: widget.focusNode,
-            keyboardType:
-                TextInputType.numberWithOptions(decimal: !widget.integer),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(
-                widget.integer ? RegExp(r'[0-9]') : RegExp(r'[0-9.]'),
-              ),
-            ],
-            textAlign: TextAlign.center,
-            textInputAction: widget.textInputAction,
-            onSubmitted: widget.onSubmitted,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              isDense: true,
-              labelText: widget.label,
-              suffixText: widget.suffix,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: cs.outlineVariant),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: cs.outlineVariant),
-              ),
-            ),
-          ),
-        ),
+        Expanded(child: field),
         _StepperButton(
           icon: Icons.add,
           onTap: _canIncrement ? () => _adjust(widget.step) : null,
@@ -176,9 +197,9 @@ class _StepperButton extends StatelessWidget {
         onPressed: onTap,
         icon: Icon(icon, size: 18),
         padding: EdgeInsets.zero,
-        // 인라인 세트 입력 행이 한 줄에 ± 버튼 6개 + 타입 선택 + 저장/닫기까지
-        // 모두 들어가야 하므로 최소 폭을 32 로 낮춤. 터치 타겟 44 는 세로축으로 유지.
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 44),
+        // 좁은 화면에서 TextField 가용 폭을 확보하기 위해 ± 폭을 28 로 타이트하게.
+        // 터치 타겟 44 는 세로축으로 유지(높이는 그대로).
+        constraints: const BoxConstraints(minWidth: 28, minHeight: 44),
         color: enabled ? cs.primary : cs.outlineVariant,
         visualDensity: VisualDensity.compact,
       ),

@@ -1,11 +1,18 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-05-05 (v12-3)
+> **마지막 업데이트**: 2026-05-10 (v12-5)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
+
+### v12-5 (2026-05) — 칼로리 자동 계산 (Atwater)
+- [x] `lib/core/nutrition/atwater_calculator.dart` 신규 — `kcalFromMacros(carbs, protein, fat)` 순수 함수 (Atwater 4/4/9). 단위 테스트 6건
+- [x] `DietForm` 칼로리 `TextFormField` 제거 → 매크로(탄·단·지) 입력 아래 라이브 미리보기 (`자동 계산: NNN kcal`). 저장 시 `kcalFromMacros()` 로 산출하여 `diet_records.total_calories` 컬럼에 기록
+- [x] `FoodTemplateCard` 추가 탭 칼로리 `TextFormField` 제거 → 매크로 한 줄 + kcal 미리보기 한 줄로 재구성. `_addTemplate()` 에서 자동 산출하여 `food_templates.calories` 컬럼에 기록
+- [x] AI 사진 분석 / 음식 템플릿 picker / 최근 식사 칩 — 매크로만 컨트롤러에 채우고 kcal 은 항상 매크로에서 Atwater 로 재계산 (출처별 kcal 무시, 일관 규칙 우선)
+- [x] DB 스키마 변경 없음 — 컬럼은 유지하여 과거 데이터·sync 호환 보존
 
 ### v12-3 (2026-05) — UI/UX HIGH 7건 (다크 모드/입력 흐름/실수 복구)
 - [x] 다크 모드 색상 하드코딩 정리 — `app_theme.dart` 매크로 토큰 (`macroCarbsFg`/`macroProteinFg`/`macroFatFg`) 신설 + 7개 위젯의 `Colors.white/orange/blue/yellow/amber` → `AppTheme` 헬퍼 (`weight_chart_card` 툴팁, `calorie_trend_chart` 아이콘, `analysis_result_sheet` 신뢰도 배너, `spreadsheet_status_card` 라이트 분기 비대칭 해소, `diet_target_card` 매크로 라벨, `weight_form` 날짜 강조)

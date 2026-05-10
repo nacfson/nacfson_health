@@ -232,42 +232,60 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
+          // 라벨을 필드 바깥 위쪽으로 분리 — Expanded 의 전체 폭을 라벨 영역으로 쓸 수 있어
+          // "강도 (RPE)" 같은 긴 라벨도 잘리지 않고, 폰트도 키워 시각성 강화.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: NumericStepperField(
-                  controller: _weightCtl,
-                  focusNode: _weightFocus,
-                  label: 'kg',
-                  step: 0.5,
-                  min: 0,
-                  onSubmitted: (_) => _repsFocus.requestFocus(),
+                flex: 1,
+                child: _LabeledField(
+                  label: '중량',
+                  child: NumericStepperField(
+                    controller: _weightCtl,
+                    focusNode: _weightFocus,
+                    suffix: 'kg',
+                    step: 0.5,
+                    min: 0,
+                    // 중량은 사용자가 직접 타이핑하는 입력이라 ± 버튼이 거의 미사용.
+                    showSteppers: false,
+                    onSubmitted: (_) => _repsFocus.requestFocus(),
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
-                child: NumericStepperField(
-                  controller: _repsCtl,
-                  focusNode: _repsFocus,
-                  label: '회',
-                  integer: true,
-                  step: 1.0,
-                  min: 0,
-                  onSubmitted: (_) => _rpeFocus.requestFocus(),
+                flex: 2,
+                child: _LabeledField(
+                  label: '횟수',
+                  child: NumericStepperField(
+                    controller: _repsCtl,
+                    focusNode: _repsFocus,
+                    suffix: '회',
+                    integer: true,
+                    step: 1.0,
+                    min: 0,
+                    onSubmitted: (_) => _rpeFocus.requestFocus(),
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
-                child: NumericStepperField(
-                  controller: _rpeCtl,
-                  focusNode: _rpeFocus,
-                  label: 'RPE',
-                  step: 0.5,
-                  min: 1,
-                  max: 10,
-                  onSubmitted: (_) => _submit(),
-                  textInputAction: TextInputAction.done,
+                flex: 2,
+                child: _LabeledField(
+                  // 1-10 척도는 라벨 자체에 명시 → suffix 없이 입력값 가시성 100%.
+                  // ("/10" suffix 가 좁은 필드에서 입력 영역 위에 겹쳐 보여 회귀.)
+                  label: '강도 (RPE 1-10)',
+                  child: NumericStepperField(
+                    controller: _rpeCtl,
+                    focusNode: _rpeFocus,
+                    step: 0.5,
+                    min: 1,
+                    max: 10,
+                    onSubmitted: (_) => _submit(),
+                    textInputAction: TextInputAction.done,
+                  ),
                 ),
               ),
             ],
@@ -278,7 +296,49 @@ class _InlineSetInputState extends ConsumerState<InlineSetInput> {
   }
 }
 
-/// 세트 타입 드롭다운 — 웜업/본세트/드롭세트/실패 4가지를 한 글자로 표시.
+/// 필드 바깥쪽 위에 작은 라벨을 노출하는 래퍼.
+/// `NumericStepperField` 내부 floating label 은 TextField 폭(±버튼 제외)에 맞춰 잘리지만,
+/// 외부 Text 라벨은 Expanded 전체 폭을 사용 가능 → 긴 라벨("강도 (RPE)")도 안 잘림.
+class _LabeledField extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledField({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 4),
+          child: Text(
+            label,
+            // softWrap:false + clip → "강도 (RPE)" 가 폭 부족해도 절대 2줄로 안 떨어짐.
+            softWrap: false,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+              height: 1.2,
+            ),
+          ),
+        ),
+        // SizedBox 로 자식 높이를 강제하면 InputDecorator 의 intrinsic 레이아웃을 짓눌러
+        // hit-test/포커스가 제대로 동작 안 하는 케이스가 있음 (RPE 입력 불가 회귀).
+        // 자연 높이 그대로 두고 부모 Row 의 crossAxisAlignment.end 로 하단 정렬.
+        child,
+      ],
+    );
+  }
+}
+
+/// 세트 타입 드롭다운 — 웜업/본세트/드롭세트/실패 4가지를 풀 텍스트로 표시.
+/// 첫 행은 [SetType ... ✓ ✗] 만 들어가서 가용 폭이 넉넉하므로 한 글자 축약 대신 전체 단어 노출.
 class _SetTypeSelector extends StatelessWidget {
   final SetType value;
   final ValueChanged<SetType> onChanged;
@@ -289,34 +349,34 @@ class _SetTypeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      // 한 글자 라벨(웜/본/드/실) + 화살표 → 44 면 충분.
-      constraints: const BoxConstraints(minWidth: 44),
+      // "드롭세트" 4글자 + 화살표 들어갈 폭.
+      constraints: const BoxConstraints(minWidth: 96),
       decoration: BoxDecoration(
         border: Border.all(color: cs.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<SetType>(
           value: value,
           isDense: true,
-          icon: Icon(Icons.arrow_drop_down, size: 18, color: cs.onSurfaceVariant),
+          icon: Icon(Icons.arrow_drop_down, size: 20, color: cs.onSurfaceVariant),
           items: const [
             DropdownMenuItem(
               value: SetType.warmup,
-              child: Text('웜', style: TextStyle(fontSize: 13)),
+              child: Text('웜업', style: TextStyle(fontSize: 14)),
             ),
             DropdownMenuItem(
               value: SetType.work,
-              child: Text('본', style: TextStyle(fontSize: 13)),
+              child: Text('본세트', style: TextStyle(fontSize: 14)),
             ),
             DropdownMenuItem(
               value: SetType.drop,
-              child: Text('드', style: TextStyle(fontSize: 13)),
+              child: Text('드롭세트', style: TextStyle(fontSize: 14)),
             ),
             DropdownMenuItem(
               value: SetType.failure,
-              child: Text('실', style: TextStyle(fontSize: 13)),
+              child: Text('실패', style: TextStyle(fontSize: 14)),
             ),
           ],
           onChanged: (t) {

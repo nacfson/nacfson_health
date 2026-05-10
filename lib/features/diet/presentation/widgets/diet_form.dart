@@ -1,8 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/nutrition/atwater_calculator.dart';
 import '../../../../features/settings/domain/entities/food_template.dart';
 import '../../../../features/settings/presentation/providers/food_template_provider.dart';
 import '../../../../shared/widgets/template_picker_sheet.dart';
@@ -22,13 +22,12 @@ class DietForm extends ConsumerStatefulWidget {
 
 class DietFormState extends ConsumerState<DietForm> {
   /// 외부 (RecordFormSheet onConfirmClose) 에서 dirty 여부를 조회하기 위한 진입점.
-  /// 신규 추가: 음식명·칼로리·탄단지·메모 중 하나라도 입력 → dirty.
+  /// 신규 추가: 음식명·탄단지·메모 중 하나라도 입력 → dirty.
   /// 수정: 초기 값과 달라졌으면 dirty.
   bool get isDirty {
     final r = widget.initialRecord;
     if (r == null) {
       return _foodNameController.text.trim().isNotEmpty ||
-          _caloriesController.text.trim().isNotEmpty ||
           _carbsController.text.trim().isNotEmpty ||
           _proteinController.text.trim().isNotEmpty ||
           _fatController.text.trim().isNotEmpty ||
@@ -38,7 +37,6 @@ class DietFormState extends ConsumerState<DietForm> {
         v % 1 == 0 ? v.toInt().toString() : v.toString();
     return _mealTypeController.text != r.mealType ||
         _foodNameController.text.trim() != r.foodName ||
-        _caloriesController.text.trim() != r.totalCalories.toString() ||
         _carbsController.text.trim() != fmt(r.carbs) ||
         _proteinController.text.trim() != fmt(r.protein) ||
         _fatController.text.trim() != fmt(r.fat) ||
@@ -50,7 +48,6 @@ class DietFormState extends ConsumerState<DietForm> {
   final _formKey = GlobalKey<FormState>();
   final _mealTypeController = TextEditingController();
   final _foodNameController = TextEditingController();
-  final _caloriesController = TextEditingController();
   final _carbsController = TextEditingController();
   final _proteinController = TextEditingController();
   final _fatController = TextEditingController();
@@ -77,7 +74,6 @@ class DietFormState extends ConsumerState<DietForm> {
     if (r != null) {
       _mealTypeController.text = r.mealType;
       _foodNameController.text = r.foodName;
-      _caloriesController.text = r.totalCalories.toString();
       _carbsController.text = r.carbs % 1 == 0
           ? r.carbs.toInt().toString()
           : r.carbs.toString();
@@ -96,7 +92,6 @@ class DietFormState extends ConsumerState<DietForm> {
   void dispose() {
     _mealTypeController.dispose();
     _foodNameController.dispose();
-    _caloriesController.dispose();
     _carbsController.dispose();
     _proteinController.dispose();
     _fatController.dispose();
@@ -104,14 +99,30 @@ class DietFormState extends ConsumerState<DietForm> {
     super.dispose();
   }
 
+  /// 현재 매크로 컨트롤러 값으로부터 Atwater 계수로 kcal 산출.
+  /// 매크로가 비어 있거나 파싱 실패 시 0 으로 취급.
+  int get _derivedCalories {
+    double parse(TextEditingController c) =>
+        double.tryParse(c.text.trim()) ?? 0;
+    return kcalFromMacros(
+      parse(_carbsController),
+      parse(_proteinController),
+      parse(_fatController),
+    );
+  }
+
   String? _macroValidator(String? v) {
     final raw = v?.trim() ?? '';
     if (raw.isEmpty) return null;
     final n = double.tryParse(raw);
-    if (n == null) return '숫자만 입력 가능합니다 (입력: $raw)';
+    if (n == null || !n.isFinite) return '숫자만 입력 가능합니다 (입력: $raw)';
     if (n < 0) return '음수는 입력할 수 없습니다 (입력: $n)';
     return null;
   }
+
+  static final _macroInputFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+  ];
 
   Future<void> _pickDateTime() async {
     final date = await showDatePicker(
@@ -179,16 +190,20 @@ class DietFormState extends ConsumerState<DietForm> {
     try {
       final foodName = _foodNameController.text.trim();
       final now = DateTime.now();
+      final carbs = double.tryParse(_carbsController.text.trim()) ?? 0;
+      final protein = double.tryParse(_proteinController.text.trim()) ?? 0;
+      final fat = double.tryParse(_fatController.text.trim()) ?? 0;
+      final derivedKcal = kcalFromMacros(carbs, protein, fat);
       if (_isEditMode) {
         final updated = widget.initialRecord!.copyWith(
           updatedAt: now,
           syncStatus: SyncStatus.modified,
           mealType: _mealTypeController.text,
           foodName: foodName,
-          totalCalories: int.parse(_caloriesController.text),
-          carbs: double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text),
-          protein: double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text),
-          fat: double.parse(_fatController.text.isEmpty ? '0' : _fatController.text),
+          totalCalories: derivedKcal,
+          carbs: carbs,
+          protein: protein,
+          fat: fat,
           satisfaction: _satisfaction,
           timestamp: _timestamp,
           memo: _memoController.text.isEmpty ? null : _memoController.text,
@@ -200,10 +215,10 @@ class DietFormState extends ConsumerState<DietForm> {
           updatedAt: now,
           mealType: _mealTypeController.text,
           foodName: foodName,
-          totalCalories: int.parse(_caloriesController.text),
-          carbs: double.parse(_carbsController.text.isEmpty ? '0' : _carbsController.text),
-          protein: double.parse(_proteinController.text.isEmpty ? '0' : _proteinController.text),
-          fat: double.parse(_fatController.text.isEmpty ? '0' : _fatController.text),
+          totalCalories: derivedKcal,
+          carbs: carbs,
+          protein: protein,
+          fat: fat,
           satisfaction: _satisfaction,
           memo: _memoController.text.isEmpty ? null : _memoController.text,
         );
@@ -230,7 +245,6 @@ class DietFormState extends ConsumerState<DietForm> {
       _mealTypeController.text = r.mealType;
       _mealDropdownVersion++;
       _foodNameController.text = r.foodName;
-      _caloriesController.text = r.totalCalories.toString();
       _carbsController.text = fmt(r.carbs);
       _proteinController.text = fmt(r.protein);
       _fatController.text = fmt(r.fat);
@@ -248,7 +262,7 @@ class DietFormState extends ConsumerState<DietForm> {
       _analyzedResult = r;
       _analyzedThumbnail = thumbnail;
       _foodNameController.text = r.foodName;
-      _caloriesController.text = r.calories.toString();
+      // r.calories 는 무시 — kcal 은 매크로에서 Atwater 로 자동 산출.
       _carbsController.text = fmt(r.carbs);
       _proteinController.text = fmt(r.protein);
       _fatController.text = fmt(r.fat);
@@ -262,7 +276,6 @@ class DietFormState extends ConsumerState<DietForm> {
       _analyzedResult = null;
       _analyzedThumbnail = null;
       _foodNameController.clear();
-      _caloriesController.clear();
       _carbsController.clear();
       _proteinController.clear();
       _fatController.clear();
@@ -287,7 +300,7 @@ class DietFormState extends ConsumerState<DietForm> {
       String fmt(double v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
       setState(() {
         _foodNameController.text = picked.name;
-        _caloriesController.text = picked.calories.toString();
+        // picked.calories 는 무시 — kcal 은 매크로에서 Atwater 로 자동 산출.
         _carbsController.text = fmt(picked.carbs);
         _proteinController.text = fmt(picked.protein);
         _fatController.text = fmt(picked.fat);
@@ -337,54 +350,47 @@ class DietFormState extends ConsumerState<DietForm> {
             validator: (v) => v?.isEmpty ?? true ? '필수' : null,
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            controller: _caloriesController,
-            decoration: const InputDecoration(labelText: '칼로리(kcal)'),
-            keyboardType: TextInputType.number,
-            validator: (v) {
-              final raw = v?.trim() ?? '';
-              if (raw.isEmpty) return '칼로리를 입력해주세요';
-              final n = int.tryParse(raw);
-              if (n == null) return '숫자만 입력 가능합니다 (입력: $raw)';
-              if (n < 0) return '음수는 입력할 수 없습니다 (입력: $n)';
-              if (n > 9999) return '0~9999 사이 값을 입력해주세요 (입력: $n)';
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: TextFormField(
                   controller: _carbsController,
-                  decoration: const InputDecoration(labelText: '탄수화물 g (선택)'),
+                  decoration: const InputDecoration(labelText: '탄수화물 g'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: _macroInputFormatters,
                   validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: _proteinController,
-                  decoration: const InputDecoration(labelText: '단백질 g (선택)'),
+                  decoration: const InputDecoration(labelText: '단백질 g'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: _macroInputFormatters,
                   validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: _fatController,
-                  decoration: const InputDecoration(labelText: '지방 g (선택)'),
+                  decoration: const InputDecoration(labelText: '지방 g'),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: _macroInputFormatters,
                   validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          _KcalPreview(kcal: _derivedCalories),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -441,6 +447,57 @@ class DietFormState extends ConsumerState<DietForm> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 매크로 입력값으로부터 Atwater 계수로 산출한 kcal 을 라이브로 표시.
+/// v12-5: 사용자가 kcal 을 직접 입력하지 않고, 탄단지 입력에서 자동 계산.
+class _KcalPreview extends StatelessWidget {
+  final int kcal;
+  const _KcalPreview({required this.kcal});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      container: true,
+      label: '자동 계산된 칼로리 $kcal 킬로칼로리',
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.primaryContainer.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.calculate_outlined, size: 18, color: cs.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '자동 계산 (탄·단×4 + 지×9)',
+                style: TextStyle(
+                  fontFamily: 'Pretendard',
+                  fontSize: 13,
+                  color: cs.onSurfaceVariant,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$kcal kcal',
+              style: TextStyle(
+                fontFamily: 'Pretendard',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: cs.primary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

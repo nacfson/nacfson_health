@@ -6,7 +6,7 @@
 
 - **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
 - **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
-- **DB 버전**: v12 (테이블 13개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine + v12 신규 5개 admin-curated 마스터: exercise_categories · exercise_category_translations · exercise_definitions · exercise_translations · one_rm_formulas. v12: 다국어 지원(ko/en) + 종목별 권위 1RM 공식 — exercise_records/templates 에 exercise_key 컬럼 추가, NSCA LeSuer 1997 검증 기반 Mayhew/Wathen/Brzycki 공식 적용, 1RM 코치 진입 시 Supabase TTL 24h fetch)
+- **DB 버전**: v12 (테이블 13개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine + v12 신규 5개 admin-curated 마스터: exercise_categories · exercise_category_translations · exercise_definitions · exercise_translations · one_rm_formulas. v12: 다국어 지원(ko/en) + 종목별 권위 1RM 공식 — exercise_records/templates 에 exercise_key 컬럼 추가, NSCA LeSuer 1997 검증 기반 Mayhew/Wathen/Brzycki 공식 적용, 1RM 코치 진입 시 Supabase TTL 24h fetch. v12-5: Atwater 4/4/9 derived kcal — diet_records.total_calories / food_templates.calories 컬럼 유지, 저장 시 매크로에서 자동 산출)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화
 - **데이터 흐름**: UI → Provider(StateNotifier) → Repository(Interface) → SQLite(구현체) ↔ SupabaseService ↔ Supabase API
@@ -68,6 +68,7 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 | `docs/changelog-v12-2.md` | v12-2 변경 로그 (B/C 그룹 audit — 빈 catch 정리 + master data throttle + 휴식 타이머 race 가드 + RecordFormSheet onConfirmClose + showAppSnackBar + Semantics + legacy_korean_mapping 회귀 테스트) |
 | `docs/changelog-v12-3.md` | v12-3 변경 로그 (UI/UX HIGH 7건 — 다크 토큰 매크로 + 검증 메시지 친절화 + 터치 타겟 44 + DietForm swipe-down 경고 + 로딩 상태 spinner + NumericStepperField + 식단 SnackBar Undo) |
 | `docs/changelog-v12-4.md` | v12-4 변경 로그 (InlineSetInput 폭 회귀 hot-fix — NumericStepperField ± 32 + IconButton 36 + _SetTypeSelector 44 + ensureVisible) |
+| `docs/changelog-v12-5.md` | v12-5 변경 로그 (칼로리 자동 계산 — Atwater 4/4/9 + 식단 폼 / 음식 템플릿에서 kcal 입력 제거 + 매크로 라이브 미리보기) |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 
 ## Git 환경 설정

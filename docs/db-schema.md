@@ -120,6 +120,8 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 | `reps` | INTEGER | 반복 횟수 |
 | `rpe` | REAL | 자각강도 (1~10) |
 | `set_type` | TEXT | 세트 타입 (`warmup`/`work`/`drop`/`failure`, DEFAULT `work`) — v9 |
+| `exercise_key` | TEXT | 마스터 운동 정의 키 (v12, `exercise_definitions.key` 참조) |
+| `category_key` | TEXT | 마스터 카테고리 키 (v12, `exercise_categories.key` 참조) |
 
 **SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
 **지원 연산**: Create · Read · Update · Delete (전체 CRUD)
@@ -146,7 +148,8 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 | `memo` | TEXT? | 메모 (nullable) |
 
 **SyncStatus**: `synced(0)` / `created(1)` / `modified(2)` / `deleted(3)`  
-**지원 연산**: Create · Read · Update · Delete (전체 CRUD)
+**지원 연산**: Create · Read · Update · Delete (전체 CRUD)  
+**칼로리 처리 (v12-5~)**: 입력 폼에서 사용자가 직접 입력하지 않고, 탄단지(`carbs`/`protein`/`fat`) 에서 Atwater 계수(4/4/9) 로 자동 산출되어 저장된다. 컬럼 자체는 유지(과거 기록·sync 호환). 산출 함수: `lib/core/nutrition/atwater_calculator.dart`
 
 ---
 
@@ -186,7 +189,7 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 **FoodTemplateSyncStatus**: `synced(0)` / `created(1)` / `deleted(3)` — `modified(2)` **미사용**  
 **지원 연산**: Create · Delete (수정 없음)  
 **Pull 병합 전략**: insert-or-skip (uuid 기준, LWW 불필요)  
-**칼로리 처리**: 탄단지 자동계산 아님 — 템플릿에 직접 저장
+**칼로리 처리 (v12-5~)**: 추가 폼에서 사용자가 직접 입력하지 않고, 탄단지에서 Atwater 계수(4/4/9) 로 자동 산출되어 저장된다. 컬럼 자체는 유지(과거 템플릿·sync 호환). 산출 함수: `lib/core/nutrition/atwater_calculator.dart`
 
 ---
 

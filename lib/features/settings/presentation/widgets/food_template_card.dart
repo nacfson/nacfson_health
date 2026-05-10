@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/nutrition/atwater_calculator.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 import '../../domain/entities/food_template.dart';
@@ -30,7 +32,6 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
 
   // 추가 탭 state
   late final TextEditingController _addNameCtrl;
-  late final TextEditingController _caloriesCtrl;
   late final TextEditingController _carbsCtrl;
   late final TextEditingController _proteinCtrl;
   late final TextEditingController _fatCtrl;
@@ -42,7 +43,6 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
     super.initState();
     _searchCtrl = TextEditingController();
     _addNameCtrl = TextEditingController();
-    _caloriesCtrl = TextEditingController();
     _carbsCtrl = TextEditingController();
     _proteinCtrl = TextEditingController();
     _fatCtrl = TextEditingController();
@@ -55,11 +55,21 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
     _searchFocusNode.dispose();
     _searchCtrl.dispose();
     _addNameCtrl.dispose();
-    _caloriesCtrl.dispose();
     _carbsCtrl.dispose();
     _proteinCtrl.dispose();
     _fatCtrl.dispose();
     super.dispose();
+  }
+
+  /// 현재 매크로 컨트롤러 값으로부터 Atwater 계수로 kcal 산출.
+  int get _derivedCalories {
+    double parse(TextEditingController c) =>
+        double.tryParse(c.text.trim()) ?? 0;
+    return kcalFromMacros(
+      parse(_carbsCtrl),
+      parse(_proteinCtrl),
+      parse(_fatCtrl),
+    );
   }
 
   void _handleSearchFocusChange() {
@@ -81,6 +91,17 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
     });
   }
 
+  static final _macroInputFormatters = <TextInputFormatter>[
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+  ];
+
+  String? _macroValidator(String? v) {
+    final raw = v?.trim() ?? '';
+    final n = double.tryParse(raw);
+    if (n == null || !n.isFinite || n < 0 || n > 999) return '0-999';
+    return null;
+  }
+
   Future<void> _addTemplate() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -89,10 +110,10 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
       ErrorOverlay.show(title: '입력 오류', message: '음식 이름을 입력해주세요.');
       return;
     }
-    final calories = int.tryParse(_caloriesCtrl.text) ?? 0;
-    final carbs = double.tryParse(_carbsCtrl.text) ?? 0;
-    final protein = double.tryParse(_proteinCtrl.text) ?? 0;
-    final fat = double.tryParse(_fatCtrl.text) ?? 0;
+    final carbs = double.tryParse(_carbsCtrl.text.trim()) ?? 0;
+    final protein = double.tryParse(_proteinCtrl.text.trim()) ?? 0;
+    final fat = double.tryParse(_fatCtrl.text.trim()) ?? 0;
+    final calories = kcalFromMacros(carbs, protein, fat);
 
     final templates = ref.read(foodTemplatesProvider);
     if (templates.any((t) => t.name == name)) {
@@ -114,7 +135,6 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
             ),
           );
       _addNameCtrl.clear();
-      _caloriesCtrl.clear();
       _carbsCtrl.clear();
       _proteinCtrl.clear();
       _fatCtrl.clear();
@@ -381,26 +401,6 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
             children: [
               Expanded(
                 child: TextFormField(
-                  controller: _caloriesCtrl,
-                  decoration: InputDecoration(
-                    hintText: '칼로리(kcal)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    final n = int.tryParse(v ?? '');
-                    if (n == null || n < 0 || n > 9999) return '0-9999';
-                    return null;
-                  },
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
                   controller: _carbsCtrl,
                   decoration: InputDecoration(
                     hintText: '탄수화물(g)',
@@ -412,18 +412,12 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    final n = double.tryParse(v ?? '');
-                    if (n == null || n < 0 || n > 999) return '0-999';
-                    return null;
-                  },
+                  inputFormatters: _macroInputFormatters,
+                  validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
+              const SizedBox(width: 8),
               Expanded(
                 child: TextFormField(
                   controller: _proteinCtrl,
@@ -437,11 +431,9 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    final n = double.tryParse(v ?? '');
-                    if (n == null || n < 0 || n > 999) return '0-999';
-                    return null;
-                  },
+                  inputFormatters: _macroInputFormatters,
+                  validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 8),
@@ -458,19 +450,44 @@ class _FoodTemplateCardState extends ConsumerState<FoodTemplateCard> {
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) {
-                    final n = double.tryParse(v ?? '');
-                    if (n == null || n < 0 || n > 999) return '0-999';
-                    return null;
-                  },
+                  inputFormatters: _macroInputFormatters,
+                  validator: _macroValidator,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.calculate_outlined, size: 16, color: cs.primary),
+                const SizedBox(width: 6),
+                Text(
+                  '자동 계산 (탄·단×4 + 지×9): ',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                Text(
+                  '$_derivedCalories kcal',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (isNameEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              '음식 이름과 매크로(칼로리/탄·단·지)를 입력하세요.',
+              '음식 이름과 매크로(탄·단·지)를 입력하세요. 칼로리는 자동 계산됩니다.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: cs.onSurfaceVariant),
             ),
