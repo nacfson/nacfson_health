@@ -1,0 +1,118 @@
+// App shell: tab switching, Seoul date bar, master data, clock.
+import { api, asList, pick } from './api.js';
+import { state, todayKey, labelKo, setDateKey, shiftDate, onDateChange } from './state.js';
+import { $, fillSelect, toast, MUSCLE_TYPES } from './dom.js';
+import { bootstrap, wireAuthHandlers } from './auth.js';
+import * as workout from './tabs/workout.js';
+import * as diet from './tabs/diet.js';
+import * as weight from './tabs/weight.js';
+import * as summary from './tabs/summary.js';
+import * as settings from './tabs/settings.js';
+
+const TABS = { workout, diet, weight, summary, settings };
+
+let activeTab = 'workout';
+
+function switchTab(name) {
+  if (!TABS[name]) return;
+  activeTab = name;
+  for (const button of document.querySelectorAll('#nav [data-tab]')) {
+    button.classList.toggle('on', button.dataset.tab === name);
+  }
+  for (const screen of document.querySelectorAll('.screen')) {
+    screen.classList.toggle('on', screen.dataset.screen === name);
+  }
+  $('content').scrollTop = 0;
+  refreshActive();
+}
+
+function refreshActive() {
+  const tab = TABS[activeTab];
+  if (!tab) return;
+  tab.refresh().catch((err) => toast('불러오기 실패: ' + err.message, true));
+}
+
+function renderDateBar() {
+  $('dateLabel').textContent = labelKo(state.dateKey);
+  $('dateToday').hidden = state.dateKey === todayKey();
+}
+
+function wireShell() {
+  for (const button of document.querySelectorAll('#nav [data-tab]')) {
+    button.addEventListener('click', () => switchTab(button.dataset.tab));
+  }
+  $('datePrev').addEventListener('click', () => shiftDate(-1));
+  $('dateNext').addEventListener('click', () => shiftDate(1));
+  $('dateToday').addEventListener('click', () => setDateKey(todayKey()));
+  onDateChange(renderDateBar);
+  renderDateBar();
+
+  const clock = () => {
+    $('statusClock').textContent = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(new Date());
+  };
+  clock();
+  setInterval(clock, 30000);
+}
+
+export function fillMuscleSelects() {
+  for (const id of ['routineType', 'etType', 'setExerciseType']) {
+    const select = $(id);
+    if (select) fillSelect(select, MUSCLE_TYPES.map((t) => ({ value: t, label: t })), select.value || '가슴');
+  }
+}
+
+async function loadMaster() {
+  try {
+    const payload = await api.get('/api/v1/master/exercises', { locale: 'ko' });
+    const categories = asList(pick(payload, 'categories'));
+    const exercises = asList(pick(payload, 'exercises'));
+    state.master = {
+      categories: categories.map((c) => ({
+        key: pick(c, 'category_key', 'key'),
+        name: pick(c, 'display_name', 'name') || pick(c, 'category_key'),
+      })),
+      exercises: exercises.map((e) => ({
+        key: pick(e, 'exercise_key', 'key'),
+        categoryKey: pick(e, 'category_key', 'categoryKey'),
+        name: pick(e, 'display_name', 'default_name', 'name'),
+        isCompound: Boolean(pick(e, 'is_compound')),
+      })).filter((e) => e.key && e.name),
+    };
+  } catch (err) {
+    state.master = { categories: [], exercises: [] };
+    if (err.status !== 401) console.warn('master data unavailable', err);
+  }
+
+  const names = $('exerciseNames');
+  if (names) {
+    names.replaceChildren(...state.master.exercises.map((e) => {
+      const option = document.createElement('option');
+      option.value = e.name;
+      return option;
+    }));
+  }
+  const routineKey = $('routineKey');
+  if (routineKey) {
+    routineKey.replaceChildren(
+      new Option('– 없음 –', ''),
+      ...state.master.exercises.map((e) => new Option(e.name, e.key)),
+    );
+  }
+}
+
+async function main() {
+  wireShell();
+  wireAuthHandlers();
+  fillMuscleSelects();
+  for (const tab of Object.values(TABS)) tab.init();
+
+  const user = await bootstrap();
+  if (!user) return;
+
+  await loadMaster();
+  refreshActive();
+}
+
+main();

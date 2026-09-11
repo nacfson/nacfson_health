@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B1B2B" />
+  <title>낙프슨 헬스</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="phone" aria-label="낙프슨 헬스 웹">
+    <div class="notch"></div>
+    <div class="status"><span id="statusClock">--:--</span><span id="statusHost">health.nacfson.cloud</span></div>
+
+    <div class="gate on" id="gate">
+      <div class="logo">NH</div>
+      <h2>낙프슨 헬스</h2>
+      <p>모바일 웹 · ProcessManager SSO<br /><code>auth.nacfson.cloud</code></p>
+      <button class="btn" id="loginButton" type="button">낙프슨 계정으로 계속</button>
+      <div class="hint" id="gateHint">세션이 만료되었거나 로그인하지 않았습니다</div>
+    </div>
+
+    <div class="app" id="app" hidden>
+      <header class="topbar">
+        <div class="avatar" id="avatar">–</div>
+        <div class="who">
+          <strong id="whoEmail">…</strong>
+          <span id="whoHost">health.nacfson.cloud</span>
+        </div>
+        <div class="sso">SSO</div>
+      </header>
+
+      <div class="datebar">
+        <button type="button" aria-label="이전 날짜" id="datePrev">‹</button>
+        <div class="label" id="dateLabel">–</div>
+        <button type="button" aria-label="다음 날짜" id="dateNext">›</button>
+        <button type="button" class="today" id="dateToday">오늘</button>
+      </div>
+
+      <main class="content" id="content">
+        <!-- ============ 운동 ============ -->
+        <section class="screen on" data-screen="workout">
+          <div class="card">
+            <div class="row between">
+              <h3>오늘 루틴</h3>
+              <span class="chip mint" id="routineChip">–</span>
+            </div>
+            <div class="row wrap" id="routineList" style="margin-top:6px"></div>
+            <form id="routineForm" class="form-grid" hidden>
+              <label class="field full"><span>운동 이름</span>
+                <input id="routineName" list="exerciseNames" autocomplete="off" placeholder="벤치프레스" required />
+              </label>
+              <label class="field"><span>부위</span>
+                <select id="routineType"></select>
+              </label>
+              <label class="field"><span>마스터 종목 (선택)</span>
+                <select id="routineKey"><option value="">– 없음 –</option></select>
+              </label>
+              <div class="form-actions full">
+                <button class="btn soft" type="submit">루틴에 추가</button>
+                <button class="btn ghost" type="button" id="routineCancel">취소</button>
+              </div>
+            </form>
+            <div class="fab-row" style="margin-top:8px">
+              <button class="btn soft" type="button" id="routineToggle">+ 운동</button>
+              <button class="btn" type="button" id="setFormToggle">세트 기록</button>
+            </div>
+          </div>
+
+          <div class="card" id="setFormCard" hidden>
+            <div class="row between">
+              <h3>세트 기록</h3>
+              <span class="chip coral" id="setEditChip" hidden>수정 중</span>
+            </div>
+            <form id="setForm" class="form-grid">
+              <label class="field full"><span>종목</span>
+                <input id="setName" list="exerciseNames" autocomplete="off" placeholder="벤치프레스" required />
+              </label>
+              <label class="field"><span>부위</span>
+                <select id="setExerciseType"></select>
+              </label>
+              <label class="field"><span>세트 유형</span>
+                <select id="setType">
+                  <option value="work">본세트</option>
+                  <option value="warmup">웜업</option>
+                  <option value="drop">드랍</option>
+                  <option value="failure">실패</option>
+                </select>
+              </label>
+              <label class="field"><span>중량 (kg)</span>
+                <input id="setWeight" type="number" step="0.5" min="0" inputmode="decimal" value="60" required />
+              </label>
+              <label class="field"><span>횟수</span>
+                <input id="setReps" type="number" step="1" min="1" inputmode="numeric" value="10" required />
+              </label>
+              <label class="field"><span>RPE</span>
+                <input id="setRpe" type="number" step="0.5" min="0" max="10" inputmode="decimal" value="7.5" />
+              </label>
+              <div class="form-actions full">
+                <button class="btn" type="submit" id="setSubmit">저장</button>
+                <button class="btn ghost" type="button" id="setEditCancel" hidden>수정 취소</button>
+                <button class="btn ghost" type="button" id="setCancel">닫기</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="exerciseGroups"></div>
+
+          <div class="card">
+            <div class="row between">
+              <h3>휴식 타이머</h3>
+              <span class="muted">웹 인페이지 전용</span>
+            </div>
+            <div class="rest">
+              <span class="time" id="restTime">1:30</span>
+              <span class="row">
+                <select id="restPreset" aria-label="휴식 시간" style="width:auto">
+                  <option value="60">60초</option>
+                  <option value="90" selected>90초</option>
+                  <option value="120">120초</option>
+                  <option value="180">180초</option>
+                </select>
+                <button class="icon-btn" type="button" id="restStart" title="시작">▶</button>
+                <button class="icon-btn" type="button" id="restPause" title="일시정지">❚❚</button>
+                <button class="icon-btn" type="button" id="restReset" title="초기화">↺</button>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ 식단 ============ -->
+        <section class="screen" data-screen="diet">
+          <div class="card">
+            <div class="row between"><h3>칼로리</h3><span class="muted" id="dietKcalLabel">0 / –</span></div>
+            <div class="bar-track"><div class="bar-fill" id="dietKcalBar" style="width:0%"></div></div>
+            <div class="macro-grid">
+              <div class="macro"><span style="color:var(--cat-diet)">탄</span><b id="dietCarbs">0g</b>
+                <div class="bar-track"><div class="bar-fill carbs" id="dietCarbsBar" style="width:0%"></div></div>
+              </div>
+              <div class="macro"><span style="color:var(--protein)">단</span><b id="dietProtein">0g</b>
+                <div class="bar-track"><div class="bar-fill protein" id="dietProteinBar" style="width:0%"></div></div>
+              </div>
+              <div class="macro"><span style="color:var(--fat)">지</span><b id="dietFat">0g</b>
+                <div class="bar-track"><div class="bar-fill fat" id="dietFatBar" style="width:0%"></div></div>
+              </div>
+            </div>
+            <p class="muted" style="margin:6px 0 0">칼로리는 서버 Atwater (탄4·단4·지9) 기준</p>
+          </div>
+
+          <div class="card">
+            <div class="row between">
+              <h3>음식 추가</h3>
+              <span class="chip coral" id="foodEditChip" hidden>수정 중</span>
+            </div>
+            <form id="foodForm" class="form-grid">
+              <label class="field"><span>식사</span>
+                <select id="foodMeal">
+                  <option value="아침">아침</option>
+                  <option value="점심" selected>점심</option>
+                  <option value="저녁">저녁</option>
+                  <option value="간식">간식</option>
+                </select>
+              </label>
+              <label class="field"><span>음식명</span>
+                <input id="foodName" autocomplete="off" placeholder="치킨 라이스볼" required />
+              </label>
+              <label class="field"><span>탄수 (g)</span>
+                <input id="foodCarbs" type="number" step="0.1" min="0" inputmode="decimal" value="0" />
+              </label>
+              <label class="field"><span>단백 (g)</span>
+                <input id="foodProtein" type="number" step="0.1" min="0" inputmode="decimal" value="0" />
+              </label>
+              <label class="field"><span>지방 (g)</span>
+                <input id="foodFat" type="number" step="0.1" min="0" inputmode="decimal" value="0" />
+              </label>
+              <label class="field"><span>만족도</span>
+                <select id="foodSatisfaction">
+                  <option value="">–</option>
+                  <option value="1">1</option><option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option><option value="5">5</option>
+                </select>
+              </label>
+              <label class="field full"><span>메모</span>
+                <input id="foodMemo" autocomplete="off" placeholder="선택" />
+              </label>
+              <p class="muted full" id="foodKcalPreview" style="margin:0">예상 0 kcal</p>
+              <div class="form-actions full">
+                <button class="btn" type="submit" id="foodSubmit">기록</button>
+                <button class="btn ghost" type="button" id="foodEditCancel" hidden>수정 취소</button>
+              </div>
+            </form>
+          </div>
+
+          <div id="dietGroups"></div>
+
+          <div class="card">
+            <div class="row between"><h3>음식 템플릿</h3><span class="muted">탭하면 입력 폼 채움</span></div>
+            <div id="foodTemplates"></div>
+            <form id="foodTemplateForm" class="form-grid" hidden>
+              <label class="field full"><span>이름</span><input id="ftName" autocomplete="off" placeholder="닭가슴살 100g" required /></label>
+              <label class="field"><span>탄수 (g)</span><input id="ftCarbs" type="number" step="0.1" min="0" inputmode="decimal" value="0" /></label>
+              <label class="field"><span>단백 (g)</span><input id="ftProtein" type="number" step="0.1" min="0" inputmode="decimal" value="0" /></label>
+              <label class="field"><span>지방 (g)</span><input id="ftFat" type="number" step="0.1" min="0" inputmode="decimal" value="0" /></label>
+              <div class="form-actions full">
+                <button class="btn soft" type="submit">템플릿 저장</button>
+                <button class="btn ghost" type="button" id="ftCancel">취소</button>
+              </div>
+            </form>
+            <button class="btn ghost" type="button" id="ftToggle" style="margin-top:8px">템플릿 추가</button>
+          </div>
+        </section>
+
+        <!-- ============ 체중 ============ -->
+        <section class="screen" data-screen="weight">
+          <div class="card">
+            <div class="row between"><h3>선택일 체중</h3><span class="chip mint" id="weightLatest">– kg</span></div>
+            <p class="muted" style="margin:4px 0 0" id="weightDelta">기록 없음</p>
+          </div>
+          <div class="card">
+            <div class="row between"><h3>추세 · 최근 30일</h3><span class="chip" id="weightTrendChip">–</span></div>
+            <div class="chart" id="weightChart"></div>
+          </div>
+          <div class="card">
+            <div class="row between">
+              <h3>체중 기록</h3>
+              <span class="chip coral" id="weightEditChip" hidden>수정 중</span>
+            </div>
+            <form id="weightForm" class="form-grid">
+              <label class="field full"><span>체중 (kg)</span>
+                <input id="weightValue" type="number" step="0.1" min="0" inputmode="decimal" placeholder="76.4" required />
+              </label>
+              <div class="form-actions full">
+                <button class="btn" type="submit" id="weightSubmit">선택일에 기록</button>
+                <button class="btn ghost" type="button" id="weightEditCancel" hidden>수정 취소</button>
+              </div>
+            </form>
+          </div>
+          <div class="card">
+            <h3>최근 기록</h3>
+            <div id="weightList"></div>
+          </div>
+        </section>
+
+        <!-- ============ 요약 ============ -->
+        <section class="screen" data-screen="summary">
+          <div class="card">
+            <div class="row between"><h3>일일 요약</h3><span class="chip" id="summaryDayChip">–</span></div>
+            <p class="muted" style="margin:4px 0 0" id="summaryKcalLabel">0 / –</p>
+            <div class="bar-track" style="margin-top:8px"><div class="bar-fill" id="summaryKcalBar" style="width:0%"></div></div>
+            <div class="macro-grid">
+              <div class="macro"><span style="color:var(--cat-diet)">탄</span><b id="summaryCarbs">0g</b>
+                <div class="bar-track"><div class="bar-fill carbs" id="summaryCarbsBar" style="width:0%"></div></div>
+              </div>
+              <div class="macro"><span style="color:var(--protein)">단</span><b id="summaryProtein">0g</b>
+                <div class="bar-track"><div class="bar-fill protein" id="summaryProteinBar" style="width:0%"></div></div>
+              </div>
+              <div class="macro"><span style="color:var(--fat)">지</span><b id="summaryFat">0g</b>
+                <div class="bar-track"><div class="bar-fill fat" id="summaryFatBar" style="width:0%"></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>운동</h3>
+            <div class="row wrap" id="summaryMuscles" style="gap:4px;margin:6px 0"></div>
+            <p class="muted" style="margin:0" id="summaryVolume">–</p>
+          </div>
+          <div class="card">
+            <h3>오늘 루틴</h3>
+            <div class="row wrap" id="summaryRoutine" style="gap:4px;margin:6px 0"></div>
+          </div>
+          <button class="btn ghost" type="button" id="summaryRefresh">새로고침</button>
+        </section>
+
+        <!-- ============ 설정 ============ -->
+        <section class="screen" data-screen="settings">
+          <div class="card">
+            <div class="row between"><h3>프로필</h3><span class="chip" id="profileGoalChip">–</span></div>
+            <form id="profileForm" class="form-grid">
+              <label class="field"><span>성별</span>
+                <select id="pfGender">
+                  <option value="male">남</option>
+                  <option value="female">여</option>
+                </select>
+              </label>
+              <label class="field"><span>나이</span>
+                <input id="pfAge" type="number" min="10" max="100" step="1" inputmode="numeric" value="30" />
+              </label>
+              <label class="field"><span>키 (m)</span>
+                <input id="pfHeight" type="number" min="1" max="2.5" step="0.01" inputmode="decimal" value="1.75" />
+              </label>
+              <label class="field"><span>목표</span>
+                <select id="pfGoal">
+                  <option value="diet">다이어트</option>
+                  <option value="lean_cut">린매스(감량)</option>
+                  <option value="lean_gain">린매스(증량)</option>
+                  <option value="bulk_up">벌크업</option>
+                </select>
+              </label>
+              <label class="field"><span>활동량</span>
+                <select id="pfActivity">
+                  <option value="sedentary">거의 없음</option>
+                  <option value="light">가벼움</option>
+                  <option value="moderate">보통</option>
+                  <option value="active">활발</option>
+                  <option value="very_active">매우 활발</option>
+                </select>
+              </label>
+              <label class="field"><span>운동 강도</span>
+                <select id="pfIntensity">
+                  <option value="low">낮음 (1.8g/kg)</option>
+                  <option value="moderate">보통 (2.0g/kg)</option>
+                  <option value="high">높음 (2.2g/kg)</option>
+                  <option value="very_high">매우 높음 (2.4g/kg)</option>
+                </select>
+              </label>
+              <label class="field"><span>목표 칼로리</span>
+                <input id="pfTargetCalories" type="number" min="0" step="10" inputmode="numeric" />
+              </label>
+              <label class="field"><span>탄수 목표 (g)</span>
+                <input id="pfTargetCarbs" type="number" min="0" step="1" inputmode="numeric" />
+              </label>
+              <label class="field"><span>단백 목표 (g)</span>
+                <input id="pfTargetProtein" type="number" min="0" step="1" inputmode="numeric" />
+              </label>
+              <label class="field"><span>지방 목표 (g)</span>
+                <input id="pfTargetFat" type="number" min="0" step="1" inputmode="numeric" />
+              </label>
+              <div class="form-actions full">
+                <button class="btn" type="submit">저장</button>
+                <button class="btn soft" type="button" id="recalcTargets">목표 재계산</button>
+              </div>
+            </form>
+            <p class="muted" style="margin:6px 0 0" id="profileHint">재계산은 최근 체중·프로필 기반 Mifflin-St Jeor</p>
+          </div>
+
+          <div class="card">
+            <div class="row between"><h3>운동 템플릿</h3><span class="muted">휴식 오버라이드</span></div>
+            <div id="exerciseTemplates"></div>
+            <form id="exerciseTemplateForm" class="form-grid" hidden>
+              <label class="field full"><span>이름</span><input id="etName" autocomplete="off" placeholder="벤치프레스" required /></label>
+              <label class="field"><span>부위</span><select id="etType"></select></label>
+              <label class="field"><span>휴식 (초)</span><input id="etRest" type="number" min="0" step="15" inputmode="numeric" placeholder="기본값" /></label>
+              <div class="form-actions full">
+                <button class="btn soft" type="submit">템플릿 저장</button>
+                <button class="btn ghost" type="button" id="etCancel">취소</button>
+              </div>
+            </form>
+            <button class="btn ghost" type="button" id="etToggle" style="margin-top:8px">템플릿 추가</button>
+          </div>
+
+          <div class="card">
+            <div class="row between"><h3>루틴 프리셋</h3><span class="muted" id="routinesHint">현재 루틴 기준</span></div>
+            <div id="workoutRoutines"></div>
+            <form id="routinePresetForm" class="form-grid">
+              <label class="field full"><span>프리셋 이름</span><input id="rpName" autocomplete="off" placeholder="가슴 &amp; 삼두" required /></label>
+              <div class="form-actions full"><button class="btn soft" type="submit">현재 루틴 저장</button></div>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>계정</h3>
+            <div class="settings-row"><div>이메일<small id="accountEmail">–</small></div><span class="chev">SSO</span></div>
+            <div class="settings-row"><div>사용자 ID<small id="accountUserID">–</small></div></div>
+            <p class="muted" style="margin:0 0 8px">식별자: <code>nacfson_session</code> 쿠키 (Supabase 아님)</p>
+            <button class="btn ghost" type="button" id="logoutButton">로그아웃</button>
+          </div>
+
+          <div class="card">
+            <h3>네이티브 앱</h3>
+            <p class="muted" style="margin:0">iOS/Android는 SQLite+Supabase 유지. 웹은 서버 집계만 사용합니다.</p>
+          </div>
+        </section>
+      </main>
+
+      <nav class="nav" id="nav" aria-label="하단 탭">
+        <button type="button" class="on" data-tab="workout"><span class="ico">🏋️</span>운동</button>
+        <button type="button" data-tab="diet"><span class="ico">🍽</span>식단</button>
+        <button type="button" data-tab="weight"><span class="ico">⚖</span>체중</button>
+        <button type="button" data-tab="summary"><span class="ico">📊</span>요약</button>
+        <button type="button" data-tab="settings"><span class="ico">⚙</span>설정</button>
+      </nav>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <datalist id="exerciseNames"></datalist>
+  </div>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
