@@ -68,6 +68,10 @@ func NewHandler(cfg config.Config, st *store.Store, central *auth.CentralClient)
 	mux.HandleFunc("PUT /api/v1/daily-routine/{date}", h.putDailyRoutine)
 
 	mux.HandleFunc("GET /api/v1/master/exercises", h.masterExercises)
+	mux.HandleFunc("GET /api/v1/master/bundle", h.masterBundle)
+
+	mux.HandleFunc("POST /api/v1/sync/{resource}", h.pushSync)
+	mux.HandleFunc("GET /api/v1/sync/{resource}", h.pullSync)
 
 	mux.HandleFunc("GET /api/v1/summary", h.summary)
 
@@ -88,7 +92,7 @@ func (h *Handler) corsMiddleware(next http.Handler) http.Handler {
 			headers.Add("Vary", "Origin")
 			if r.Method == http.MethodOptions {
 				headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-				headers.Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token")
+				headers.Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization")
 				headers.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return

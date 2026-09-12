@@ -14,26 +14,35 @@ import (
 )
 
 // centralStub impersonates the ProcessManager Auth service contract:
-// GET /api/internal/cookie-session and DELETE /api/auth/session.
+// GET /api/internal/cookie-session, GET/DELETE /api/auth/session.
 type centralStub struct {
 	server *httptest.Server
 
 	mu             sync.Mutex
 	sessionBody    string
 	sessionStatus  int
+	bearerBody     string
+	bearerStatus   int
 	logoutStatus   int
 	seenValidate   http.Header
+	seenBearer     http.Header
 	seenLogout     http.Header
 	logoutRequests int
+	bearerRequests int
 }
 
 func newCentralStub(t *testing.T) *centralStub {
 	t.Helper()
+	expires := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	stub := &centralStub{
 		sessionStatus: http.StatusOK,
 		sessionBody: `{"user_id":"11111111-1111-1111-1111-111111111111",
 			"email":"USER@Example.com","is_admin":false,
-			"expires_at":"` + time.Now().Add(time.Hour).UTC().Format(time.RFC3339) + `"}`,
+			"expires_at":"` + expires + `"}`,
+		bearerStatus: http.StatusOK,
+		bearerBody: `{"expires_at":"` + expires + `",
+			"user":{"id":"11111111-1111-1111-1111-111111111111",
+			"email":"USER@Example.com","is_admin":false}}`,
 		logoutStatus: http.StatusNoContent,
 	}
 	mux := http.NewServeMux()
@@ -41,6 +50,16 @@ func newCentralStub(t *testing.T) *centralStub {
 		stub.mu.Lock()
 		stub.seenValidate = r.Header.Clone()
 		body, status := stub.sessionBody, stub.sessionStatus
+		stub.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	})
+	mux.HandleFunc("GET /api/auth/session", func(w http.ResponseWriter, r *http.Request) {
+		stub.mu.Lock()
+		stub.seenBearer = r.Header.Clone()
+		stub.bearerRequests++
+		body, status := stub.bearerBody, stub.bearerStatus
 		stub.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
@@ -63,6 +82,18 @@ func (s *centralStub) validateHeaders() http.Header {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.seenValidate
+}
+
+func (s *centralStub) bearerHeaders() http.Header {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.seenBearer
+}
+
+func (s *centralStub) bearerCalls() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bearerRequests
 }
 
 func (s *centralStub) logoutHeaders() http.Header {
@@ -126,6 +157,111 @@ func TestAuthMiddlewareRejectsMissingCookie(t *testing.T) {
 	assertBareUnauthorized(t, rec)
 	if stub.validateHeaders() != nil {
 		t.Fatal("auth service must not be called without a cookie")
+	}
+	if stub.bearerCalls() != 0 {
+		t.Fatal("bearer session must not be called without Authorization")
+	}
+}
+
+func TestAuthMiddlewareAcceptsBearerToken(t *testing.T) {
+	stub := newCentralStub(t)
+	handler := newTestHandler(t, stub)
+
+	rec := do(t, handler, http.MethodGet, "/api/me", nil, func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer native-token")
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body %s)", rec.Code, rec.Body.String())
+	}
+	if stub.bearerCalls() != 1 {
+		t.Fatalf("bearer session calls = %d, want 1", stub.bearerCalls())
+	}
+	if got := stub.bearerHeaders().Get("Authorization"); got != "Bearer native-token" {
+		t.Fatalf("Authorization forwarded = %q", got)
+	}
+	if stub.validateHeaders() != nil {
+		t.Fatal("cookie-session must not be called for Bearer auth")
+	}
+	if findCookie(rec, csrfCookieName) != nil {
+		t.Fatal("Bearer auth must not issue health_csrf")
+	}
+}
+
+func TestAuthMiddlewarePrefersCookieOverBearer(t *testing.T) {
+	stub := newCentralStub(t)
+	handler := newTestHandler(t, stub)
+
+	rec := do(t, handler, http.MethodGet, "/api/me", sessionCookie("good"), func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer native-token")
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if stub.validateHeaders() == nil {
+		t.Fatal("cookie path must win when both credentials are present")
+	}
+	if stub.bearerCalls() != 0 {
+		t.Fatal("Bearer validation must be skipped when cookie is present")
+	}
+}
+
+func TestBearerMutationSkipsCSRF(t *testing.T) {
+	stub := newCentralStub(t)
+	handler := newTestHandler(t, stub)
+
+	rec := do(t, handler, http.MethodPost, "/api/logout", nil, func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer native-token")
+		// No Origin / CSRF on purpose — native clients skip CSRF.
+	})
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204 (body %s)", rec.Code, rec.Body.String())
+	}
+	if stub.logouts() != 1 {
+		t.Fatalf("central logout calls = %d, want 1", stub.logouts())
+	}
+	if got := stub.logoutHeaders().Get("Authorization"); got != "Bearer native-token" {
+		t.Fatalf("logout Authorization = %q", got)
+	}
+}
+
+func TestBearerRejectsInvalidToken(t *testing.T) {
+	stub := newCentralStub(t)
+	stub.bearerStatus = http.StatusUnauthorized
+	stub.bearerBody = `{"error":"unauthorized"}`
+	handler := newTestHandler(t, stub)
+
+	rec := do(t, handler, http.MethodGet, "/api/me", nil, func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer bad")
+	})
+
+	assertBareUnauthorized(t, rec)
+}
+
+func TestSpoofedIdentityHeadersIgnoredForBearer(t *testing.T) {
+	stub := newCentralStub(t)
+	handler := newTestHandler(t, stub)
+
+	rec := do(t, handler, http.MethodGet, "/api/me", nil, func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer native-token")
+		r.Header.Set("X-User-Id", "99999999-9999-9999-9999-999999999999")
+		r.Header.Set("X-User-Email", "attacker@example.com")
+	})
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var payload struct {
+		UserID string `json:"user_id"`
+		Email  string `json:"email"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if payload.UserID != "11111111-1111-1111-1111-111111111111" || payload.Email != "user@example.com" {
+		t.Fatalf("identity came from headers: %+v", payload)
 	}
 }
 

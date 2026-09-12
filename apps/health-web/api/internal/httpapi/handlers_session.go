@@ -20,8 +20,18 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, meResponse{UserID: user.ID.String(), Email: user.Email})
 }
 
-// logout revokes the central cookie session and clears the local cookie.
+// logout revokes the central session (cookie or Bearer) and clears the SSO
+// cookie when present.
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	if method, ok := authMethodFromContext(r.Context()); ok && method == authMethodBearer {
+		if token, ok := bearerTokenFromContext(r.Context()); ok && token != "" {
+			if err := h.central.LogoutBearerSession(r.Context(), token); err != nil {
+				slog.Warn("api: central bearer logout failed", "error", err)
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	if cookie, ok := sessionCookieFromContext(r.Context()); ok && cookie != "" {
 		if err := h.central.LogoutCookieSession(r.Context(), cookie); err != nil {
 			// Best effort: the browser cookie is cleared regardless so the SPA
