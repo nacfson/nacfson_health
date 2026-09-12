@@ -61,12 +61,12 @@ function renderChart() {
   const min = Math.min(...weights);
   const max = Math.max(...weights);
   const span = max - min || 1;
-  const width = 300;
-  const height = 96;
-  const step = points.length > 1 ? (width - 16) / (points.length - 1) : 0;
+  const width = 640;
+  const height = 200;
+  const step = points.length > 1 ? (width - 24) / (points.length - 1) : 0;
   const coords = points.map((row, index) => {
-    const x = 8 + index * step;
-    const y = 84 - ((row.weight - min) / span) * 68;
+    const x = 12 + index * step;
+    const y = 180 - ((row.weight - min) / span) * 150;
     return [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
   });
   const last = coords[coords.length - 1];

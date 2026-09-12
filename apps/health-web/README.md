@@ -1,10 +1,11 @@
 # health-web
 
-Web product for nacfson_health, served at `https://health.nacfson.cloud`: a mobile-first Korean
-SPA (`운동 · 식단 · 체중 · 요약 · 설정`) backed by a Go API and Postgres.
+Web product for nacfson_health, served at `https://health.nacfson.cloud`: a web-native Korean
+SPA with sidebar navigation and History routes (`/summary`, `/workout`, `/diet`, `/weight`,
+`/settings`) backed by a Go API and Postgres. Default home is the summary dashboard.
 
 The native Flutter app (`lib/`, `ios/`, `android/`) is untouched by this app and keeps using its own
-SQLite + Supabase stack. There is no sync bridge yet.
+SQLite + Supabase stack. There is no sync bridge yet. Web and Flutter do not share UI kits.
 
 ```
 apps/health-web/
@@ -13,8 +14,16 @@ apps/health-web/
     cmd/migrate schema migrations + master-data seed
     internal/   config, auth, store, httpapi, domain, migrations, seed
     db/         migrations/*.sql and master_exercise_seed_v12_6.json
-  frontend/   static SPA (nginx image)
+  frontend/   static SPA (nginx image; no bundler)
+    public/   index.html + styles.css (web shell + design tokens)
+    src/      ES modules: app, router, api, auth, state, tabs/*
 ```
+
+Frontend notes:
+
+- Vanilla SPA only (no React/Vue). Layout is sidebar + main; phone bezel / bottom tab chrome is gone.
+- Client router (`src/router.js`) maps paths to tab modules; nginx `try_files` falls back to `index.html`.
+- Auth/CSRF clients (`api.js`, `auth.js`) and tab `init`/`refresh` contracts are unchanged.
 
 ## Authentication
 
@@ -115,9 +124,17 @@ go test ./...
 `api/Dockerfile` builds one image containing both binaries plus `db/`:
 
 ```bash
-docker build -t 192.168.219.100:5000/health-api:latest apps/health-web/api
+docker build -t ghcr.io/nacfson/health-api:latest apps/health-web/api
 ```
 
 `WORKDIR` is `/app` (`./api`, `./migrate`, `db/migrations`, `db/master_exercise_seed_v12_6.json`), so
 the migrate Job only needs `DATABASE_URL` and can run `./migrate up` followed by `./migrate seed`.
 The image runs as UID 65532.
+
+Frontend static image (nginx):
+
+```bash
+docker build -t ghcr.io/nacfson/health-frontend:latest apps/health-web/frontend
+```
+
+Production rolls use `ghcr.io/nacfson/health-frontend:<tag>` on Oracle k3s (`health` namespace).

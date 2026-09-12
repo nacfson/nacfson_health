@@ -34,7 +34,6 @@ export function showApp(user) {
   const email = (user && user.email) || '';
   $('whoEmail').textContent = email || '알 수 없음';
   $('whoHost').textContent = location.host;
-  $('statusHost').textContent = location.host;
   $('avatar').textContent = initials(email);
   const accountEmail = $('accountEmail');
   if (accountEmail) accountEmail.textContent = email || '–';
