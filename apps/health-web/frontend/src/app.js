@@ -1,8 +1,15 @@
-// App shell: tab switching, Seoul date bar, master data, clock.
+// App shell: History router, Seoul date bar, master data.
 import { api, asList, pick } from './api.js';
 import { state, todayKey, labelKo, setDateKey, shiftDate, onDateChange } from './state.js';
 import { $, fillSelect, toast, MUSCLE_TYPES } from './dom.js';
 import { bootstrap, wireAuthHandlers } from './auth.js';
+import {
+  DEFAULT_TAB,
+  labelForTab,
+  navigate,
+  resolveInitialTab,
+  wirePopstate,
+} from './router.js';
 import * as workout from './tabs/workout.js';
 import * as diet from './tabs/diet.js';
 import * as weight from './tabs/weight.js';
@@ -11,19 +18,39 @@ import * as settings from './tabs/settings.js';
 
 const TABS = { workout, diet, weight, summary, settings };
 
-let activeTab = 'workout';
+let activeTab = DEFAULT_TAB;
 
-function switchTab(name) {
+function setSidebarOpen(open) {
+  const shell = $('app');
+  const backdrop = $('sidebarBackdrop');
+  if (!shell) return;
+  shell.classList.toggle('nav-open', open);
+  if (backdrop) backdrop.hidden = !open;
+}
+
+function switchTab(name, { fromPop = false, skipRefresh = false } = {}) {
   if (!TABS[name]) return;
   activeTab = name;
-  for (const button of document.querySelectorAll('#nav [data-tab]')) {
-    button.classList.toggle('on', button.dataset.tab === name);
+  if (!fromPop) navigate(name);
+
+  for (const link of document.querySelectorAll('#nav [data-tab]')) {
+    link.classList.toggle('on', link.dataset.tab === name);
+  }
+  for (const brand of document.querySelectorAll('.brand[data-tab]')) {
+    brand.classList.toggle('on', brand.dataset.tab === name);
   }
   for (const screen of document.querySelectorAll('.screen')) {
     screen.classList.toggle('on', screen.dataset.screen === name);
   }
-  $('content').scrollTop = 0;
-  refreshActive();
+
+  const title = $('pageTitleSlot');
+  if (title) title.textContent = labelForTab(name);
+
+  const content = $('content');
+  if (content) content.scrollTop = 0;
+  setSidebarOpen(false);
+
+  if (!skipRefresh) refreshActive();
 }
 
 function refreshActive() {
@@ -38,22 +65,31 @@ function renderDateBar() {
 }
 
 function wireShell() {
-  for (const button of document.querySelectorAll('#nav [data-tab]')) {
-    button.addEventListener('click', () => switchTab(button.dataset.tab));
+  for (const link of document.querySelectorAll('#nav [data-tab], .brand[data-tab]')) {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      switchTab(link.dataset.tab);
+    });
   }
+
   $('datePrev').addEventListener('click', () => shiftDate(-1));
   $('dateNext').addEventListener('click', () => shiftDate(1));
   $('dateToday').addEventListener('click', () => setDateKey(todayKey()));
-  onDateChange(renderDateBar);
+  onDateChange(() => {
+    renderDateBar();
+    refreshActive();
+  });
   renderDateBar();
 
-  const clock = () => {
-    $('statusClock').textContent = new Intl.DateTimeFormat('ko-KR', {
-      timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).format(new Date());
-  };
-  clock();
-  setInterval(clock, 30000);
+  const toggle = $('sidebarToggle');
+  if (toggle) toggle.addEventListener('click', () => {
+    const shell = $('app');
+    setSidebarOpen(!(shell && shell.classList.contains('nav-open')));
+  });
+  const backdrop = $('sidebarBackdrop');
+  if (backdrop) backdrop.addEventListener('click', () => setSidebarOpen(false));
+
+  wirePopstate((tab) => switchTab(tab, { fromPop: true }));
 }
 
 export function fillMuscleSelects() {
@@ -112,7 +148,9 @@ async function main() {
   if (!user) return;
 
   await loadMaster();
-  refreshActive();
+
+  const initial = resolveInitialTab();
+  switchTab(initial, { fromPop: true });
 }
 
 main();
