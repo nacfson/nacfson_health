@@ -91,16 +91,9 @@
 				<string>nacfsonhealth</string>
 			</array>
 		</dict>
-		<!-- Supabase 인증 콜백용 URL 스킴 -->
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>io.supabase.nacfson</string>
-			</array>
-		</dict>
-		<!-- Google 로그인 OAuth 콜백용 역방향 클라이언트 ID (iOS 클라이언트) -->
+		<!-- nacfson.cloud Auth 콜백용 URL 스킴 (widget scheme 과 동일 host 구분) -->
+		<!-- login-callback 은 nacfsonhealth://login-callback?token=... -->
+		<!-- Google OAuth reverse client ID — Auth 호스팅 로그인에서 사용 가능 -->
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>

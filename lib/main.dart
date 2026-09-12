@@ -6,12 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
 import 'core/ai/food_vision_provider.dart';
-import 'core/config/app_env.dart';
 import 'core/router/app_router.dart';
+import 'core/sync/health_auth_service.dart';
 import 'core/sync/sync_preferences.dart';
 import 'core/sync/sync_state.dart';
 import 'core/widget/home_widget_service.dart';
@@ -33,10 +32,7 @@ import 'features/settings/presentation/providers/food_template_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: AppEnv.supabaseUrl,
-    anonKey: AppEnv.supabaseAnonKey,
-  );
+  await sharedHealthAuth().restoreSession();
 
   final prefs = await SharedPreferences.getInstance();
   final syncPrefs = SyncPreferences(prefs);
@@ -181,8 +177,12 @@ class _NacfsonHealthAppWithSyncState
 
     void handle(Uri? uri) {
       if (uri == null) return;
-      // supabase OAuth(`io.supabase.nacfson://...`) 등 다른 스킴은 무시.
+      // Auth callback (`nacfsonhealth://login-callback`) and other non-widget hosts.
       if (uri.scheme != 'nacfsonhealth') return;
+      if (uri.host == 'login-callback') {
+        unawaited(sharedHealthAuth().completeFromRedirect(uri));
+        return;
+      }
       final route = switch (uri.host) {
         'diet' => '/diet',
         'summary' => '/summary',

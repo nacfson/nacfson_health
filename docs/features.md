@@ -1,20 +1,29 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-09-11 (health-web MVP)
+> **마지막 업데이트**: 2026-09-12 (native → owned backend cutover)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
 
+### Native → owned backend cutover (2026-09)
+- [x] health-api Bearer auth (`Authorization: Bearer` → Auth `GET /api/auth/session`) + SPA cookie/CSRF unchanged
+- [x] Sync bridge `POST/GET /api/v1/sync/{resource}` for 6 user-owned tables; master `GET /api/v1/master/bundle` (+ formulas)
+- [x] Flutter offline-first cutover — `HealthAuthService` + `HealthSyncService`; remove `supabase_flutter` / `SUPABASE_*` / Gemini client keys
+- [x] Fresh cloud big-bang (no Supabase migration); first sync uploads local → empty Postgres
+- [~] **Deprecated-not-removed (gated)**: Gemini/AI insights · food vision · coach chat · 1RM AI note — UI visible, non-interactive / soft unavailable copy, no network
+- [~] **Deprecated-not-removed (gated)**: Apple Health / Health Connect — UI visible via `GatedHealthDataSource`, no permission prompts or OS reads
+- [x] Supabase project usage for this app is shut down for native clients (no Supabase secrets in health-api k8s)
+
 ### health-web MVP (2026-09) — ProcessManager Option B SPA
-- [x] `apps/health-web/` 신규 — Go API + vanilla SPA (Flutter `web/` 미사용). 네이티브 `lib/`/`ios/`/`android/` 미변경
-- [x] ProcessManager SSO — cookie `nacfson_session` → Auth `GET /api/internal/cookie-session`; 로컬 users 테이블 없음; CSRF `health_csrf`
+- [x] `apps/health-web/` 신규 — Go API + vanilla SPA (Flutter `web/` 미사용)
+- [x] ProcessManager SSO — cookie `nacfson_session` → Auth `GET /api/internal/cookie-session`; Bearer path for native
 - [x] Postgres user-owned 스키마 + master 시드 (`./migrate up` + `./migrate seed`)
 - [x] 5탭 CRUD — 운동|식단|체중|요약|설정; Atwater 서버 계산; summary DTO; daily_routine self-heal
+- [x] Native↔web sync bridge (P4) — shared Postgres tables + versioned sync API
 - [x] K8s manifests — `ProcessManager/k8s/health/` (`health.nacfson.cloud`)
-- [ ] 클러스터 배포 완료 — registry push + shared-app-db provision + migrate Job + Ingress smoke (API 192.168.219.120:6443 unreachable at implement time)
-- [ ] Native↔web sync bridge (P4, out of MVP)
+- [ ] 클러스터 배포 완료 — registry push + shared-app-db provision + migrate Job + Ingress smoke
 
 ### v12-5 (2026-05) — 칼로리 자동 계산 (Atwater)
 - [x] `lib/core/nutrition/atwater_calculator.dart` 신규 — `kcalFromMacros(carbs, protein, fat)` 순수 함수 (Atwater 4/4/9). 단위 테스트 6건

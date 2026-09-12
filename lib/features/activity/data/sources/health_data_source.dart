@@ -240,3 +240,20 @@ class HealthDataSourceImpl implements HealthDataSource {
     }
   }
 }
+
+/// Cutover gate: keep activity UI chrome, never prompt OS or hit HealthKit/HC.
+class GatedHealthDataSource implements HealthDataSource {
+  const GatedHealthDataSource();
+
+  @override
+  Future<ActivityAuthStatus> checkAvailability() async =>
+      ActivityAuthStatus.unsupported;
+
+  @override
+  Future<ActivityAuthStatus> requestAuthorization() async =>
+      ActivityAuthStatus.unsupported;
+
+  @override
+  Future<DailyActivity> getDailyActivity(DateTime date) async =>
+      DailyActivity.empty(date);
+}

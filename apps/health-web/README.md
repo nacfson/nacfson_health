@@ -3,8 +3,8 @@
 Web product for nacfson_health, served at `https://health.nacfson.cloud`: a mobile-first Korean
 SPA (`운동 · 식단 · 체중 · 요약 · 설정`) backed by a Go API and Postgres.
 
-The native Flutter app (`lib/`, `ios/`, `android/`) is untouched by this app and keeps using its own
-SQLite + Supabase stack. There is no sync bridge yet.
+The native Flutter app (`lib/`, `ios/`, `android/`) uses the same Postgres via Bearer
+auth and the sync bridge (`POST/GET /api/v1/sync/{resource}`). SQLite remains offline-first.
 
 ```
 apps/health-web/
@@ -18,22 +18,23 @@ apps/health-web/
 
 ## Authentication
 
-Cookie-only SSO through ProcessManager Auth (`auth.nacfson.cloud`). There is no local users table and
-no bearer-token path.
+Dual auth on health-api:
 
-1. The browser holds the `nacfson_session` cookie issued by Auth.
-2. Every request to this API forwards that cookie to
+1. **SPA (cookie SSO):** browser holds `nacfson_session` →
    `GET {CENTRAL_AUTH_INTERNAL_URL}/api/internal/cookie-session` with
-   `Authorization: Bearer {AUTH_SESSION_INTERNAL_TOKEN}`.
-3. The returned `user_id` becomes the tenant key for every SQL statement (`AuthUser.ID`).
-4. Missing or invalid cookie → `401 {"error":"unauthorized"}`. Public exceptions: `GET /healthz`,
-   `GET /readyz`.
+   `Authorization: Bearer {AUTH_SESSION_INTERNAL_TOKEN}`. Mutations need `health_csrf` +
+   allow-listed `Origin`.
+2. **Native (Bearer):** `Authorization: Bearer <opaque session>` → Auth
+   `GET /api/auth/session`. CSRF is skipped for Bearer. Logout uses
+   `DELETE /api/auth/session` with the same Bearer.
 
-Mutations additionally require a CSRF token: the `health_csrf` cookie (readable, host-only,
-`SameSite=Lax`, `Path=/`, `Secure` behind TLS) must match the `X-CSRF-Token` header, and `Origin`
-must be listed in `ALLOWED_ORIGINS`. The cookie is issued on any authenticated request.
+There is no local users table. The returned Auth `user_id` is the tenant key for every
+SQL statement. Missing or invalid credentials → `401 {"error":"unauthorized"}`. Public
+exceptions: `GET /healthz`, `GET /readyz`.
 
 `X-User-Id` / `X-User-Email` / `X-User-Roles` request headers are always discarded.
+
+No Supabase secrets are used by health-api.
 
 ## API
 
@@ -55,7 +56,9 @@ must be listed in `ALLOWED_ORIGINS`. The cookie is issued on any authenticated r
 | GET / POST / DELETE | `/api/v1/food-templates` | `DELETE /{uuid}`; no PATCH (Flutter parity) |
 | GET / POST | `/api/v1/workout-routines` | PATCH / DELETE `/{uuid}` |
 | GET / PUT | `/api/v1/daily-routine/{date}` | planner day, `YYYY-MM-DD` |
-| GET | `/api/v1/master/exercises?locale=ko` | categories + 257 definitions with translations |
+| GET | `/api/v1/master/exercises?locale=ko` | categories + definitions (SPA picker) |
+| GET | `/api/v1/master/bundle` | full native master dump (+ formulas) |
+| POST / GET | `/api/v1/sync/{resource}` | native push upsert / pull delta (`since`) |
 | GET | `/api/v1/summary?date=` | daily dashboard DTO |
 
 Conventions:
