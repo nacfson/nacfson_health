@@ -104,8 +104,9 @@ class _PhotoAnalysisCardState extends ConsumerState<PhotoAnalysisCard> {
       if (!mounted) return;
       if (e.message == 'DAILY_LIMIT_REACHED') {
         await _showLimitDialog();
-      } else if (e.message == 'GEMINI_API_KEY_MISSING') {
-        _showSnackBar('Gemini API 키(.env)를 설정해주세요');
+      } else if (e.message == 'GEMINI_API_KEY_MISSING' ||
+          e.message == 'AI_UNAVAILABLE') {
+        _showSnackBar('사진 분석은 현재 사용할 수 없습니다');
       } else {
         _showSnackBar('분석에 실패했습니다. 직접 입력해주세요');
       }

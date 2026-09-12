@@ -41,14 +41,16 @@
 
 ## 동기화 프로토콜 (4단계)
 
-`lib/core/sync/sync_state.dart` → `_syncAll()` 함수에서 실행. 백엔드는 **Supabase PostgreSQL** (v7 이후, Google Sheets는 제거됨 — `docs/changelog-v7.md` 참고).
+`lib/core/sync/sync_state.dart` → `_syncAll()` 함수에서 실행. 백엔드는 **health-web Go API + Postgres** (ProcessManager Auth Bearer). Supabase는 네이티브에서 제거됨.
 
 | 단계 | 방향 | 내용 |
 |------|------|------|
-| **1. Push** | 로컬 → Supabase | `sync_status = created/modified/deleted` 항목을 `batchPush*` 로 upsert. soft-delete 는 `is_deleted=true` 플래그. 성공 시 `synced`로 마킹 |
-| **2. Pull** | Supabase → 로컬 | `read*Delta(lastSyncAt)` 로 최근 변경 행을 가져와 로컬에 병합 |
+| **1. Push** | 로컬 → health-api | `sync_status = created/modified/deleted` 항목을 `HealthSyncService.batchPush*` → `POST /api/v1/sync/{table}` upsert. soft-delete 는 `is_deleted=true`. 성공 시 `synced`로 마킹 |
+| **2. Pull** | health-api → 로컬 | `read*Delta(lastSyncAt)` → `GET /api/v1/sync/{table}?since=` 로 최근 변경 행을 가져와 로컬에 병합 |
 | **3. HardDelete** | 로컬 | `sync_status = deleted` + push 반영 완료된 항목을 로컬 DB에서 영구 삭제 |
 | **4. Timestamp 갱신** | — | 오류 없을 때만 `lastSyncTimestamp` 업데이트 |
+
+**Auth**: opaque Bearer from ProcessManager Auth (`nacfsonhealth://login-callback?token=`). Cookie SSO remains for the web SPA only.
 
 **Pull 병합 전략**:
 - 레코드(`exercise_records`, `diet_records`, `weight_records`): LWW (Last-Write-Wins, `updated_at` 기준)
@@ -56,9 +58,11 @@
 - 루틴(`workout_routines`): LWW
 - `daily_routine`: 로컬 전용(동기화 안 함)
 
-**`ensureAllRequiredSheets()`**: legacy Google Sheets 시절의 함수 — Supabase 전환 이후 **no-op**. 호출자 정리 전까지 호환용으로 유지. Supabase 테이블 스키마는 서버 측에서 관리.
+**Master data**: `GET /api/v1/master/bundle` (categories/definitions/translations/formulas) → SQLite replace, TTL 24h.
 
-**컬럼 추가 시 운영 절차**: 로컬 DB 마이그레이션(`database_helper.dart`)에 앞서 Supabase 대시보드에서 테이블 ALTER 필수 (예: v9의 `exercise_records.set_type`).
+**`ensureAllRequiredSheets()`**: legacy no-op. Schema is managed by health-web migrations.
+
+**Fresh cloud**: no Supabase export/import. First sync after cutover uploads local SQLite rows to an empty Postgres tenant.
 
 ---
 

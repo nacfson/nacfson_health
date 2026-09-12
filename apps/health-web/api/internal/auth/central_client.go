@@ -34,6 +34,16 @@ type CookieSession struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+// BearerSession is the GET /api/auth/session response for opaque native tokens.
+type BearerSession struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	User      struct {
+		ID      string `json:"id"`
+		Email   string `json:"email"`
+		IsAdmin bool   `json:"is_admin"`
+	} `json:"user"`
+}
+
 type CentralClient struct {
 	baseURL       string
 	internalURL   string
@@ -70,6 +80,93 @@ func (c *CentralClient) backendURL() string {
 
 func NormalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+// ValidateSession calls GET /api/auth/session with the caller's opaque Bearer
+// token (native / non-cookie clients). Identity always comes from Auth — never
+// from client X-User-* headers.
+func (c *CentralClient) ValidateSession(ctx context.Context, token string) (AuthUser, BearerSession, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return AuthUser{}, BearerSession{}, ErrInvalidToken
+	}
+
+	endpoint, err := url.JoinPath(c.backendURL(), "/api/auth/session")
+	if err != nil {
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: session URL: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: session request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: session failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: read session: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return AuthUser{}, BearerSession{}, ErrInvalidToken
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: session status %d", resp.StatusCode)
+	}
+
+	var payload BearerSession
+	if err := json.Unmarshal(body, &payload); err != nil {
+		slog.Error("auth: decode bearer session", "error", err)
+		return AuthUser{}, BearerSession{}, fmt.Errorf("auth: decode session: %w", err)
+	}
+	email := NormalizeEmail(payload.User.Email)
+	if payload.User.ID == "" || email == "" {
+		return AuthUser{}, BearerSession{}, ErrInvalidToken
+	}
+	if !payload.ExpiresAt.IsZero() && !payload.ExpiresAt.After(time.Now()) {
+		return AuthUser{}, BearerSession{}, ErrInvalidToken
+	}
+	id, err := uuid.Parse(payload.User.ID)
+	if err != nil {
+		return AuthUser{}, BearerSession{}, ErrInvalidToken
+	}
+	payload.User.Email = email
+	return AuthUser{ID: id, Email: email}, payload, nil
+}
+
+// LogoutBearerSession calls DELETE /api/auth/session with a Bearer token.
+func (c *CentralClient) LogoutBearerSession(ctx context.Context, token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return ErrInvalidToken
+	}
+	endpoint, err := url.JoinPath(c.backendURL(), "/api/auth/session")
+	if err != nil {
+		return fmt.Errorf("auth: bearer logout URL: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("auth: bearer logout request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth: bearer logout failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return ErrInvalidToken
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("auth: bearer logout status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // ValidateCookieSession calls GET /api/internal/cookie-session (PN algorithm).

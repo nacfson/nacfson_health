@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../features/diet/data/repositories/diet_repository.dart';
 import '../../features/diet/presentation/providers/diet_provider.dart';
@@ -14,8 +13,8 @@ import '../../features/settings/presentation/providers/food_template_provider.da
 import '../../features/weight/data/repositories/weight_repository.dart';
 import '../../features/weight/presentation/providers/weight_provider.dart';
 import '../nutrition/nutrition_targets.dart';
-import 'google_auth_service.dart';
-import 'supabase_service.dart';
+import 'health_auth_service.dart';
+import 'health_sync_service.dart';
 import 'sync_preferences.dart';
 import 'sync_status.dart';
 
@@ -44,27 +43,29 @@ final lastSyncTimeProvider = Provider<DateTime?>((ref) {
 });
 
 // ============================================================================
-// Provider: GoogleAuthService (Supabase 구현체 래퍼)
+// Provider: HealthAuthService (ProcessManager Auth)
 // ============================================================================
 
-final googleAuthServiceProvider = Provider<GoogleAuthService>((ref) {
-  return GoogleAuthService();
+final googleAuthServiceProvider = Provider<HealthAuthService>((ref) {
+  return sharedHealthAuth();
 });
 
 // ============================================================================
-// Provider: SupabaseService
+// Provider: HealthSyncService
 // ============================================================================
 
-final supabaseServiceProvider = Provider<SupabaseService>((ref) {
-  return SupabaseService();
+final supabaseServiceProvider = Provider<HealthSyncService>((ref) {
+  final svc = HealthSyncService();
+  svc.attachToken(sharedHealthAuth().accessToken);
+  return svc;
 });
 
 // ============================================================================
-// Provider: Supabase Auth Stream (반응형 로그인 상태)
+// Provider: Auth Stream (반응형 로그인 상태)
 // ============================================================================
 
 final supabaseAuthStreamProvider = StreamProvider<AuthState>((ref) {
-  return Supabase.instance.client.auth.onAuthStateChange;
+  return sharedHealthAuth().onAuthStateChange;
 });
 
 // ============================================================================
@@ -108,7 +109,7 @@ final syncStateProvider = StateNotifierProvider<SyncStateNotifier, SyncState>((
 });
 
 class SyncStateNotifier extends StateNotifier<SyncState> {
-  final SupabaseService _supabaseService;
+  final HealthSyncService _supabaseService;
   final SyncPreferences _prefs;
   final ExerciseRepository _exerciseRepo;
   final DietRepository _dietRepo;
@@ -124,7 +125,7 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
   final WorkoutRoutineNotifier _workoutRoutineNotifier;
 
   SyncStateNotifier({
-    required SupabaseService supabaseService,
+    required HealthSyncService supabaseService,
     required SyncPreferences prefs,
     required ExerciseRepository exerciseRepo,
     required DietRepository dietRepo,
@@ -155,9 +156,10 @@ class SyncStateNotifier extends StateNotifier<SyncState> {
         super(SyncState.idle);
 
   Future<SyncResult> performSync() async {
-    if (Supabase.instance.client.auth.currentUser == null) {
+    if (!sharedHealthAuth().isSignedIn) {
       throw Exception('로그인이 필요합니다');
     }
+    _supabaseService.attachToken(sharedHealthAuth().accessToken);
 
     // 동시 sync 가드: 백그라운드 복귀 + 사용자 클릭 + auth 콜백이 동시에 트리거할 때
     // 두번째 호출은 무위 반환. push/pull 카운트 0 으로 리포트.
@@ -216,21 +218,21 @@ final isSyncingProvider = Provider<bool>((ref) {
 });
 
 // ============================================================================
-// Provider: Is Signed In (Supabase auth stream 기반)
+// Provider: Is Signed In (Auth stream 기반)
 // ============================================================================
 
 final isSignedInProvider = Provider<bool>((ref) {
   ref.watch(supabaseAuthStreamProvider);
-  return Supabase.instance.client.auth.currentUser != null;
+  return sharedHealthAuth().isSignedIn;
 });
 
 // ============================================================================
-// Provider: Current Account (Supabase User)
+// Provider: Current Account
 // ============================================================================
 
-final currentAccountProvider = Provider<User?>((ref) {
+final currentAccountProvider = Provider<AuthAccount?>((ref) {
   ref.watch(supabaseAuthStreamProvider);
-  return Supabase.instance.client.auth.currentUser;
+  return sharedHealthAuth().currentAccount;
 });
 
 // ============================================================================
@@ -316,7 +318,7 @@ typedef NutritionTargetsProvider = NutritionTargetsNotifier;
 // ============================================================================
 
 Future<SyncResult> _syncAll(
-  SupabaseService supabaseService,
+  HealthSyncService supabaseService,
   ExerciseRepository exerciseRepo,
   DietRepository dietRepo,
   ExerciseTemplateRepository templateRepo,

@@ -25,11 +25,11 @@ dependencies:
   sqflite: ^2.4.2
   path: ^1.9.1
 
-  # Supabase
-  supabase_flutter: ^2.8.4
-
   # URL 런처 (OAuth 브라우저 오픈)
   url_launcher: ^6.3.1
+  app_links: ^6.4.0
+  http: ^1.2.2
+  flutter_secure_storage: ^9.2.4
 
   # 로컬 저장소 및 유틸리티
   shared_preferences: ^2.3.5
@@ -44,10 +44,7 @@ dependencies:
   # iOS 26 Liquid Glass (iOS 전용 PlatformView, iOS ≤ 25 / Android 는 fallback)
   native_liquid_glass: ^0.2.6
 
-  # AI
-  google_generative_ai: ^0.4.7
-
-  # 사진 음식 분석
+  # 사진 음식 분석 (AI gated — picker kept for UI)
   image_picker: ^1.1.2
   image: ^4.2.0
   crypto: ^3.0.5

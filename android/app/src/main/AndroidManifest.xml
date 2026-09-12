@@ -40,12 +40,12 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Supabase OAuth 콜백용 딥링크 스킴 -->
-            <intent-filter android:label="supabase_oauth_callback">
+            <!-- nacfson.cloud Auth 콜백용 딥링크 스킴 -->
+            <intent-filter android:label="health_auth_callback">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="io.supabase.nacfson"
+                <data android:scheme="nacfsonhealth"
                       android:host="login-callback"/>
             </intent-filter>
         </activity>

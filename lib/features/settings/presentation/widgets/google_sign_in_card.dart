@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/sync/google_auth_service.dart';
+import '../../../../core/sync/health_auth_service.dart';
 import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 
@@ -22,7 +22,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
       final authService = ref.read(googleAuthServiceProvider);
       await authService.signIn();
       // 세션 도착은 Supabase auth stream이 자동으로 처리
-    } on GoogleSignInException catch (e) {
+    } on HealthAuthException catch (e) {
       ErrorOverlay.show(
         title: '로그인 실패',
         message: e.message,
@@ -74,7 +74,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Google 연동',
+                  '클라우드 연동',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -82,7 +82,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
             const SizedBox(height: 12),
             if (isSignedIn && currentAccount != null) ...[
               Text(
-                currentAccount.email ?? '알 수 없는 계정',
+                currentAccount.email,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
@@ -101,7 +101,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
               ),
             ] else ...[
               Text(
-                'Google 계정에 연결하면 데이터를 Supabase에 백업할 수 있습니다.',
+                'nacfson.cloud 계정에 연결하면 데이터를 백업하고 기기 간 동기화할 수 있습니다.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 8),
@@ -115,7 +115,7 @@ class _GoogleSignInCardState extends ConsumerState<GoogleSignInCard> {
                           width: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Google로 로그인'),
+                      : const Text('로그인'),
                 ),
               ),
             ],

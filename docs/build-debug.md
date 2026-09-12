@@ -312,7 +312,10 @@ class _MyFormState extends ConsumerState<MyForm> {
 
 **증상**: 요약 화면에서 "AI 분석 중 오류가 발생했습니다." 표시
 
-**환경 변수 주입 방식 (v12.1+)**: `flutter_dotenv` 의 asset 번들 방식은 IPA/APK 디컴파일 시 키가 평문 노출되는 위험이 있어 폐기. 모든 키(`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GEMINI_API_KEY`)는 빌드 시점 `--dart-define-from-file=.env` 로 주입한다. 단일 진입점은 `lib/core/config/app_env.dart`.
+**환경 변수 주입 방식 (cutover+)**: `--dart-define-from-file=.env` 로
+`HEALTH_API_BASE_URL`, `CENTRAL_AUTH_URL`, `AUTH_REDIRECT_URL` 을 주입한다
+(기본값은 production hosts). `SUPABASE_*` / `GEMINI_API_KEY` 는 제거됨. 단일 진입점은
+`lib/core/config/app_env.dart`.
 
 **체크리스트**:
 

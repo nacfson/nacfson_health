@@ -19,11 +19,17 @@ const (
 	csrfTokenTTL   = 24 * time.Hour
 )
 
-// csrfProtection issues the CSRF cookie for authenticated requests and enforces
-// it (plus an allow-listed Origin) on mutations.
+// csrfProtection issues the CSRF cookie for cookie-authenticated requests and
+// enforces it (plus an allow-listed Origin) on mutations. Bearer (native)
+// clients skip CSRF — it only protects browser sibling-subdomain cookie abuse.
 func (h *Handler) csrfProtection(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := UserFromContext(r.Context()); !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if method, ok := authMethodFromContext(r.Context()); ok && method == authMethodBearer {
 			next.ServeHTTP(w, r)
 			return
 		}

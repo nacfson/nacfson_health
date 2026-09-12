@@ -801,9 +801,10 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
             error: (e, _) {
               final msg = e.toString();
               final String text;
-              if (msg.contains('GEMINI_API_KEY_MISSING') ||
+              if (msg.contains('AI_UNAVAILABLE') ||
+                  msg.contains('GEMINI_API_KEY_MISSING') ||
                   msg.contains('API')) {
-                text = 'Gemini API 키를 .env 파일에 설정해주세요.';
+                text = 'AI 인사이트는 현재 사용할 수 없습니다.';
               } else {
                 text = '인사이트를 불러오지 못했습니다. 새로고침해보세요.';
               }

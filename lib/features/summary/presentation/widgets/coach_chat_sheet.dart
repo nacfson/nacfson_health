@@ -342,10 +342,11 @@ class _ErrorBanner extends ConsumerWidget {
     if (error.contains('CHAT_DAILY_LIMIT_REACHED')) {
       text =
           '오늘 코치 대화는 $kCoachChatDailyLimit회까지 이용할 수 있어요. 내일 다시 이용해주세요.';
-    } else if (error.contains('GEMINI_API_KEY_MISSING') ||
+    } else if (error.contains('AI_UNAVAILABLE') ||
+        error.contains('GEMINI_API_KEY_MISSING') ||
         error.contains('API_KEY') ||
         error.contains('API key')) {
-      text = 'Gemini API 키가 설정되지 않았거나 유효하지 않아요. .env 파일을 확인해주세요.';
+      text = 'AI 코치는 현재 사용할 수 없어요. 곧 다시 제공될 예정입니다.';
     } else if (error.contains('RESOURCE_EXHAUSTED') ||
         error.contains('quota') ||
         error.contains('429') ||

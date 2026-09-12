@@ -15,6 +15,15 @@ type contextKey string
 const (
 	userContextKey          contextKey = "authUser"
 	sessionCookieContextKey contextKey = "authSessionCookie"
+	authMethodContextKey    contextKey = "authMethod"
+	bearerTokenContextKey   contextKey = "authBearerToken"
+)
+
+type authMethod string
+
+const (
+	authMethodCookie authMethod = "cookie"
+	authMethodBearer authMethod = "bearer"
 )
 
 func withUser(ctx context.Context, user auth.AuthUser) context.Context {
@@ -23,6 +32,14 @@ func withUser(ctx context.Context, user auth.AuthUser) context.Context {
 
 func withSessionCookie(ctx context.Context, cookieValue string) context.Context {
 	return context.WithValue(ctx, sessionCookieContextKey, cookieValue)
+}
+
+func withAuthMethod(ctx context.Context, method authMethod) context.Context {
+	return context.WithValue(ctx, authMethodContextKey, method)
+}
+
+func withBearerToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, bearerTokenContextKey, token)
 }
 
 // UserFromContext returns the authenticated caller placed there by the auth
@@ -37,11 +54,21 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 	return value, ok
 }
 
-// authMiddleware validates the central session cookie. There is no bearer path
-// for the web MVP: a missing or invalid cookie is always 401.
+func authMethodFromContext(ctx context.Context) (authMethod, bool) {
+	method, ok := ctx.Value(authMethodContextKey).(authMethod)
+	return method, ok
+}
+
+func bearerTokenFromContext(ctx context.Context) (string, bool) {
+	value, ok := ctx.Value(bearerTokenContextKey).(string)
+	return value, ok
+}
+
+// authMiddleware validates the central session cookie or an opaque Bearer
+// token. Cookie wins when present (SPA SSO). Missing or invalid credentials
+// always yield 401. Client X-User-* headers are never trusted.
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Never trust identity headers: identity comes from the cookie check only.
 		discardClientIdentityHeaders(r)
 
 		if isPublicRequest(r) {
@@ -49,30 +76,51 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		cookie, err := r.Cookie(auth.CentralSessionCookieName)
-		if err != nil || strings.TrimSpace(cookie.Value) == "" {
+		if cookie, err := r.Cookie(auth.CentralSessionCookieName); err == nil && strings.TrimSpace(cookie.Value) != "" {
+			user, _, err := h.central.ValidateCookieSession(r.Context(), cookie.Value)
+			if err != nil {
+				writeAuthFailure(w, err)
+				return
+			}
+			ctx := withAuthMethod(withSessionCookie(withUser(r.Context(), user), cookie.Value), authMethodCookie)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		token := bearerToken(r)
+		if token == "" {
 			writeUnauthorized(w)
 			return
 		}
-
-		user, _, err := h.central.ValidateCookieSession(r.Context(), cookie.Value)
+		user, _, err := h.central.ValidateSession(r.Context(), token)
 		if err != nil {
-			switch {
-			case errors.Is(err, auth.ErrInvalidToken):
-				writeUnauthorized(w)
-			case errors.Is(err, auth.ErrInternalAuthNotConfigured):
-				slog.Error("api: central auth is not configured", "error", err)
-				writeError(w, http.StatusInternalServerError, "internal", "authentication is not configured")
-			default:
-				slog.Error("api: cookie session validation failed", "error", err)
-				writeError(w, http.StatusServiceUnavailable, "auth_unavailable", "could not validate the session")
-			}
+			writeAuthFailure(w, err)
 			return
 		}
-
-		ctx := withSessionCookie(withUser(r.Context(), user), cookie.Value)
+		ctx := withAuthMethod(withBearerToken(withUser(r.Context(), user), token), authMethodBearer)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func writeAuthFailure(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, auth.ErrInvalidToken):
+		writeUnauthorized(w)
+	case errors.Is(err, auth.ErrInternalAuthNotConfigured):
+		slog.Error("api: central auth is not configured", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal", "authentication is not configured")
+	default:
+		slog.Error("api: session validation failed", "error", err)
+		writeError(w, http.StatusServiceUnavailable, "auth_unavailable", "could not validate the session")
+	}
+}
+
+func bearerToken(r *http.Request) string {
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if !strings.HasPrefix(header, "Bearer ") {
+		return ""
+	}
+	return strings.TrimSpace(header[7:])
 }
 
 // isPublicRequest reports whether a request may bypass authentication.

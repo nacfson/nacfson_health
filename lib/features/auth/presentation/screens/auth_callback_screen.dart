@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/sync/health_auth_service.dart';
 import '../../../../core/sync/sync_state.dart';
 import '../../../../shared/widgets/error_overlay.dart';
 
@@ -22,7 +22,6 @@ class _AuthCallbackScreenState extends ConsumerState<AuthCallbackScreen> {
   @override
   void initState() {
     super.initState();
-    // build 밖에서 한 번만 리스너 등록. signedIn 이벤트가 오면 라우팅 처리.
     _subscription = ref.listenManual<AsyncValue<AuthState>>(
       supabaseAuthStreamProvider,
       (_, next) {
@@ -35,6 +34,14 @@ class _AuthCallbackScreenState extends ConsumerState<AuthCallbackScreen> {
         });
       },
     );
+    // Already signed in when landing here (token accepted before route).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_handled) return;
+      if (sharedHealthAuth().isSignedIn) {
+        _handled = true;
+        _onSignedIn();
+      }
+    });
   }
 
   @override
@@ -45,9 +52,7 @@ class _AuthCallbackScreenState extends ConsumerState<AuthCallbackScreen> {
 
   void _onSignedIn() {
     if (!mounted) return;
-    // 로그인 시작 화면(설정)으로 복귀. /exercise 강제 이동으로 인한 혼란 방지.
     context.go('/settings');
-    // 동기화는 라우팅 이후 백그라운드에서 실행. 실패해도 화면은 유지.
     unawaited(_syncInBackground());
   }
 

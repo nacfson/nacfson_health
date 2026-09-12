@@ -5,9 +5,9 @@ import '../../data/repositories/activity_repository.dart';
 import '../../data/sources/health_data_source.dart';
 import '../../domain/entities/daily_activity.dart';
 
-/// HealthDataSource 싱글톤. main.dart 에서 override 하지 않으면 실제 구현 사용.
+/// HealthDataSource 싱글톤 — HealthKit / Health Connect 는 cutover 동안 게이트.
 final healthDataSourceProvider = Provider<HealthDataSource>((ref) {
-  return HealthDataSourceImpl();
+  return const GatedHealthDataSource();
 });
 
 /// ActivityRepository 싱글톤.
