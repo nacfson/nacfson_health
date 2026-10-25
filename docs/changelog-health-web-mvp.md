@@ -11,7 +11,7 @@ Web product at `https://health.nacfson.cloud` (ProcessManager Option B). Lives i
 
 ## Ops remaining (cluster unreachable from implement workstation)
 
-1. ~~Push `health-api` / `health-frontend` to `192.168.219.100:5000`~~ → GHCR publish automated (`.github/workflows/publish-ghcr-images.yml`, 2026-10-25): `ghcr.io/nacfson/health-{backend,frontend}`; pin digests in `nacfson_pipeline`
+1. ~~Push `health-api` / `health-frontend` to `192.168.219.100:5000`~~ → GHCR publish automated (`.github/workflows/publish-ghcr-images.yml`, 2026-10-25): `ghcr.io/nacfson/health-{backend,frontend}`; pin digests in `nacfson_pipeline`. Actions bumped to Node 24 majors (checkout v7, setup-go v7, docker/* v4/v6/v7) to clear the Node.js 20 deprecation warning
 2. Provision DB `health` on `shared-app-db.nacfson-data`
 3. Fill `health-secrets`, apply manifests, run migrate Job
 4. Browser smoke on `https://health.nacfson.cloud`
