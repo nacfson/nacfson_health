@@ -27,7 +27,7 @@ no bearer-token path.
    `Authorization: Bearer {AUTH_SESSION_INTERNAL_TOKEN}`.
 3. The returned `user_id` becomes the tenant key for every SQL statement (`AuthUser.ID`).
 4. Missing or invalid cookie → `401 {"error":"unauthorized"}`. Public exceptions: `GET /healthz`,
-   `GET /readyz`.
+   `GET /readyz`, `GET /api/auth/config`.
 
 Mutations additionally require a CSRF token: the `health_csrf` cookie (readable, host-only,
 `SameSite=Lax`, `Path=/`, `Secure` behind TLS) must match the `X-CSRF-Token` header, and `Origin`
@@ -41,6 +41,7 @@ must be listed in `ALLOWED_ORIGINS`. The cookie is issued on any authenticated r
 |---|---|---|
 | GET | `/healthz` | liveness, no auth |
 | GET | `/readyz` | DB ping, no auth |
+| GET | `/api/auth/config` | `{auth_url}` (public central Auth URL); no auth, no DB, no Auth call. Frontend `startupProbe` target in nacfson_pipeline |
 | GET | `/api/me` | `{user_id,email}`, issues `health_csrf` |
 | POST | `/api/logout` | revokes the cookie session via Auth |
 | GET / PUT | `/api/v1/profile` | upsert profile; `GET` returns `exists:false` + defaults when unset |
@@ -140,7 +141,8 @@ cross-compiles for the target (`TARGETOS`/`TARGETARCH`), so arm64 builds skip QE
 - `go vet` + `go test` for the API, and `frontend/smoke-test.sh`, gate both builds. The smoke test
   runs the SPA image the way the pipeline pod does (UID 10001, read-only rootfs, all capabilities
   dropped, writable `/tmp` · `/var/cache/nginx` · `/var/log/nginx`) against a stub `health-backend`.
-  It checks `/` and `/healthz` on 8080.
+  It checks `/`, `/healthz` and `/api/auth/config` on 8080 (the liveness, readiness and startup probe
+  paths).
 - Pull requests (and manual runs from other branches) build both images without logging in or
   pushing.
 - After pushing, the run re-reads the published index and fails if a platform, label, or port is

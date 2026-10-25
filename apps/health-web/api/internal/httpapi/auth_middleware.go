@@ -81,7 +81,7 @@ func isPublicRequest(r *http.Request) bool {
 		return false
 	}
 	switch strings.TrimRight(r.URL.Path, "/") {
-	case "/healthz", "/readyz":
+	case "/healthz", "/readyz", "/api/auth/config":
 		return true
 	default:
 		return false
