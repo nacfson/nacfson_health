@@ -1,0 +1,174 @@
+name: Publish health-web images
+
+# Builds the health-web API and SPA images for linux/amd64 + linux/arm64 and
+# publishes them to GHCR on every push to main that touches apps/health-web/**.
+#
+# - Pull requests (and manual runs from non-main branches) build both images
+#   without logging in or pushing, so they can never overwrite published tags.
+# - Tags: 7-char commit SHA (+ `latest` on main). The resolver in
+#   nacfson_pipeline's `update-project-images` skill looks up `sha[:7]`,
+#   matches jobs by the role word in the job name ("backend" / "frontend"),
+#   and blocks on a revision-label mismatch, so keep those three in sync.
+# - After pushing, the verify step re-reads the published index and fails the
+#   run if either platform, the source/revision labels, or the port is wrong.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/health-web/**"
+      - ".github/workflows/publish-ghcr-images.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/health-web/**"
+      - ".github/workflows/publish-ghcr-images.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a main run mid-publish; superseded PR runs can go.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  api-tests:
+    # Keep the role words "backend"/"frontend" out of this name: the pin
+    # resolver treats any job whose name contains them as a publish job.
+    name: API tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/health-web/api
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/health-web/api/go.mod
+          cache-dependency-path: apps/health-web/api/go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+  publish:
+    name: Publish ${{ matrix.role }} image
+    needs: api-tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - role: backend
+            image: health-backend
+            context: apps/health-web/api
+            port: "8080"
+          - role: frontend
+            image: health-frontend
+            context: apps/health-web/frontend
+            # Current nginx `listen 80`. Moves to 8080 together with the
+            # frontend runtime fix for the nacfson_pipeline Deployment.
+            port: "80"
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # metadata-action also emits org.opencontainers.image.source and
+      # org.opencontainers.image.revision (= github.sha); do not set them here.
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.description=nacfson_health health-web ${{ matrix.role }}
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build (and push on main)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          cache-from: type=gha,scope=${{ matrix.role }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.role }}
+
+      - name: Verify published image
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PORT: ${{ matrix.port }}
+        run: |
+          set -euo pipefail
+          REF="${IMAGE}@${DIGEST}"
+          # For a multi-platform index this is a map: "linux/<arch>" -> image config.
+          docker buildx imagetools inspect "$REF" --format '{{json .Image}}' > image.json
+          SRC="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          for p in linux/amd64 linux/arm64; do
+            jq -e --arg p "$p" 'has($p)' image.json > /dev/null \
+              || { echo "::error::$REF is missing $p"; exit 1; }
+            jq -e --arg p "$p" --arg v "$GITHUB_SHA" \
+              '.[$p].config.Labels["org.opencontainers.image.revision"] == $v' image.json > /dev/null \
+              || { echo "::error::$p revision label != $GITHUB_SHA"; exit 1; }
+            jq -e --arg p "$p" --arg v "$SRC" \
+              '.[$p].config.Labels["org.opencontainers.image.source"] == $v' image.json > /dev/null \
+              || { echo "::error::$p source label != $SRC"; exit 1; }
+            jq -e --arg p "$p" --arg v "${PORT}/tcp" \
+              '.[$p].config.ExposedPorts | has($v)' image.json > /dev/null \
+              || { echo "::error::$p does not expose ${PORT}/tcp"; exit 1; }
+          done
+          echo "verified $REF"
+
+      - name: Summary
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          ROLE: ${{ matrix.role }}
+        run: |
+          {
+            echo "### ${ROLE} image published"
+            echo ""
+            echo "Tags:"
+            echo ""
+            while IFS= read -r tag; do
+              if [ -n "$tag" ]; then echo "- \`${tag}\`"; fi
+            done <<< "$TAGS"
+            echo ""
+            echo "Pin (for nacfson_pipeline \`update-project-images\`):"
+            echo ""
+            echo "\`${IMAGE}@${DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
