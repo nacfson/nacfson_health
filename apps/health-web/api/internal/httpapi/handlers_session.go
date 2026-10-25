@@ -10,6 +10,19 @@ type meResponse struct {
 	Email  string `json:"email"`
 }
 
+type authConfigResponse struct {
+	AuthURL string `json:"auth_url"`
+}
+
+// authConfig is public and DB-free: it exposes only the public central Auth
+// URL (never the internal URL or token). nacfson_pipeline's frontend
+// startupProbe hits it through nginx `location /api/` to prove the proxy
+// reaches the backend (CONTRACT_PROBES_READINESS), so it must not depend on
+// the database or the central Auth service.
+func (h *Handler) authConfig(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, authConfigResponse{AuthURL: h.cfg.CentralAuthURL})
+}
+
 // me is the SPA bootstrap call: it identifies the caller and (via the CSRF
 // middleware) guarantees the health_csrf cookie exists for later mutations.
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {

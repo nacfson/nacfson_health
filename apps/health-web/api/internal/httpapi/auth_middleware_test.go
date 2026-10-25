@@ -84,6 +84,7 @@ func newTestHandler(t *testing.T, stub *centralStub) http.Handler {
 	cfg := config.Config{
 		AppAddr:        ":0",
 		AllowedOrigins: []string{"https://health.nacfson.cloud"},
+		CentralAuthURL: "https://auth.nacfson.cloud",
 	}
 	central := auth.NewCentralClient(stub.server.URL, stub.server.URL, "internal-token", stub.server.Client())
 	return NewHandler(cfg, nil, central)

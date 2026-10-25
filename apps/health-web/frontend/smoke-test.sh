@@ -34,9 +34,10 @@ fail() {
 docker build -q -t "$IMAGE" "$HERE" > /dev/null
 docker network create "$NET" > /dev/null
 
-# Stub backend: answers /healthz with "ok" under the Service name nginx proxies to.
+# Stub backend: answers /healthz and /api/auth/config with "ok" under the
+# Service name nginx proxies to.
 docker run -d --name "$BE" --network "$NET" --network-alias health-backend \
-  busybox:1.36 sh -c 'mkdir -p /www && echo ok > /www/healthz && exec httpd -f -p 8080 -h /www' > /dev/null
+  busybox:1.36 sh -c 'mkdir -p /www/api/auth && echo ok > /www/healthz && echo ok > /www/api/auth/config && exec httpd -f -p 8080 -h /www' > /dev/null
 
 docker run -d --name "$FE" --network "$NET" \
   --user 10001:10001 --read-only --cap-drop ALL --security-opt no-new-privileges \
@@ -57,5 +58,8 @@ curl -fsS "http://127.0.0.1:${PORT}/" | grep -qi '<html' \
   || fail "GET / on 8080 did not return the SPA shell (liveness probe)"
 [ "$(curl -fsS "http://127.0.0.1:${PORT}/healthz")" = "ok" ] \
   || fail "GET /healthz on 8080 was not proxied to health-backend (readiness probe)"
+# The real backend route is covered by internal/httpapi/handlers_session_test.go.
+[ "$(curl -fsS "http://127.0.0.1:${PORT}/api/auth/config")" = "ok" ] \
+  || fail "GET /api/auth/config on 8080 was not proxied to health-backend (startup probe)"
 
 echo "frontend smoke test passed"

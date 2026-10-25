@@ -28,6 +28,7 @@ func NewHandler(cfg config.Config, st *store.Store, central *auth.CentralClient)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.healthz)
 	mux.HandleFunc("GET /readyz", h.readyz)
+	mux.HandleFunc("GET /api/auth/config", h.authConfig)
 	mux.HandleFunc("GET /api/me", h.me)
 	mux.HandleFunc("POST /api/logout", h.logout)
 
