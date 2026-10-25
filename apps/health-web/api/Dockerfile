@@ -1,15 +1,18 @@
 # syntax=docker/dockerfile:1
 
 # --- build -------------------------------------------------------------------
-FROM golang:1.23-bookworm AS build
+# Compile on the builder's native platform and cross-compile for the target,
+# so multi-arch (amd64 + arm64) builds never run the Go toolchain under QEMU.
+FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS build
 
 WORKDIR /src
+ARG TARGETOS TARGETARCH
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api \
-    && CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api \
+    && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
 # --- runtime -----------------------------------------------------------------
 # Migrations run through this same image (`./migrate up` then `./migrate seed`),

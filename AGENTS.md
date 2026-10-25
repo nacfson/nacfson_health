@@ -6,7 +6,7 @@
 
 - **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
 - **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
-- **Web (Option B)**: `apps/health-web/` — Go API + vanilla SPA at `https://health.nacfson.cloud` (ProcessManager SSO + Postgres). Native `lib/`/`ios/`/`android/` 경로와 분리. 상세: `apps/health-web/README.md`, `docs/changelog-health-web-mvp.md`
+- **Web (Option B)**: `apps/health-web/` — Go API + vanilla SPA at `https://health.nacfson.cloud` (ProcessManager SSO + Postgres). Native `lib/`/`ios/`/`android/` 경로와 분리. 상세: `apps/health-web/README.md`, `docs/changelog-health-web-mvp.md`. 이미지: GHCR `ghcr.io/nacfson/health-{backend,frontend}` via `.github/workflows/publish-ghcr-images.yml`
 - **DB 버전**: v12 (테이블 13개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine + v12 신규 5개 admin-curated 마스터: exercise_categories · exercise_category_translations · exercise_definitions · exercise_translations · one_rm_formulas. v12: 다국어 지원(ko/en) + 종목별 권위 1RM 공식 — exercise_records/templates 에 exercise_key 컬럼 추가, NSCA LeSuer 1997 검증 기반 Mayhew/Wathen/Brzycki 공식 적용, 1RM 코치 진입 시 Supabase TTL 24h fetch. v12-5: Atwater 4/4/9 derived kcal — diet_records.total_calories / food_templates.calories 컬럼 유지, 저장 시 매크로에서 자동 산출. v12-6: master 운동 시드 약 100종 추가(머신·케이블 + 무기구 — 총 ~257종) + 앱 번들 시드 도입(`assets/master_exercise_seed_v12_6.json` — 오프라인 첫 실행에서도 picker 동작 보장) + 운동 추가 시트의 [직접 입력] 진입점 제거. v12-8: 개별 커스텀 운동 템플릿은 `exercise_key/category_key=NULL` 로 저장, nullable identity 컬럼은 master-linked 데이터 호환을 위해 Supabase user-owned 테이블에도 보강)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화

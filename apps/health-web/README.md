@@ -115,9 +115,39 @@ go test ./...
 `api/Dockerfile` builds one image containing both binaries plus `db/`:
 
 ```bash
-docker build -t 192.168.219.100:5000/health-api:latest apps/health-web/api
+docker build -t ghcr.io/nacfson/health-backend:dev apps/health-web/api
 ```
 
 `WORKDIR` is `/app` (`./api`, `./migrate`, `db/migrations`, `db/master_exercise_seed_v12_6.json`), so
 the migrate Job only needs `DATABASE_URL` and can run `./migrate up` followed by `./migrate seed`.
-The image runs as UID 65532.
+The image runs as UID 65532. The Go build stage runs on the builder's native platform and
+cross-compiles for the target (`TARGETOS`/`TARGETARCH`), so arm64 builds skip QEMU for compilation.
+
+## Published images (CI)
+
+`.github/workflows/publish-ghcr-images.yml` publishes both images on every push to `main` that touches
+`apps/health-web/**` (or the workflow itself):
+
+| Image | Context | Port |
+|---|---|---|
+| `ghcr.io/nacfson/health-backend` | `apps/health-web/api` | 8080 |
+| `ghcr.io/nacfson/health-frontend` | `apps/health-web/frontend` | 80 |
+
+- Platforms: `linux/amd64` + `linux/arm64` (one OCI index per tag).
+- Tags: 7-char commit SHA, plus `latest` on `main`.
+- Labels: `org.opencontainers.image.source` (this repo) and `org.opencontainers.image.revision`
+  (full commit SHA).
+- `go vet` + `go test` for the API gate both builds.
+- Pull requests (and manual runs from other branches) build both images without logging in or
+  pushing.
+- After pushing, the run re-reads the published index and fails if a platform, label, or port is
+  wrong. The run's step summary prints the `ghcr.io/nacfson/health-<role>@sha256:…` pin.
+
+Deployment pins live in `nacfson_pipeline` (`deploy/projects/health/workloads/*.yaml`). Update them
+with that repo's `update-project-images` skill, e.g. `proj-health backend image: <Actions run URL>`.
+The publish job names (`Publish backend image` / `Publish frontend image`) carry the role word that
+skill matches on, so keep them.
+
+If the first push fails with `denied: permission_denied: write_package`, the package was created
+outside Actions: open the package on GitHub → Package settings → Manage Actions access → add
+`nacfson/nacfson_health` with **Write**, then re-run the failed jobs.

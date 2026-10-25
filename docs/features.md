@@ -1,6 +1,6 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-09-11 (health-web MVP)
+> **마지막 업데이트**: 2026-10-25 (health-web GHCR publish)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
@@ -13,7 +13,8 @@
 - [x] Postgres user-owned 스키마 + master 시드 (`./migrate up` + `./migrate seed`)
 - [x] 5탭 CRUD — 운동|식단|체중|요약|설정; Atwater 서버 계산; summary DTO; daily_routine self-heal
 - [x] K8s manifests — `ProcessManager/k8s/health/` (`health.nacfson.cloud`)
-- [ ] 클러스터 배포 완료 — registry push + shared-app-db provision + migrate Job + Ingress smoke (API 192.168.219.120:6443 unreachable at implement time)
+- [x] GHCR 이미지 자동 배포 — `.github/workflows/publish-ghcr-images.yml` (main push, amd64+arm64, sha7/latest, PR build-only, 게시 후 index 검증)
+- [ ] 클러스터 배포 완료 — ~~registry push~~ (GHCR CI 로 대체) + shared-app-db provision + migrate Job + Ingress smoke (API 192.168.219.120:6443 unreachable at implement time)
 - [ ] Native↔web sync bridge (P4, out of MVP)
 
 ### v12-5 (2026-05) — 칼로리 자동 계산 (Atwater)
