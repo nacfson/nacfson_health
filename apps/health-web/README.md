@@ -131,13 +131,16 @@ cross-compiles for the target (`TARGETOS`/`TARGETARCH`), so arm64 builds skip QE
 | Image | Context | Port |
 |---|---|---|
 | `ghcr.io/nacfson/health-backend` | `apps/health-web/api` | 8080 |
-| `ghcr.io/nacfson/health-frontend` | `apps/health-web/frontend` | 80 |
+| `ghcr.io/nacfson/health-frontend` | `apps/health-web/frontend` | 8080 |
 
 - Platforms: `linux/amd64` + `linux/arm64` (one OCI index per tag).
 - Tags: 7-char commit SHA, plus `latest` on `main`.
 - Labels: `org.opencontainers.image.source` (this repo) and `org.opencontainers.image.revision`
   (full commit SHA).
-- `go vet` + `go test` for the API gate both builds.
+- `go vet` + `go test` for the API, and `frontend/smoke-test.sh`, gate both builds. The smoke test
+  runs the SPA image the way the pipeline pod does (UID 10001, read-only rootfs, all capabilities
+  dropped, writable `/tmp` · `/var/cache/nginx` · `/var/log/nginx`) against a stub `health-backend`.
+  It checks `/` and `/healthz` on 8080.
 - Pull requests (and manual runs from other branches) build both images without logging in or
   pushing.
 - After pushing, the run re-reads the published index and fails if a platform, label, or port is

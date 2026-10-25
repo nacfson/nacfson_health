@@ -59,9 +59,20 @@ jobs:
       - name: go test
         run: go test ./...
 
+  spa-smoke:
+    # Role words stay out of this name too (see api-tests).
+    name: SPA runtime smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run SPA image under the pod's security constraints
+        run: bash apps/health-web/frontend/smoke-test.sh
+
   publish:
     name: Publish ${{ matrix.role }} image
-    needs: api-tests
+    needs: [api-tests, spa-smoke]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -74,9 +85,7 @@ jobs:
           - role: frontend
             image: health-frontend
             context: apps/health-web/frontend
-            # Current nginx `listen 80`. Moves to 8080 together with the
-            # frontend runtime fix for the nacfson_pipeline Deployment.
-            port: "80"
+            port: "8080"
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
       PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
