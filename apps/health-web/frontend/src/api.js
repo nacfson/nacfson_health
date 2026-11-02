@@ -1,4 +1,4 @@
-// Fetch wrapper: same-origin /api calls with SSO cookies + CSRF header.
+// Fetch wrapper: same-origin /api calls with the health-web session cookie + CSRF header.
 const CSRF_COOKIE = 'health_csrf';
 const CSRF_HEADER = 'X-CSRF-Token';
 
@@ -19,6 +19,12 @@ export function readCookie(name) {
 let onUnauthorized = null;
 export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
+}
+
+// Called when the sign-in service cannot confirm the session (503 auth_unavailable).
+let onUnavailable = null;
+export function setUnavailableHandler(fn) {
+  onUnavailable = fn;
 }
 
 function buildQuery(query) {
@@ -70,6 +76,10 @@ async function request(method, path, body, query) {
   if (res.status === 401) {
     if (onUnauthorized) onUnauthorized();
     throw new ApiError('unauthorized', '세션이 만료되었습니다', 401);
+  }
+  if (res.status === 503 && payload && payload.error === 'auth_unavailable') {
+    if (onUnavailable) onUnavailable();
+    throw new ApiError('auth_unavailable', '로그인 서비스를 일시적으로 사용할 수 없습니다', 503);
   }
   if (!res.ok) {
     const code = (payload && payload.error) || 'http_' + res.status;

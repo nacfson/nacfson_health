@@ -55,9 +55,9 @@ a stub ticket, then `/api/me` 200.
 - [X] T011 [US1] Create `api/internal/httpapi/handlers_auth.go`: `authConfig`, `login`, `callback`, `me` (`{user_id}` only). Delete `handlers_session.go`
 - [X] T012 [US1] Rewrite `api/internal/httpapi/auth_middleware.go`: public allow-list (`/healthz`, `/readyz`, `GET /api/auth/config|login|callback`, `POST /api/auth/logout`), cookie → session row → gateway confirm → identity match → refresh handle → user in context, with the R6 failure mapping and structured log events
 - [X] T013 [US1] Update `api/internal/httpapi/router.go`: new routes, `Handler{cfg, store, sessions, gateway}`, remove `/api/logout`
-- [ ] T014 [US1] Update `frontend/src/auth.js`: no automatic redirect. `loginURL()` → `/api/auth/login?next=<path>`. Show the gate with a reason from `?auth=` (`failed`/`unavailable`/`signed_out`), then clean the URL. 401 → gate "세션이 만료되었습니다". 503 → gate "로그인 서비스를 일시적으로 사용할 수 없습니다"
-- [ ] T015 [US1] Update `frontend/src/api.js`: the 401 handler shows the gate (keeping form state) instead of redirecting
-- [ ] T016 [US1] Update `frontend/public/index.html`: gate copy ("Google 계정으로 로그인 · nacfson 통합 계정"), button "Google로 계속", topbar without email
+- [X] T014 [US1] Update `frontend/src/auth.js`: no automatic redirect. `loginURL()` → `/api/auth/login?next=<path>`. Show the gate with a reason from `?auth=` (`failed`/`unavailable`/`signed_out`), then clean the URL. 401 → gate "세션이 만료되었습니다". 503 → gate "로그인 서비스를 일시적으로 사용할 수 없습니다"
+- [X] T015 [US1] Update `frontend/src/api.js`: the 401 handler shows the gate (keeping form state) instead of redirecting
+- [X] T016 [US1] Update `frontend/public/index.html`: gate copy ("Google 계정으로 로그인 · nacfson 통합 계정"), button "Google로 계속", topbar without email
 
 **Checkpoint**: US1 is fully testable on its own.
 
@@ -89,8 +89,8 @@ enforced.
 
 - [X] T019 [P] [US2] `api/internal/httpapi/logout_test.go`: CSRF/Origin required (403 otherwise). Revoked → `platform:"revoked"`. Gateway failure → `platform:"unconfirmed"` with row still deleted. No session → `platform:"none"`. Gateway rejecting the session does not block logout
 - [X] T020 [US2] Implement `logout` in `api/internal/httpapi/handlers_auth.go`. Export the CSRF check helper in `api/internal/httpapi/csrf.go`. Remove `clearCentralSessionCookie`
-- [ ] T021 [US2] Update `frontend/src/auth.js` `logout()`: `POST /api/auth/logout`, then show the gate with "로그아웃되었습니다", or "로그아웃되었지만 다른 nacfson 서비스의 로그아웃은 확인되지 않았습니다" when `platform:"unconfirmed"`
-- [ ] T022 [US2] Update the account card in `frontend/public/index.html`: no email row, "로그인 방식: Google (nacfson 통합 계정)", button "로그아웃 (모든 nacfson 서비스)". Update `showApp` in `frontend/src/auth.js` accordingly
+- [X] T021 [US2] Update `frontend/src/auth.js` `logout()`: `POST /api/auth/logout`, then show the gate with "로그아웃되었습니다", or "로그아웃되었지만 다른 nacfson 서비스의 로그아웃은 확인되지 않았습니다" when `platform:"unconfirmed"`
+- [X] T022 [US2] Update the account card in `frontend/public/index.html`: no email row, "로그인 방식: Google (nacfson 통합 계정)", button "로그아웃 (모든 nacfson 서비스)". Update `showApp` in `frontend/src/auth.js` accordingly
 
 **Checkpoint**: US1, US2, and US3 all pass.
 
@@ -115,7 +115,7 @@ enforced.
 
 - [ ] T029 `gofmt -l`, `go vet ./...`, `go test ./...` in `api/`
 - [ ] T030 Run `frontend/smoke-test.sh` (needs docker). If docker is unavailable, record that
-- [ ] T031 Run `node --check` on every changed SPA module
+- [X] T031 Run `node --check` on every changed SPA module
 - [ ] T032 Live verification per quickstart §3 after merge and the `nacfson_pipeline` image pin bump (outside this branch)
 
 ---

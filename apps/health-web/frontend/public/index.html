@@ -15,16 +15,16 @@
     <div class="gate on" id="gate">
       <div class="logo">NH</div>
       <h2>낙프슨 헬스</h2>
-      <p>모바일 웹 · ProcessManager SSO<br /><code>auth.nacfson.cloud</code></p>
-      <button class="btn" id="loginButton" type="button">낙프슨 계정으로 계속</button>
-      <div class="hint" id="gateHint">세션이 만료되었거나 로그인하지 않았습니다</div>
+      <p>Google 계정으로 로그인<br />nacfson 통합 계정</p>
+      <button class="btn" id="loginButton" type="button">Google로 계속</button>
+      <div class="hint" id="gateHint" role="status" aria-live="polite">로그인하지 않았습니다</div>
     </div>
 
     <div class="app" id="app" hidden>
       <header class="topbar">
-        <div class="avatar" id="avatar">–</div>
+        <div class="avatar" id="avatar" aria-hidden="true">NH</div>
         <div class="who">
-          <strong id="whoEmail">…</strong>
+          <strong id="whoName">…</strong>
           <span id="whoHost">health.nacfson.cloud</span>
         </div>
         <div class="sso">SSO</div>
@@ -360,10 +360,10 @@
 
           <div class="card">
             <h3>계정</h3>
-            <div class="settings-row"><div>이메일<small id="accountEmail">–</small></div><span class="chev">SSO</span></div>
+            <div class="settings-row"><div>로그인 방식<small>Google (nacfson 통합 계정)</small></div><span class="chev">SSO</span></div>
             <div class="settings-row"><div>사용자 ID<small id="accountUserID">–</small></div></div>
-            <p class="muted" style="margin:0 0 8px">식별자: <code>nacfson_session</code> 쿠키 (Supabase 아님)</p>
-            <button class="btn ghost" type="button" id="logoutButton">로그아웃</button>
+            <p class="muted" style="margin:0 0 8px">로그아웃하면 이 브라우저의 모든 nacfson 서비스에서 로그아웃됩니다.</p>
+            <button class="btn ghost" type="button" id="logoutButton">로그아웃 (모든 nacfson 서비스)</button>
           </div>
 
           <div class="card">
