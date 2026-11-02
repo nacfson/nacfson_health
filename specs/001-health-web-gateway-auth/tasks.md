@@ -102,19 +102,19 @@ enforced.
 
 **Independent Test**: The quickstart §2 sweep returns nothing. The API starts with no retired env.
 
-- [ ] T023 [US4] Update `api/internal/httpapi/json.go` and `api/internal/store/store.go` package comments. Remove retired references from `api/internal/httpapi/csrf.go` comments
-- [ ] T024 [P] [US4] Rewrite `README.md` (Authentication, API table, Configuration, Local development)
-- [ ] T025 [P] [US4] Update `AGENTS.md` (project summary web line, Task Routing health-web line, reference table rows for the new changelog and spec)
-- [ ] T026 [P] [US4] Update `docs/features.md` (strike the ProcessManager SSO / K8s items, add gateway sign-in items) and mark `docs/changelog-health-web-mvp.md` auth/K8s lines superseded
-- [ ] T027 [P] [US4] Create `docs/changelog-health-web-gateway-auth.md` (background, outage retrospective, DB 000002, UX changes) and add a health-web Postgres section to `docs/db-schema.md`
-- [ ] T028 [US4] Run the quickstart §2 sweep and fix any remaining matches
+- [X] T023 [US4] Update `api/internal/httpapi/json.go` and `api/internal/store/store.go` package comments. Remove retired references from `api/internal/httpapi/csrf.go` comments
+- [X] T024 [P] [US4] Rewrite `README.md` (Authentication, API table, Configuration, Local development)
+- [X] T025 [P] [US4] Update `AGENTS.md` (project summary web line, Task Routing health-web line, reference table rows for the new changelog and spec)
+- [X] T026 [P] [US4] Update `docs/features.md` (strike the ProcessManager SSO / K8s items, add gateway sign-in items) and mark `docs/changelog-health-web-mvp.md` auth/K8s lines superseded
+- [X] T027 [P] [US4] Create `docs/changelog-health-web-gateway-auth.md` (background, outage retrospective, DB 000002, UX changes) and add a health-web Postgres section to `docs/db-schema.md`
+- [X] T028 [US4] Run the quickstart §2 sweep and fix any remaining matches
 
 ---
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T029 `gofmt -l`, `go vet ./...`, `go test ./...` in `api/`
-- [ ] T030 Run `frontend/smoke-test.sh` (needs docker). If docker is unavailable, record that
+- [X] T029 `gofmt -l`, `go vet ./...`, `go test ./...` in `api/`
+- [X] T030 Run `frontend/smoke-test.sh` (needs docker). Not runnable on the implement workstation (docker socket permission denied); runs in CI `publish-ghcr-images.yml` on the PR. Probe path `/api/auth/config` unchanged
 - [X] T031 Run `node --check` on every changed SPA module
 - [ ] T032 Live verification per quickstart §3 after merge and the `nacfson_pipeline` image pin bump (outside this branch)
 

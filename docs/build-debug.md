@@ -926,3 +926,15 @@ Apple은 HealthKit 을 무료(Personal) 팀에서도 개발 빌드까지 허용�
 - [ ] Android: `minSdk = 26+`, Manifest 권한 5종 + `<queries>` Health Connect 패키지 + `PrivacyPolicyActivity` 등록
 - [ ] 실기기에서 다른 앱(삼성헬스/Google Fit/Apple Watch) 이 활동 데이터를 기록하고 있는지 확인 (빈 Health Connect/HealthKit 은 모든 값이 0이라 동작 검증 불가)
 - [ ] 앱 백그라운드 → resume 시 활동 카드가 자동 갱신되는지 (`AppLifecycleState.resumed` 핸들러)
+
+---
+
+## health-web: 로그인 후 `404 page not found` / UI 가 잠깐 보였다 사라짐
+
+2026-11 사고(`docs/changelog-health-web-gateway-auth.md`)에서 얻은 체크리스트이다. 네트워크 문제가 아니므로 Hubble 에는 보이지 않는다.
+
+1. 브라우저 DevTools → Network → **Preserve log** 를 켠다. 마지막 요청의 **호스트**를 본다. `auth.nacfson.cloud` 에서 404 가 났다면 해당 경로가 플랫폼 allowlist(`nacfson_pipeline/deploy/platform/ingress/ingress-allowlist.yaml`)에 없다는 뜻이다.
+2. 본문이 `server:` 헤더 없이 text/plain `404 page not found` 이면 Traefik 이 라우트를 찾지 못한 것이다. nginx 404 는 `server: nginx` 를 달고 오고, health API 404 는 JSON 이다.
+3. 각 단계를 curl 로 따라간다: `curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" <url>`.
+4. 로그는 `KUBECONFIG=~/.kube/nacfson-vps-k3s.yaml kubectl -n proj-health logs deploy/health-backend` 로 본다(`~/.kube/config` 는 다른 로컬 클러스터). `auth.gateway.unavailable` / `auth.session.rejected reason=…` / `auth.callback.failed reason=…` 이벤트를 확인한다.
+5. **하네스 규칙**: health-web 은 `nacfson_pipeline` 계약(`contracts/CONTRACT_AUTH_DOOR.md`, `CONTRACT_DATABASE.md`)의 소비자이다. 그쪽 계약이 바뀌면 같은 작업 단위에서 `specs/001-health-web-gateway-auth/contracts/gateway-consumer.md` 와 코드를 함께 갱신한다. SPA 에 로그인 자동 리다이렉트를 다시 넣지 않는다(실패 원인을 숨긴다).

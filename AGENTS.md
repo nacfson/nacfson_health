@@ -6,7 +6,7 @@
 
 - **목표**: 개인 맞춤형 피트니스 & 식단 통합 대시보드
 - **스택**: Flutter, Dart, Riverpod (StateNotifier+Provider), go_router (ShellRoute), sqflite, supabase_flutter, fl_chart
-- **Web (Option B)**: `apps/health-web/` — Go API + vanilla SPA at `https://health.nacfson.cloud` (ProcessManager SSO + Postgres). Native `lib/`/`ios/`/`android/` 경로와 분리. 상세: `apps/health-web/README.md`, `docs/changelog-health-web-mvp.md`. 이미지: GHCR `ghcr.io/nacfson/health-{backend,frontend}` via `.github/workflows/publish-ghcr-images.yml`
+- **Web (Option B)**: `apps/health-web/` — Go API + vanilla SPA at `https://health.nacfson.cloud` (nacfson_pipeline 플랫폼 게이트웨이 로그인 `signIn: shared` + Postgres, 기동 시 migrations 자동 적용). Native `lib/`/`ios/`/`android/` 경로와 분리. 상세: `apps/health-web/README.md`, `docs/changelog-health-web-gateway-auth.md`, `specs/001-health-web-gateway-auth/`. 이미지: GHCR `ghcr.io/nacfson/health-{backend,frontend}` via `.github/workflows/publish-ghcr-images.yml`
 - **DB 버전**: v12 (테이블 13개: exercise_records · diet_records · exercise_templates · food_templates · weight_records · user_profiles · workout_routines · daily_routine + v12 신규 5개 admin-curated 마스터: exercise_categories · exercise_category_translations · exercise_definitions · exercise_translations · one_rm_formulas. v12: 다국어 지원(ko/en) + 종목별 권위 1RM 공식 — exercise_records/templates 에 exercise_key 컬럼 추가, NSCA LeSuer 1997 검증 기반 Mayhew/Wathen/Brzycki 공식 적용, 1RM 코치 진입 시 Supabase TTL 24h fetch. v12-5: Atwater 4/4/9 derived kcal — diet_records.total_calories / food_templates.calories 컬럼 유지, 저장 시 매크로에서 자동 산출. v12-6: master 운동 시드 약 100종 추가(머신·케이블 + 무기구 — 총 ~257종) + 앱 번들 시드 도입(`assets/master_exercise_seed_v12_6.json` — 오프라인 첫 실행에서도 picker 동작 보장) + 운동 추가 시트의 [직접 입력] 진입점 제거. v12-8: 개별 커스텀 운동 템플릿은 `exercise_key/category_key=NULL` 로 저장, nullable identity 컬럼은 master-linked 데이터 호환을 위해 Supabase user-owned 테이블에도 보강)
 - **탭 구조**: 운동 | 식단 | 체중 | 요약 | 설정
 - **UX 원칙**: 폼보다 빠른 입력, 시트보다 직관적인 결과 시각화
@@ -29,7 +29,7 @@
 - **코딩 컨벤션, 네이밍 규칙 확인 시**: `docs/conventions.md`
 - **빌드 오류, 런타임 크래시, 프리뷰 실행 문제 발생 시**: `docs/build-debug.md`
 - **StateNotifier 초기화, GoRouter redirect, dispose() ref 사용 시**: `docs/build-debug.md`
-- **health-web (Go API / SPA / ProcessManager K8s) 수정 시**: `apps/health-web/README.md` + ProcessManager `docs/health-web-integration-spec.md` / `docs/shared-cookie-auth.md` / `k8s/health/`
+- **health-web (Go API / SPA) 수정 시**: `apps/health-web/README.md` + `specs/001-health-web-gateway-auth/` (인증 계약) + `nacfson_pipeline` 의 `contracts/CONTRACT_AUTH_DOOR.md` · `contracts/CONTRACT_DATABASE.md` · `deploy/projects/health/` (배포·라우트·probe·NetworkPolicy 는 pipeline 소유)
 
 ## 문서 업데이트 의무
 
@@ -76,7 +76,9 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 | `docs/changelog-v12-6.md` | v12-6 변경 로그 (master 운동 시드 약 100종 확장 + 앱 번들 시드 도입(오프라인 첫 실행 보장) + 운동 추가 시트 [직접 입력] 진입점 제거 + 정합성 검증 테스트) |
 | `docs/changelog-v12-7.md` | v12-7 변경 로그 (iOS OAuth 브라우저 동작 명확화 — `LaunchMode.externalApplication` 의 기본 브라우저 호출 보장 + `platformDefault` fallback + `LSApplicationQueriesSchemes` 등록 + 진단 로깅 + ASWebAuthenticationSession 통설 정정) |
 | `docs/changelog-v12-8.md` | v12-8 변경 로그 (개별 커스텀 운동 템플릿 + nullable `exercise_key/category_key` 호환 + Supabase user-owned identity 컬럼 sync 활성화) |
-| `docs/changelog-health-web-mvp.md` | health-web MVP (Go API + SPA + ProcessManager K8s; native Flutter 미변경) |
+| `docs/changelog-health-web-mvp.md` | health-web MVP (Go API + SPA; 인증·배포 부분은 2026-11 로 대체됨) |
+| `docs/changelog-health-web-gateway-auth.md` | health-web 플랫폼 게이트웨이 로그인 (레거시 SSO 제거, `users`/`web_sessions` migration 000002, 404 사고 회고) |
+| `specs/001-health-web-gateway-auth/` | Spec Kit 001 — spec · clarifications · plan · research · contracts · tasks |
 | `apps/health-web/README.md` | health-web 로컬/클러스터 운영 가이드 |
 | `docs/build-debug.md` | 빌드 타겟, Riverpod 초기화, GoRouter, dispose, macOS 포커스, Gemini 디버깅 |
 

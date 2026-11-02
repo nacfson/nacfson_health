@@ -1,6 +1,6 @@
 // Package store is the Postgres persistence layer for the health web API.
-// Every row is owned by exactly one tenant: the AuthUser.ID from the central
-// cookie session. There is no local users table.
+// Every row is owned by exactly one tenant: the users.id bound to the caller's
+// platform identity (issuer, subject); see users.go and sessions.go.
 package store
 
 import (

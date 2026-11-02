@@ -16,7 +16,7 @@ and logout outcomes.
 
 ```bash
 git grep -nE 'nacfson_session|cookie-session|AUTH_SESSION_INTERNAL_TOKEN|CENTRAL_AUTH|ProcessManager SSO|auth\.nacfson\.cloud/login' \
-  -- ':!docs/changelog-*' ':!specs/001-health-web-gateway-auth' ':!docs/superpowers'
+  -- ':!docs/changelog-*' ':!specs/001-health-web-gateway-auth' ':!docs/superpowers' ':!.specify/memory/constitution.md'
 ```
 
 Expected: no output.

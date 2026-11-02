@@ -1,20 +1,30 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-10-25 (health-web GHCR publish)
+> **마지막 업데이트**: 2026-11-02 (health-web 플랫폼 게이트웨이 로그인, spec 001)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
 
-### health-web MVP (2026-09) — ProcessManager Option B SPA
+### health-web 플랫폼 게이트웨이 로그인 (2026-11) — spec `specs/001-health-web-gateway-auth/`
+- [x] 레거시 인증 제거 — 중앙 인증 클라이언트, 레거시 세션 쿠키, 공유 검증 토큰, 관련 env 전부 삭제
+- [x] `nacfson_pipeline` 게이트웨이 연동 (`signIn: shared`) — `/api/auth/login` → `auth.nacfson.cloud/oauth/start` → `/api/auth/callback` (nonce 바인딩 + 1회용 ticket 교환, audience `project-health` 검증)
+- [x] 서버측 세션 — `web_sessions` (게이트웨이 handle 저장) + 브라우저는 `__Host-health_session` 쿠키만 보유. 매 요청 게이트웨이 `/auth` 확인, 실패 시 fail-closed (401/503)
+- [x] 플랫폼 계정 바인딩 — `users(issuer, subject)` (migration 000002). 이메일 미저장·미사용
+- [x] 전 서비스 로그아웃 — `POST /api/auth/logout` 가 플랫폼 세션 revoke
+- [x] SPA 로그인 화면 — 자동 리다이렉트 제거, 사유 표시(`?auth=failed|unavailable`, 세션 만료, 로그아웃), 이메일 UI 제거
+- [x] API 기동 시 migrations + master seed 자동 적용 (`MIGRATE_ON_START`, pipeline CONTRACT_DATABASE §6)
+- [ ] 클러스터 실검증 — 머지 → GHCR 게시 → `nacfson_pipeline` 이미지 pin bump → quickstart §3
+
+### health-web MVP (2026-09) — Option B SPA
 - [x] `apps/health-web/` 신규 — Go API + vanilla SPA (Flutter `web/` 미사용). 네이티브 `lib/`/`ios/`/`android/` 미변경
-- [x] ProcessManager SSO — cookie `nacfson_session` → Auth `GET /api/internal/cookie-session`; 로컬 users 테이블 없음; CSRF `health_csrf`
+- [x] ~~레거시 cookie SSO — 로컬 users 테이블 없음~~ → 2026-11 플랫폼 게이트웨이 로그인으로 대체 (위 항목). CSRF `health_csrf` 는 유지
 - [x] Postgres user-owned 스키마 + master 시드 (`./migrate up` + `./migrate seed`)
 - [x] 5탭 CRUD — 운동|식단|체중|요약|설정; Atwater 서버 계산; summary DTO; daily_routine self-heal
-- [x] K8s manifests — `ProcessManager/k8s/health/` (`health.nacfson.cloud`)
+- [x] ~~레거시 K8s manifests~~ → 배포는 `nacfson_pipeline` (`deploy/projects/health/`) 이 소유
 - [x] GHCR 이미지 자동 배포 — `.github/workflows/publish-ghcr-images.yml` (main push, amd64+arm64, sha7/latest, PR build-only, 게시 후 index 검증)
-- [ ] 클러스터 배포 완료 — ~~registry push~~ (GHCR CI 로 대체) + shared-app-db provision + migrate Job + Ingress smoke (API 192.168.219.120:6443 unreachable at implement time)
+- [x] ~~클러스터 배포 — shared-app-db provision + migrate Job~~ → `nacfson_pipeline` proj-health 로 배포됨. migrate Job 대신 API 기동 시 자동 적용
 - [ ] Native↔web sync bridge (P4, out of MVP)
 
 ### v12-5 (2026-05) — 칼로리 자동 계산 (Atwater)

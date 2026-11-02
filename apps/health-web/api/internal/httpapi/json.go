@@ -1,6 +1,7 @@
-// Package httpapi exposes the health web API. Authentication is cookie-only:
-// the SPA talks to this API on the same origin as its own pages, using the
-// nacfson_session cookie issued by the central auth service.
+// Package httpapi exposes the health web API. The SPA talks to it on the same
+// origin. Sign-in goes through the nacfson_pipeline platform gateway; the
+// browser holds only the host-only __Host-health_session cookie, and every
+// request is confirmed with the gateway (auth_middleware.go).
 package httpapi
 
 import (

@@ -328,3 +328,35 @@ ALTER TABLE exercise_records ADD COLUMN set_type TEXT NOT NULL DEFAULT 'work'
 - **UUID 자동 생성**: `uuid: ''` (빈 문자열) 전달 시 SQLite 구현체에서 UUID v4 자동 할당
 - **컬럼 네이밍**: DB는 `snake_case`, Dart Entity는 `camelCase` — Repository에서 매핑
 - **`id` 컬럼**: 로컬 전용, Google Sheets 연동 시 절대 사용 금지 (uuid 사용)
+
+---
+
+## health-web Postgres (`apps/health-web/api/db/migrations`)
+
+네이티브 SQLite/Supabase 와 **별개**인 health-web 전용 Postgres(`proj_health`, nacfson_pipeline vault-db-proxy 경유)이다. golang-migrate 형식(`NNNNNN_name.{up,down}.sql`)을 쓰고, API 기동 시 자동 적용된다(`MIGRATE_ON_START`, pipeline CONTRACT_DATABASE §6). SQLite DB 버전(v12)과는 무관하다.
+
+| 버전 | 파일 | 내용 |
+|------|------|------|
+| 1 | `000001_init_user_owned` | user-owned 8테이블(`user_id UUID`) + master 5테이블 + `set_updated_at` 트리거 |
+| 2 | `000002_platform_identity` | `users`(플랫폼 identity 바인딩) + `web_sessions`(서버측 세션). 2026-11, spec 001 |
+
+### users
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| `id` | UUID PK | Go 에서 생성. 모든 user-owned 테이블 `user_id` 의 값 |
+| `issuer` | TEXT NOT NULL | 플랫폼 issuer |
+| `subject` | TEXT NOT NULL | Keycloak subject |
+| `created_at` / `last_seen_at` | TIMESTAMPTZ | 첫 로그인 / 최근 로그인 |
+
+`UNIQUE(issuer, subject)` 이다. 이메일·이름·자격증명 컬럼은 두지 않는다(AUTH-01).
+
+### web_sessions
+
+| 컬럼 | 타입 | 비고 |
+|------|------|------|
+| `id_hash` | BYTEA PK | `sha256(쿠키 토큰)`, 32 bytes. 원본 토큰은 브라우저 `__Host-health_session` 에만 있음 |
+| `user_id` | UUID FK → `users(id)` ON DELETE CASCADE | |
+| `issuer` / `subject` | TEXT | 게이트웨이 확인 결과와 매 요청 대조 |
+| `session_handle` | TEXT | 게이트웨이 opaque handle. refresh 시 교체. 로그·응답 노출 금지 |
+| `created_at` / `expires_at` | TIMESTAMPTZ | 만료 = 생성 + gateway `expires_in`(8h). `expires_at` 인덱스로 매시간 purge |

@@ -1,0 +1,6 @@
+# Build context hygiene (Spec Kit implement setup)
+.git
+smoke-test.sh
+.env*
+.DS_Store
+*.log
