@@ -21,6 +21,22 @@ reject every request: it checks sessions with a sign-in service the cluster no l
 The cluster's sign-in service (the platform gateway, backed by Google sign-in) is already set up to
 accept health-web as a sign-in client. The missing part is health-web itself.
 
+## Clarifications
+
+### Session 2026-11-02
+
+- Q: Who should be allowed to use health-web once they've signed in with Google? → A: Anyone who
+  completes platform sign-in, declared explicitly as health-web's access rule. Accounts are owned by
+  the platform's internal account management system (Keycloak behind the platform gateway).
+  health-web never creates, registers, or edits accounts itself. It only keeps a project account
+  bound to the platform identity, prepared when the gateway hands a confirmed identity back.
+- Q: When a user signs out of health-web, what should that end? → A: The platform session,
+  platform-wide. Every nacfson project in that browser is signed out, and the next sign-in goes
+  through Google again.
+- Q: When someone opens health-web without a session, should they first see health-web's sign-in
+  screen, or go straight to Google? → A: health-web's sign-in screen, with one "Continue with
+  Google" action and any status message. No automatic redirect.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Sign in and reach my data (Priority: P1)
@@ -46,8 +62,9 @@ confirm the app loads and can save and re-read a weight entry.
 4. **Given** a visitor who signs in for the first time, **When** they land back in health-web,
    **Then** an empty personal account is ready for them without any extra registration step.
 5. **Given** a visitor already signed in to another nacfson project, **When** they open health-web,
-   **Then** they still pass through health-web's own sign-in handoff once, and are not asked for
-   their Google credentials again while the platform session is valid.
+   **Then** they see health-web's sign-in screen once, and after choosing to continue they return
+   signed in without being asked for their Google credentials again while the platform session is
+   valid.
 
 ---
 
@@ -68,8 +85,13 @@ reload shows the sign-in screen and no personal data is returned.
 1. **Given** a signed-in user, **When** they reload the page or open the site in a new tab of the
    same browser, **Then** they remain signed in.
 2. **Given** a signed-in user, **When** they choose sign-out in Settings, **Then** they see the
-   sign-in screen, and any later data request from that browser is refused.
-3. **Given** a user whose platform session has expired or been revoked elsewhere, **When** they next
+   sign-in screen, any later data request from that browser is refused, and choosing to continue
+   goes through the Google sign-in step again. Google may still remember the account, but the
+   platform does not reuse the revoked session.
+3. **Given** a user signed in to health-web and another nacfson project in the same browser,
+   **When** they sign out of health-web, **Then** the other project also treats them as signed out
+   on its next request.
+4. **Given** a user whose platform session has expired or been revoked elsewhere, **When** they next
    load or save data, **Then** they are shown the sign-in screen with a short "session ended"
    explanation instead of an error page or a silent failure.
 
@@ -150,15 +172,25 @@ present.
 
 **Sign-in**
 
-- **FR-001**: Visitors without a confirmed session MUST see the health-web sign-in screen. They MUST
-  NOT be sent to a retired or non-existent sign-in address.
+- **FR-001**: Visitors without a confirmed session MUST see the health-web sign-in screen, with a
+  single "Continue with Google" action. health-web MUST NOT redirect to sign-in automatically.
+  Sign-in starts only when the user chooses to continue. Visitors MUST NOT be sent to a retired or
+  non-existent sign-in address.
+- **FR-001a**: The sign-in screen MUST show why it appears when the reason is known: session ended,
+  signed out, sign-in failed or was abandoned, or sign-in temporarily unavailable.
 - **FR-002**: Sign-in MUST be performed by the platform's shared sign-in service. health-web MUST NOT
   collect passwords or talk to Google directly.
 - **FR-003**: After sign-in, the user MUST return to the health-web page they originally requested.
   Return targets MUST be limited to paths within health-web.
 - **FR-004**: The sign-in handoff MUST be bound to the browser that started it, MUST be single-use,
   and MUST expire within minutes. Handoffs that fail these checks MUST be refused.
-- **FR-005**: A first-time sign-in MUST create the user's health-web account automatically.
+- **FR-005**: User accounts MUST be owned by the platform's internal account management system.
+  health-web MUST NOT offer registration, password, or account-editing flows. On a person's first
+  confirmed sign-in, health-web MUST automatically prepare that person's health-web project account,
+  bound to their platform identity, with no extra step for the user.
+- **FR-005a**: health-web's access rule MUST be declared explicitly: every confirmed platform identity
+  issued for health-web may use health-web for their own data. Any identity that fails confirmation
+  MUST be refused (fail closed).
 
 **Identity and data isolation**
 
@@ -185,8 +217,10 @@ present.
 
 **Sign-out**
 
-- **FR-014**: Users MUST be able to sign out from Settings. Sign-out MUST end the session in
-  health-web for that browser and MUST ask the platform to revoke the platform session.
+- **FR-014**: Users MUST be able to sign out from Settings. Sign-out MUST revoke the platform
+  session (platform-wide: other nacfson projects in that browser are signed out too) and MUST end
+  health-web's session in that browser. The Settings sign-out action MUST say that it signs the user
+  out of all nacfson services. The next sign-in MUST go through Google again.
 - **FR-015**: After sign-out, later requests from that browser MUST be treated as unsigned-in.
 
 **User-facing content**
@@ -214,9 +248,11 @@ present.
 
 - **Platform identity**: Who the person is according to the platform: issuing authority plus subject
   identifier. Assigned by the platform and stable across sign-ins.
-- **health-web user account**: health-web's own record for a platform identity. Created on first
-  sign-in, it owns all personal records (profile, workouts, meals, weights, templates, routines).
-  Exactly one account per platform identity.
+- **Platform account**: The person's account in the platform's internal account management system.
+  Created by the platform on first Google sign-in. health-web never creates or changes it.
+- **health-web project account**: health-web's binding to one platform identity. Prepared on first
+  confirmed sign-in, it owns all personal records (profile, workouts, meals, weights, templates,
+  routines). Exactly one per platform identity. It holds no email, name, or credentials.
 - **Browser session**: The signed-in state of one browser. It refers to a platform session, is
   renewed by the platform, and ends at sign-out, expiry, or revocation.
 - **Sign-in handoff**: A short-lived, single-use, browser-bound step that carries the result of
@@ -252,8 +288,7 @@ present.
   plan is added to this spec.
 - Only Google sign-in through the platform is offered. Other sign-in methods are out of scope.
 - The native mobile app keeps its own sign-in and is not affected.
-- Business permissions stay as they are: every signed-in person may use health-web for their own
-  data. There are no admin roles in health-web.
+- There are no admin roles in health-web. The only access rule is FR-005a.
 - Session duration, renewal, and revocation behave as defined by the platform's sign-in contract.
   health-web follows them.
 - One backend instance serves health-web. Handoff state that lives only in memory is acceptable.
