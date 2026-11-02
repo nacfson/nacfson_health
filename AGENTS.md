@@ -16,6 +16,7 @@
 
 작업의 종류에 따라 코드를 수정하기 전 아래의 연관 문서를 반드시 먼저 읽고 지시사항을 따르세요.
 
+- **모든 작업의 상위 규칙**: `.specify/memory/constitution.md` (Spec Kit constitution). 인증·테넌시·스키마·레포 간 계약을 건드리는 기능은 Spec Kit 흐름(`/speckit.specify` → `/speckit.clarify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`)으로 진행하고 산출물은 `specs/NNN-<slug>/` 에 둔다.
 - **아키텍처, 데이터 흐름, 동기화 로직 수정 시**: `docs/architecture.md`
 - **DB 테이블/컬럼 변경, 마이그레이션 작성 시**: `docs/db-schema.md`
 - **Supabase 서버 스키마/트리거 수정, 신규 sync 테이블 추가 시**: `docs/db-schema.md` 의 "Supabase 서버 스키마 관리" 섹션 및 `supabase/migrations/` 확인
@@ -52,6 +53,7 @@ DB 버전 증가 또는 `supabase/migrations/` 신규 SQL 파일 작성·적용 
 
 | 문서 | 설명 |
 |------|------|
+| `.specify/memory/constitution.md` | Spec Kit constitution (상위 원칙 · 품질 게이트 · 거버넌스) |
 | `docs/architecture.md` | 동기화 프로토콜, 도메인 분리 구조, 데이터 흐름 |
 | `docs/db-schema.md` | DB 버전 이력, 전체 테이블 스키마, 마이그레이션 SQL |
 | `docs/ui-architecture.md` | 위젯 계층도, 네비게이션 구조, 애니메이션 |
