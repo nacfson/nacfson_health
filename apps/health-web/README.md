@@ -9,31 +9,45 @@ SQLite + Supabase stack. There is no sync bridge yet.
 ```
 apps/health-web/
   api/        Go module github.com/nacfson/nacfson_health/apps/health-web/api
-    cmd/api     HTTP server
-    cmd/migrate schema migrations + master-data seed
-    internal/   config, auth, store, httpapi, domain, migrations, seed
+    cmd/api     HTTP server (applies migrations + seed on start)
+    cmd/migrate manual migrate up/down/version/seed
+    internal/   config, platformauth (gateway client), store, httpapi, domain, migrations, seed
     db/         migrations/*.sql and master_exercise_seed_v12_6.json
   frontend/   static SPA (nginx image)
 ```
 
 ## Authentication
 
-Cookie-only SSO through ProcessManager Auth (`auth.nacfson.cloud`). There is no local users table and
-no bearer-token path.
+health-web is a `signIn: shared` project of the nacfson_pipeline platform
+(`contracts/CONTRACT_AUTH_DOOR.md`). Accounts belong to the platform (Keycloak behind the
+`identity/gateway` service, Google sign-in). The API is a small backend-for-frontend around it. Spec,
+decisions, and contracts: `specs/001-health-web-gateway-auth/`.
 
-1. The browser holds the `nacfson_session` cookie issued by Auth.
-2. Every request to this API forwards that cookie to
-   `GET {CENTRAL_AUTH_INTERNAL_URL}/api/internal/cookie-session` with
-   `Authorization: Bearer {AUTH_SESSION_INTERNAL_TOKEN}`.
-3. The returned `user_id` becomes the tenant key for every SQL statement (`AuthUser.ID`).
-4. Missing or invalid cookie → `401 {"error":"unauthorized"}`. Public exceptions: `GET /healthz`,
-   `GET /readyz`, `GET /api/auth/config`.
+1. The SPA shows its sign-in screen. **Google로 계속** opens `GET /api/auth/login?next=/path`.
+2. The API sets `__Host-health_login=<nonce>` and redirects to
+   `https://auth.nacfson.cloud/oauth/start?return=https://health.nacfson.cloud/api/auth/callback?pa_bind=<sha256(nonce)>`.
+3. After Google sign-in the gateway redirects to `/api/auth/callback?…&ticket=<one-time>`. The API
+   checks the nonce binding and redeems the ticket in-cluster (`POST {gateway}/auth/exchange`). It
+   requires audience `project-health`, upserts `users(issuer, subject)`, stores the gateway session
+   handle in `web_sessions`, and sets `__Host-health_session` (random 32-byte token, HttpOnly,
+   Secure, SameSite=Lax, host-only). Failures land on `/?auth=failed|unavailable`.
+4. Every other `/api/*` request: cookie → `web_sessions` row → `GET {gateway}/auth` with the stored
+   handle. Audience and `(issuer, subject)` must match. A refreshed handle is stored. A rejected or
+   mismatched session is deleted (`401 {"error":"unauthorized"}`). An unreachable gateway is
+   `503 {"error":"auth_unavailable"}`, so nothing is served without a confirmed identity.
+5. `POST /api/auth/logout` revokes the platform session (`POST {gateway}/auth/logout`), which signs
+   the browser out of every nacfson service, and always deletes the local session.
 
-Mutations additionally require a CSRF token: the `health_csrf` cookie (readable, host-only,
+Public routes: `GET /healthz`, `GET /readyz`, `GET /api/auth/config|login|callback`, and
+`POST /api/auth/logout` (which checks CSRF itself). Email is never stored, returned, or used as an
+identifier.
+
+Mutations (including logout) require a CSRF token: the `health_csrf` cookie (readable, host-only,
 `SameSite=Lax`, `Path=/`, `Secure` behind TLS) must match the `X-CSRF-Token` header, and `Origin`
 must be listed in `ALLOWED_ORIGINS`. The cookie is issued on any authenticated request.
 
-`X-User-Id` / `X-User-Email` / `X-User-Roles` request headers are always discarded.
+Client-supplied `X-User-*`, `X-Project-Audience`, and `Authorization` request headers are always
+discarded.
 
 ## API
 
@@ -41,9 +55,11 @@ must be listed in `ALLOWED_ORIGINS`. The cookie is issued on any authenticated r
 |---|---|---|
 | GET | `/healthz` | liveness, no auth |
 | GET | `/readyz` | DB ping, no auth |
-| GET | `/api/auth/config` | `{auth_url}` (public central Auth URL); no auth, no DB, no Auth call. Frontend `startupProbe` target in nacfson_pipeline |
-| GET | `/api/me` | `{user_id,email}`, issues `health_csrf` |
-| POST | `/api/logout` | revokes the cookie session via Auth |
+| GET | `/api/auth/config` | `{"login_url":"/api/auth/login"}`. No auth, no DB, no gateway call. Frontend `startupProbe` target in nacfson_pipeline |
+| GET | `/api/auth/login` | `?next=<same-site path>` → `302` to the gateway's `/oauth/start` |
+| GET | `/api/auth/callback` | gateway return. Redeems the ticket, sets the session, `302` to `next` or `/?auth=…` |
+| POST | `/api/auth/logout` | platform-wide sign-out. `{"status":"signed_out","platform":"revoked\|unconfirmed\|none"}` |
+| GET | `/api/me` | `{user_id}`, issues `health_csrf` |
 | GET / PUT | `/api/v1/profile` | upsert profile; `GET` returns `exists:false` + defaults when unset |
 | POST | `/api/v1/profile/recalculate-targets` | body `{"weight":<kg optional>}`; persists daily targets |
 | GET / POST | `/api/v1/exercise` | list `?date=` or `?from=&to=`; create |
@@ -79,37 +95,36 @@ Conventions:
 | Env | Default | Purpose |
 |---|---|---|
 | `APP_ADDR` | `:8080` | listen address |
-| `APP_PUBLIC_URL` | `https://health.nacfson.cloud` | public origin |
+| `PUBLIC_APP_URL` | `https://health.nacfson.cloud` | public origin (`APP_PUBLIC_URL` accepted as a fallback). Its first host label derives the audience |
 | `DATABASE_URL` | — (required) | Postgres URL for the `health` database |
 | `MIGRATIONS_PATH` | `file://db/migrations` | golang-migrate source |
+| `MIGRATE_ON_START` | `true` | apply migrations and the idempotent master seed before serving (nacfson_pipeline CONTRACT_DATABASE §6). Startup fails if either fails |
 | `SEED_PATH` | `db/master_exercise_seed_v12_6.json` | master catalog JSON |
-| `CENTRAL_AUTH_URL` | `https://auth.nacfson.cloud` | browser-facing Auth origin |
-| `CENTRAL_AUTH_INTERNAL_URL` | falls back to `CENTRAL_AUTH_URL` | in-cluster Auth base URL |
-| `AUTH_SESSION_INTERNAL_TOKEN` | — | shared verifier token for the Auth internal API |
+| `GATEWAY_AUTH_URL` | `http://gateway.identity.svc:8080/auth` | in-cluster gateway verify URL. `/auth/exchange` and `/auth/logout` are derived from it |
+| `PUBLIC_AUTH_URL` | `https://auth.nacfson.cloud` | browser-facing sign-in origin (`/oauth/start`) |
+| `PROJECT_AUDIENCE` | `project-` + host label (`project-health`) | gateway audience this API accepts |
 | `ALLOWED_ORIGINS` | `https://health.nacfson.cloud,http://localhost:8080,http://127.0.0.1:8080` | CSRF/CORS allow-list |
 | `TZ` | `Asia/Seoul` | calendar timezone for date filters |
 
-`AUTH_SESSION_INTERNAL_TOKEN` must never reach the frontend bundle or nginx configmaps.
+No shared secret is needed: the gateway is reached only over the cluster network, and the platform
+NetworkPolicy allows `proj-health` egress to `identity/gateway:8080`.
 
 ## Local development
 
 ```bash
-# 1. schema + master data (idempotent)
 cd apps/health-web/api
-DATABASE_URL='postgres://localhost:5432/health?sslmode=disable' go run ./cmd/migrate up
-DATABASE_URL='postgres://localhost:5432/health?sslmode=disable' go run ./cmd/migrate seed
 
-# 2. api
-DATABASE_URL='postgres://localhost:5432/health?sslmode=disable' \
-AUTH_SESSION_INTERNAL_TOKEN='<dev verifier token>' \
-CENTRAL_AUTH_INTERNAL_URL='https://auth.nacfson.cloud' \
-go run ./cmd/api
+# api (applies migrations + seed on start)
+DATABASE_URL='postgres://localhost:5432/health?sslmode=disable' go run ./cmd/api
 
-# 3. tests
-go test ./...
+# tests (gateway and session store are faked; no Postgres needed)
+go vet ./... && go test ./...
 ```
 
-`migrate` also accepts `down --steps N` and `version`.
+Signing in needs the in-cluster gateway, so an end-to-end sign-in is only possible on the cluster.
+Locally, the API serves the public routes, and every authenticated route answers
+`503 auth_unavailable` (or `401` without a cookie). Schema-only work can still use
+`go run ./cmd/migrate up|down --steps N|version|seed`.
 
 ## Container
 
@@ -119,9 +134,9 @@ go test ./...
 docker build -t ghcr.io/nacfson/health-backend:dev apps/health-web/api
 ```
 
-`WORKDIR` is `/app` (`./api`, `./migrate`, `db/migrations`, `db/master_exercise_seed_v12_6.json`), so
-the migrate Job only needs `DATABASE_URL` and can run `./migrate up` followed by `./migrate seed`.
-The image runs as UID 65532. The Go build stage runs on the builder's native platform and
+`WORKDIR` is `/app` (`./api`, `./migrate`, `db/migrations`, `db/master_exercise_seed_v12_6.json`).
+`./api` applies `db/migrations` and the seed itself on start (`MIGRATE_ON_START`), so the deployment
+needs no migrate Job. `./migrate` stays for manual `down` / `version`. The image runs as UID 65532. The Go build stage runs on the builder's native platform and
 cross-compiles for the target (`TARGETOS`/`TARGETARCH`), so arm64 builds skip QEMU for compilation.
 
 ## Published images (CI)

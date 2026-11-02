@@ -1,4 +1,5 @@
-// Command api serves the health web API (cookie-only auth, Postgres store).
+// Command api serves the health web API. Sign-in goes through the
+// nacfson_pipeline platform gateway; sessions are server-side (Postgres).
 package main
 
 import (
@@ -11,11 +12,37 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/auth"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/config"
 	httpapi "github.com/nacfson/nacfson_health/apps/health-web/api/internal/httpapi"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/migrations"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/platformauth"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/seed"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/store"
 )
+
+const sessionPurgeInterval = time.Hour
+
+// purgeExpiredSessions deletes expired web_sessions rows every hour until ctx
+// ends. Lookups already ignore expired rows; this only bounds table growth.
+func purgeExpiredSessions(ctx context.Context, st *store.Store) {
+	ticker := time.NewTicker(sessionPurgeInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			n, err := st.PurgeExpiredWebSessions(ctx)
+			if err != nil {
+				slog.Warn("auth.session.purge_failed", "error", err)
+				continue
+			}
+			if n > 0 {
+				slog.Info("auth.session.purged", "count", n)
+			}
+		}
+	}
+}
 
 func main() {
 	ctx := context.Background()
@@ -34,6 +61,23 @@ func main() {
 		}
 	}
 
+	// nacfson_pipeline CONTRACT_DATABASE §6: idempotent schema migrations run on
+	// backend startup from MIGRATIONS_PATH. golang-migrate holds an advisory
+	// lock, so overlapping rollouts cannot double-apply.
+	if cfg.MigrateOnStart {
+		if err := migrations.Up(cfg.MigrationsPath, cfg.DatabaseURL); err != nil {
+			slog.Error("migrations failed", "path", cfg.MigrationsPath, "error", err)
+			os.Exit(1)
+		}
+		slog.Info("migrations applied", "path", cfg.MigrationsPath)
+		stats, err := seed.Run(ctx, cfg.DatabaseURL, cfg.SeedPath)
+		if err != nil {
+			slog.Error("master catalog seed failed", "path", cfg.SeedPath, "error", err)
+			os.Exit(1)
+		}
+		slog.Info("master catalog seeded", "definitions", stats.Definitions, "translations", stats.Translations)
+	}
+
 	st, err := store.New(ctx, cfg.DatabaseURL, location)
 	if err != nil {
 		slog.Error("database unavailable", "error", err)
@@ -41,14 +85,19 @@ func main() {
 	}
 	defer st.Close()
 
-	central := auth.NewCentralClient(cfg.CentralAuthURL, cfg.CentralAuthInternalURL, cfg.AuthSessionInternalToken, nil)
-	if cfg.AuthSessionInternalToken == "" {
-		slog.Warn("AUTH_SESSION_INTERNAL_TOKEN is empty: every request will fail authentication")
+	if cfg.Audience() == "" {
+		slog.Error("cannot derive the gateway audience; set PUBLIC_APP_URL or PROJECT_AUDIENCE")
+		os.Exit(1)
 	}
+	gateway := platformauth.NewClient(cfg.GatewayBaseURL(), cfg.AppHost(), nil)
+
+	purgeCtx, stopPurge := context.WithCancel(ctx)
+	defer stopPurge()
+	go purgeExpiredSessions(purgeCtx, st)
 
 	server := &http.Server{
 		Addr:              cfg.AppAddr,
-		Handler:           httpapi.NewHandler(cfg, st, central),
+		Handler:           httpapi.NewHandler(cfg, st, st, gateway),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      60 * time.Second,
@@ -59,8 +108,10 @@ func main() {
 	go func() {
 		slog.Info("health api listening",
 			"addr", cfg.AppAddr,
-			"public_url", cfg.AppPublicURL,
-			"auth_url", cfg.CentralAuthInternalURL,
+			"public_url", cfg.AppOrigin(),
+			"auth_url", cfg.AuthOrigin(),
+			"gateway_url", cfg.GatewayBaseURL(),
+			"audience", cfg.Audience(),
 			"timezone", location.String())
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errs <- err

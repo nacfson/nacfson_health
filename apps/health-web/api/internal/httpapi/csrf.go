@@ -2,17 +2,15 @@ package httpapi
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/auth"
 )
 
-// CSRF uses a host-only, readable cookie plus a matching header. health_csrf is
-// deliberately not named after the auth service so sibling subdomains never
-// share it.
+// CSRF uses a host-only, readable cookie plus a matching header, because the
+// session itself is an automatically-sent cookie (__Host-health_session).
 const (
 	csrfCookieName = "health_csrf"
 	csrfHeaderName = "X-CSRF-Token"
@@ -38,9 +36,7 @@ func (h *Handler) csrfProtection(next http.Handler) http.Handler {
 				writeError(w, http.StatusForbidden, "csrf_failed", "origin is not allowed")
 				return
 			}
-			cookie, err := r.Cookie(csrfCookieName)
-			headerToken := strings.TrimSpace(r.Header.Get(csrfHeaderName))
-			if err != nil || strings.TrimSpace(cookie.Value) == "" || headerToken == "" || cookie.Value != headerToken {
+			if !csrfTokenMatches(r) {
 				writeError(w, http.StatusForbidden, "csrf_failed", "missing or mismatched CSRF token")
 				return
 			}
@@ -48,6 +44,22 @@ func (h *Handler) csrfProtection(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// csrfRequestValid is the full CSRF check for cookie-authenticated mutations
+// that run outside the middleware (logout): allow-listed Origin plus a
+// matching health_csrf cookie/header pair.
+func csrfRequestValid(r *http.Request, allowedOrigins []string) bool {
+	return originAllowed(r.Header.Get("Origin"), allowedOrigins) && csrfTokenMatches(r)
+}
+
+func csrfTokenMatches(r *http.Request) bool {
+	cookie, err := r.Cookie(csrfCookieName)
+	headerToken := strings.TrimSpace(r.Header.Get(csrfHeaderName))
+	if err != nil || strings.TrimSpace(cookie.Value) == "" || headerToken == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(headerToken)) == 1
 }
 
 func ensureCSRFToken(w http.ResponseWriter, r *http.Request) (string, error) {
@@ -69,22 +81,6 @@ func ensureCSRFToken(w http.ResponseWriter, r *http.Request) (string, error) {
 		SameSite: http.SameSiteLaxMode,
 	})
 	return token, nil
-}
-
-// clearCentralSessionCookie expires the shared SSO cookie on logout. It carries
-// the parent domain because the cookie is issued by auth.nacfson.cloud.
-func clearCentralSessionCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     auth.CentralSessionCookieName,
-		Value:    "",
-		Path:     "/",
-		Domain:   "nacfson.cloud",
-		Expires:  time.Unix(1, 0),
-		MaxAge:   -1,
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
 }
 
 func isMutationMethod(method string) bool {

@@ -1,0 +1,6 @@
+# Build context hygiene (Spec Kit implement setup)
+.git
+*.test
+*.out
+.env*
+.DS_Store
