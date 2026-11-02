@@ -27,8 +27,9 @@ Every call sends `X-Forwarded-Host: <app host>` and uses a 5 s timeout.
 
 `GET {base}/auth`, `Authorization: Bearer <handle>`.
 
-- `200`: `X-User-Subject` and `X-User-Issuer` are required. `X-Project-Audience`, when present,
-  MUST equal the expected audience. `X-Refreshed-Session-Handle`, when present, replaces the stored
+- `200`: `X-User-Subject` and `X-User-Issuer` are required. `X-Project-Audience` MUST be present
+  and equal the expected audience (the gateway always sends it; a missing value fails closed). The
+  confirmed issuer and subject MUST equal the ones stored with the session. `X-Refreshed-Session-Handle`, when present, replaces the stored
   handle.
 - `401`: rejected.
 - `503`, any other status, or a network error: unavailable.

@@ -1,36 +1,28 @@
 package httpapi
 
 import (
-	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
 // GET /api/auth/config backs the nacfson_pipeline frontend startupProbe
 // (CONTRACT_PROBES_READINESS: a public, DB-free `/api/...` route that proves the
 // nginx `/api/` proxy reaches the backend). It must answer without a session,
-// without the central Auth service, and without the database.
-func TestAuthConfigIsPublicAndDBFree(t *testing.T) {
-	stub := newCentralStub(t)
-	// newTestHandler wires a nil store: any DB access would panic.
-	handler := newTestHandler(t, stub)
+// without the gateway, and without the database.
+func TestAuthConfigIsPublicDBFreeAndGatewayFree(t *testing.T) {
+	env := newTestEnv(t)
 
-	rec := do(t, handler, http.MethodGet, "/api/auth/config", nil, nil)
+	rec := do(t, env.handler, http.MethodGet, "/api/auth/config", nil, nil)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body %s)", rec.Code, rec.Body.String())
 	}
-	var body struct {
-		AuthURL string `json:"auth_url"`
+	if got := strings.TrimSpace(rec.Body.String()); got != `{"login_url":"/api/auth/login"}` {
+		t.Fatalf("body = %s", got)
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode body %q: %v", rec.Body.String(), err)
-	}
-	if body.AuthURL != "https://auth.nacfson.cloud" {
-		t.Fatalf("auth_url = %q, want public central auth URL", body.AuthURL)
-	}
-	if stub.validateHeaders() != nil {
-		t.Fatal("central auth was called; the probe route must not depend on it")
+	if ex, conf, rev := env.gateway.calls(); ex+conf+rev != 0 {
+		t.Fatal("the probe route must not call the gateway")
 	}
 	if len(rec.Result().Cookies()) != 0 {
 		t.Fatalf("unexpected cookies on public route: %v", rec.Result().Cookies())
@@ -38,25 +30,38 @@ func TestAuthConfigIsPublicAndDBFree(t *testing.T) {
 }
 
 func TestAuthConfigIgnoresInvalidSessionCookie(t *testing.T) {
-	stub := newCentralStub(t)
-	stub.sessionStatus = http.StatusUnauthorized
-	stub.sessionBody = `{"error":"unauthorized"}`
-	handler := newTestHandler(t, stub)
+	env := newTestEnv(t)
 
-	rec := do(t, handler, http.MethodGet, "/api/auth/config", sessionCookie("stale"), nil)
+	rec := do(t, env.handler, http.MethodGet, "/api/auth/config", sessionCookie("stale"), nil)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (body %s)", rec.Code, rec.Body.String())
+		t.Fatalf("status = %d, want 200", rec.Code)
 	}
-	if stub.validateHeaders() != nil {
-		t.Fatal("central auth was called for a public route")
+	if _, conf, _ := env.gateway.calls(); conf != 0 {
+		t.Fatal("the gateway was called for a public route")
 	}
 }
 
 func TestAuthConfigRejectsMutations(t *testing.T) {
-	handler := newTestHandler(t, newCentralStub(t))
+	env := newTestEnv(t)
+	assertBareUnauthorized(t, do(t, env.handler, http.MethodPost, "/api/auth/config", nil, nil))
+}
 
-	rec := do(t, handler, http.MethodPost, "/api/auth/config", nil, nil)
+func TestHealthzStaysPublic(t *testing.T) {
+	env := newTestEnv(t)
+	if rec := do(t, env.handler, http.MethodGet, "/healthz", nil, nil); rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if _, conf, _ := env.gateway.calls(); conf != 0 {
+		t.Fatal("public endpoints must not call the gateway")
+	}
+}
 
-	assertBareUnauthorized(t, rec)
+func TestRetiredLogoutRouteIsGone(t *testing.T) {
+	env := newTestEnv(t)
+	env.sessions.seed(t, env.gateway, "tok", "h", "sub-alice")
+	rec := do(t, env.handler, http.MethodPost, "/api/logout", sessionCookie("tok"), withCSRF)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /api/logout = %d, want 404", rec.Code)
+	}
 }

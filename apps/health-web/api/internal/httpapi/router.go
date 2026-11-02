@@ -8,29 +8,32 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/auth"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/config"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/store"
 )
 
 // Handler owns the API dependencies.
 type Handler struct {
-	cfg     config.Config
-	store   *store.Store
-	central *auth.CentralClient
+	cfg      config.Config
+	store    *store.Store
+	sessions SessionStore
+	gateway  Gateway
 }
 
 // NewHandler builds the API router. Middleware order (outermost first):
-// CORS → auth → CSRF → routes.
-func NewHandler(cfg config.Config, st *store.Store, central *auth.CentralClient) http.Handler {
-	h := &Handler{cfg: cfg, store: st, central: central}
+// CORS → auth → CSRF → routes. st serves the data routes; sessions and gateway
+// serve sign-in (in production sessions is the same *store.Store).
+func NewHandler(cfg config.Config, st *store.Store, sessions SessionStore, gateway Gateway) http.Handler {
+	h := &Handler{cfg: cfg, store: st, sessions: sessions, gateway: gateway}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", h.healthz)
 	mux.HandleFunc("GET /readyz", h.readyz)
 	mux.HandleFunc("GET /api/auth/config", h.authConfig)
+	mux.HandleFunc("GET /api/auth/login", h.login)
+	mux.HandleFunc("GET /api/auth/callback", h.callback)
+	mux.HandleFunc("POST /api/auth/logout", h.logout)
 	mux.HandleFunc("GET /api/me", h.me)
-	mux.HandleFunc("POST /api/logout", h.logout)
 
 	mux.HandleFunc("GET /api/v1/profile", h.getProfile)
 	mux.HandleFunc("PUT /api/v1/profile", h.putProfile)
@@ -121,11 +124,11 @@ func (h *Handler) notFound(w http.ResponseWriter, _ *http.Request) {
 }
 
 // requireUser returns the authenticated caller or writes a 401.
-func requireUser(w http.ResponseWriter, r *http.Request) (auth.AuthUser, bool) {
+func requireUser(w http.ResponseWriter, r *http.Request) (AuthUser, bool) {
 	user, ok := UserFromContext(r.Context())
 	if !ok {
 		writeUnauthorized(w)
-		return auth.AuthUser{}, false
+		return AuthUser{}, false
 	}
 	return user, true
 }

@@ -19,19 +19,19 @@ All paths are relative to `apps/health-web/` unless they start with `docs/`, `AG
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm the baseline: `go vet ./... && go test ./...` pass in `api/` before changes
+- [X] T001 Confirm the baseline: `go vet ./... && go test ./...` pass in `api/` before changes
 
 ---
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T002 Add `api/db/migrations/000002_platform_identity.up.sql` and `.down.sql` (`users`, `web_sessions`, per data-model.md)
-- [ ] T003 [P] Rewrite `api/internal/config/config.go`: drop `CENTRAL_AUTH_URL`, `CENTRAL_AUTH_INTERNAL_URL`, `AUTH_SESSION_INTERNAL_TOKEN`. Add `GATEWAY_AUTH_URL`, `PUBLIC_AUTH_URL`, `PUBLIC_APP_URL` (fallback `APP_PUBLIC_URL`), `PROJECT_AUDIENCE`, `MIGRATE_ON_START`, and `GatewayBaseURL()` / `AppHost()` / `Audience()` helpers
-- [ ] T004 [P] Create `api/internal/platformauth/gateway.go`: `Client` with `Exchange`, `Confirm`, `Revoke`, `ErrRejected`, `ErrUnavailable` (contracts/gateway-consumer.md)
-- [ ] T005 [P] Create `api/internal/platformauth/gateway_test.go`: stub-gateway tests for every status row in contracts/gateway-consumer.md, including the `X-Forwarded-Host` and bearer headers
-- [ ] T006 [P] Create `api/internal/store/users.go` (`EnsureUser`) and `api/internal/store/sessions.go` (`CreateWebSession`, `WebSession`, `UpdateWebSessionHandle`, `DeleteWebSession`, `PurgeExpiredWebSessions`) with sha256 token hashing
-- [ ] T007 Create `api/internal/httpapi/auth_identity.go` (`AuthUser`, context helpers, `SessionStore` interface) and delete `api/internal/auth/central_client.go`
-- [ ] T008 Update `api/cmd/api/main.go`: run migrations and seed when `MIGRATE_ON_START` (default true), exit non-zero on failure, wire `platformauth.Client`, start the hourly session purge, remove the central client and token warning
+- [X] T002 Add `api/db/migrations/000002_platform_identity.up.sql` and `.down.sql` (`users`, `web_sessions`, per data-model.md)
+- [X] T003 [P] Rewrite `api/internal/config/config.go`: drop `CENTRAL_AUTH_URL`, `CENTRAL_AUTH_INTERNAL_URL`, `AUTH_SESSION_INTERNAL_TOKEN`. Add `GATEWAY_AUTH_URL`, `PUBLIC_AUTH_URL`, `PUBLIC_APP_URL` (fallback `APP_PUBLIC_URL`), `PROJECT_AUDIENCE`, `MIGRATE_ON_START`, and `GatewayBaseURL()` / `AppHost()` / `Audience()` helpers
+- [X] T004 [P] Create `api/internal/platformauth/gateway.go`: `Client` with `Exchange`, `Confirm`, `Revoke`, `ErrRejected`, `ErrUnavailable` (contracts/gateway-consumer.md)
+- [X] T005 [P] Create `api/internal/platformauth/gateway_test.go`: stub-gateway tests for every status row in contracts/gateway-consumer.md, including the `X-Forwarded-Host` and bearer headers
+- [X] T006 [P] Create `api/internal/store/users.go` (`EnsureUser`) and `api/internal/store/sessions.go` (`CreateWebSession`, `WebSession`, `UpdateWebSessionHandle`, `DeleteWebSession`, `PurgeExpiredWebSessions`) with sha256 token hashing
+- [X] T007 Create `api/internal/httpapi/auth_identity.go` (`AuthUser`, context helpers, `SessionStore` interface) and delete `api/internal/auth/central_client.go`
+- [X] T008 Update `api/cmd/api/main.go`: run migrations and seed when `MIGRATE_ON_START` (default true), exit non-zero on failure, wire `platformauth.Client`, start the hourly session purge, remove the central client and token warning
 
 **Checkpoint**: The API compiles with the new dependencies. Auth routes come next.
 
@@ -47,14 +47,14 @@ a stub ticket, then `/api/me` 200.
 
 ### Tests
 
-- [ ] T009 [P] [US1] `api/internal/httpapi/auth_flow_test.go`: login redirect shape (`return` URL, `pa_bind`, nonce cookie attributes, `next` sanitising), callback success (user upsert, session cookie attributes, redirect to `next`), callback failures (no ticket, missing/mismatched binding without redeeming, exchange 401 → `failed`, exchange down → `unavailable`, foreign audience → `failed`)
-- [ ] T010 [P] [US1] `api/internal/httpapi/handlers_session_test.go`: `/api/auth/config` stays public, DB-free, gateway-free, cookie-free, with body `{"login_url":"/api/auth/login"}`
+- [X] T009 [P] [US1] `api/internal/httpapi/auth_flow_test.go`: login redirect shape (`return` URL, `pa_bind`, nonce cookie attributes, `next` sanitising), callback success (user upsert, session cookie attributes, redirect to `next`), callback failures (no ticket, missing/mismatched binding without redeeming, exchange 401 → `failed`, exchange down → `unavailable`, foreign audience → `failed`)
+- [X] T010 [P] [US1] `api/internal/httpapi/handlers_session_test.go`: `/api/auth/config` stays public, DB-free, gateway-free, cookie-free, with body `{"login_url":"/api/auth/login"}`
 
 ### Implementation
 
-- [ ] T011 [US1] Create `api/internal/httpapi/handlers_auth.go`: `authConfig`, `login`, `callback`, `me` (`{user_id}` only). Delete `handlers_session.go`
-- [ ] T012 [US1] Rewrite `api/internal/httpapi/auth_middleware.go`: public allow-list (`/healthz`, `/readyz`, `GET /api/auth/config|login|callback`, `POST /api/auth/logout`), cookie → session row → gateway confirm → identity match → refresh handle → user in context, with the R6 failure mapping and structured log events
-- [ ] T013 [US1] Update `api/internal/httpapi/router.go`: new routes, `Handler{cfg, store, sessions, gateway}`, remove `/api/logout`
+- [X] T011 [US1] Create `api/internal/httpapi/handlers_auth.go`: `authConfig`, `login`, `callback`, `me` (`{user_id}` only). Delete `handlers_session.go`
+- [X] T012 [US1] Rewrite `api/internal/httpapi/auth_middleware.go`: public allow-list (`/healthz`, `/readyz`, `GET /api/auth/config|login|callback`, `POST /api/auth/logout`), cookie → session row → gateway confirm → identity match → refresh handle → user in context, with the R6 failure mapping and structured log events
+- [X] T013 [US1] Update `api/internal/httpapi/router.go`: new routes, `Handler{cfg, store, sessions, gateway}`, remove `/api/logout`
 - [ ] T014 [US1] Update `frontend/src/auth.js`: no automatic redirect. `loginURL()` → `/api/auth/login?next=<path>`. Show the gate with a reason from `?auth=` (`failed`/`unavailable`/`signed_out`), then clean the URL. 401 → gate "세션이 만료되었습니다". 503 → gate "로그인 서비스를 일시적으로 사용할 수 없습니다"
 - [ ] T015 [US1] Update `frontend/src/api.js`: the 401 handler shows the gate (keeping form state) instead of redirecting
 - [ ] T016 [US1] Update `frontend/public/index.html`: gate copy ("Google 계정으로 로그인 · nacfson 통합 계정"), button "Google로 계속", topbar without email
@@ -71,8 +71,8 @@ isolated.
 **Independent Test**: In `go test`: forged headers → 401. Foreign audience → 401 and session
 deleted. Gateway down → 503. Two sessions resolve to two different user ids. Identity mismatch → 401.
 
-- [ ] T017 [P] [US3] `api/internal/httpapi/auth_middleware_test.go`: forged `X-User-*`/`Authorization` without cookie → 401 and no gateway call. Unknown cookie → 401 and cookie cleared. Expired row → 401. Gateway 401 → 401, row deleted, cookie cleared. Gateway 503 / network error → 503 `auth_unavailable`, row kept. Audience mismatch and subject mismatch → 401, row deleted. Refreshed handle stored. Two users get distinct `user_id` in context. Spoofed headers never reach handlers
-- [ ] T018 [US3] Make sure `discardClientIdentityHeaders` also strips `X-User-Subject`, `X-User-Issuer`, `Authorization` in `api/internal/httpapi/auth_identity.go`
+- [X] T017 [P] [US3] `api/internal/httpapi/auth_middleware_test.go`: forged `X-User-*`/`Authorization` without cookie → 401 and no gateway call. Unknown cookie → 401 and cookie cleared. Expired row → 401. Gateway 401 → 401, row deleted, cookie cleared. Gateway 503 / network error → 503 `auth_unavailable`, row kept. Audience mismatch and subject mismatch → 401, row deleted. Refreshed handle stored. Two users get distinct `user_id` in context. Spoofed headers never reach handlers
+- [X] T018 [US3] Make sure `discardClientIdentityHeaders` also strips `X-User-Subject`, `X-User-Issuer`, `Authorization` in `api/internal/httpapi/auth_identity.go`
 
 **Checkpoint**: US1 and US3 pass together.
 
@@ -87,8 +87,8 @@ health-web's session.
 revoke called with the stored handle, row deleted, cookie cleared, `platform` outcome reported. CSRF
 enforced.
 
-- [ ] T019 [P] [US2] `api/internal/httpapi/logout_test.go`: CSRF/Origin required (403 otherwise). Revoked → `platform:"revoked"`. Gateway failure → `platform:"unconfirmed"` with row still deleted. No session → `platform:"none"`. Gateway rejecting the session does not block logout
-- [ ] T020 [US2] Implement `logout` in `api/internal/httpapi/handlers_auth.go`. Export the CSRF check helper in `api/internal/httpapi/csrf.go`. Remove `clearCentralSessionCookie`
+- [X] T019 [P] [US2] `api/internal/httpapi/logout_test.go`: CSRF/Origin required (403 otherwise). Revoked → `platform:"revoked"`. Gateway failure → `platform:"unconfirmed"` with row still deleted. No session → `platform:"none"`. Gateway rejecting the session does not block logout
+- [X] T020 [US2] Implement `logout` in `api/internal/httpapi/handlers_auth.go`. Export the CSRF check helper in `api/internal/httpapi/csrf.go`. Remove `clearCentralSessionCookie`
 - [ ] T021 [US2] Update `frontend/src/auth.js` `logout()`: `POST /api/auth/logout`, then show the gate with "로그아웃되었습니다", or "로그아웃되었지만 다른 nacfson 서비스의 로그아웃은 확인되지 않았습니다" when `platform:"unconfirmed"`
 - [ ] T022 [US2] Update the account card in `frontend/public/index.html`: no email row, "로그인 방식: Google (nacfson 통합 계정)", button "로그아웃 (모든 nacfson 서비스)". Update `showApp` in `frontend/src/auth.js` accordingly
 
