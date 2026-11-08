@@ -10,16 +10,20 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/config"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/migrations"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/seed"
 )
 
+var version = "v0.0.0"
+
 func main() {
+	slog.SetDefault(logx.New(os.Stderr, "health-migrate", version))
+
 	var steps int
 	flag.IntVar(&steps, "steps", 1, "number of migration steps for down")
 	flag.Parse()
@@ -53,12 +57,12 @@ func main() {
 		}
 		slog.Info("migrations rolled back", "steps", steps)
 	case "version":
-		version, dirty, err := migrations.Version(cfg.MigrationsPath, cfg.DatabaseURL)
+		schemaVersion, dirty, err := migrations.Version(cfg.MigrationsPath, cfg.DatabaseURL)
 		if err != nil {
 			slog.Error("migration version failed", "error", err)
 			os.Exit(1)
 		}
-		fmt.Printf("version=%d dirty=%t\n", version, dirty)
+		slog.Info("migration version", "schema_version", schemaVersion, "dirty", dirty)
 	case "seed":
 		stats, err := seed.Run(context.Background(), cfg.DatabaseURL, cfg.SeedPath)
 		if err != nil {

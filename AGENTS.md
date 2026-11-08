@@ -29,7 +29,7 @@
 - **코딩 컨벤션, 네이밍 규칙 확인 시**: `docs/conventions.md`
 - **빌드 오류, 런타임 크래시, 프리뷰 실행 문제 발생 시**: `docs/build-debug.md`
 - **StateNotifier 초기화, GoRouter redirect, dispose() ref 사용 시**: `docs/build-debug.md`
-- **health-web (Go API / SPA) 수정 시**: `apps/health-web/README.md` + `specs/001-health-web-gateway-auth/` (인증 계약) + `nacfson_pipeline` 의 `contracts/CONTRACT_AUTH_DOOR.md` · `contracts/CONTRACT_DATABASE.md` · `deploy/projects/health/` (배포·라우트·probe·NetworkPolicy 는 pipeline 소유)
+- **health-web (Go API / SPA) 수정 시**: `apps/health-web/README.md` + `specs/001-health-web-gateway-auth/` (인증 계약) + `nacfson_pipeline` 의 `contracts/CONTRACT_AUTH_DOOR.md` · `contracts/CONTRACT_DATABASE.md` · `contracts/CONTRACT_LOG_SCHEMA.md` · `deploy/projects/health/` (배포·라우트·probe·NetworkPolicy 는 pipeline 소유)
 
 ## 문서 업데이트 의무
 

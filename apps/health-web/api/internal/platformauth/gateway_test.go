@@ -9,10 +9,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 )
 
 type seen struct {
-	method, path, auth, host, body string
+	method, path, auth, host, traceparent, body string
 }
 
 func stubGateway(t *testing.T, handler func(w http.ResponseWriter, r *http.Request)) (*Client, *[]seen) {
@@ -20,7 +22,7 @@ func stubGateway(t *testing.T, handler func(w http.ResponseWriter, r *http.Reque
 	var calls []seen
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		calls = append(calls, seen{r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-Forwarded-Host"), string(b)})
+		calls = append(calls, seen{r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("X-Forwarded-Host"), r.Header.Get("traceparent"), string(b)})
 		handler(w, r)
 	}))
 	t.Cleanup(srv.Close)
@@ -32,7 +34,8 @@ func TestExchangeSendsTicketAndHostAndDecodesIdentity(t *testing.T) {
 		_, _ = w.Write([]byte(`{"session_handle":"v1.h","subject":"sub-1","issuer":"https://auth.nacfson.cloud/realms/platform","audience":"project-health","expires_in":3600}`))
 	})
 
-	got, err := c.Exchange(context.Background(), " t-1 ")
+	ctx := logx.WithTraceID(context.Background(), "4bf92f3577b34da6a3ce929d0e0e4736")
+	got, err := c.Exchange(ctx, " t-1 ")
 	if err != nil {
 		t.Fatalf("Exchange: %v", err)
 	}
@@ -43,6 +46,9 @@ func TestExchangeSendsTicketAndHostAndDecodesIdentity(t *testing.T) {
 	call := (*calls)[0]
 	if call.method != http.MethodPost || call.path != "/auth/exchange" || call.host != "health.nacfson.cloud" {
 		t.Fatalf("unexpected call %+v", call)
+	}
+	if call.traceparent != "00-4bf92f3577b34da6a3ce929d0e0e4736-4bf92f3577b34da6-01" {
+		t.Fatalf("traceparent = %q", call.traceparent)
 	}
 	if strings.TrimSpace(call.body) != `{"ticket":"t-1"}` {
 		t.Fatalf("body = %q", call.body)

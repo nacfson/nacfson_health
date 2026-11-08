@@ -49,7 +49,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, ctx context.Context, token
 		return AuthUser{}, false
 	}
 	if err != nil {
-		slog.Error("auth.session.store_unavailable", "error", err)
+		slog.ErrorContext(ctx, "auth.session.store_unavailable", "error", err)
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "session store unavailable")
 		return AuthUser{}, false
 	}
@@ -61,7 +61,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, ctx context.Context, token
 		writeUnauthorized(w)
 		return AuthUser{}, false
 	case err != nil:
-		slog.Warn("auth.gateway.unavailable", "error", err)
+		slog.WarnContext(ctx, "auth.gateway.unavailable", "error", err)
 		writeError(w, http.StatusServiceUnavailable, "auth_unavailable", "the sign-in service is temporarily unavailable")
 		return AuthUser{}, false
 	}
@@ -81,7 +81,7 @@ func (h *Handler) authenticate(w http.ResponseWriter, ctx context.Context, token
 		if err := h.sessions.UpdateWebSessionHandle(ctx, token, confirmed.RefreshedHandle); err != nil {
 			// The old handle stays valid until its refresh token expires
 			// (revokeRefreshToken=false), so the request can still proceed.
-			slog.Warn("auth.session.refresh_store_failed", "error", err)
+			slog.WarnContext(ctx, "auth.session.refresh_store_failed", "error", err)
 		}
 	}
 	return AuthUser{ID: sess.UserID}, true
@@ -90,9 +90,9 @@ func (h *Handler) authenticate(w http.ResponseWriter, ctx context.Context, token
 // endSession deletes a session the gateway no longer vouches for and clears
 // the browser cookie.
 func (h *Handler) endSession(ctx context.Context, w http.ResponseWriter, token, reason string) {
-	slog.Info("auth.session.rejected", "reason", reason)
+	slog.InfoContext(ctx, "auth.session.rejected", "reason", reason)
 	if err := h.sessions.DeleteWebSession(ctx, token); err != nil {
-		slog.Error("auth.session.delete_failed", "reason", reason, "error", err)
+		slog.ErrorContext(ctx, "auth.session.delete_failed", "reason", reason, "error", err)
 	}
 	clearSessionCookie(w)
 }

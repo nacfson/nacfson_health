@@ -14,11 +14,14 @@ import (
 
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/config"
 	httpapi "github.com/nacfson/nacfson_health/apps/health-web/api/internal/httpapi"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/migrations"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/platformauth"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/seed"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/store"
 )
+
+var version = "v0.0.0"
 
 const sessionPurgeInterval = time.Hour
 
@@ -45,6 +48,8 @@ func purgeExpiredSessions(ctx context.Context, st *store.Store) {
 }
 
 func main() {
+	slog.SetDefault(logx.New(os.Stderr, "health-api", version))
+
 	ctx := context.Background()
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {

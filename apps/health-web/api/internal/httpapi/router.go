@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/config"
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/store"
 )
 
@@ -21,8 +22,8 @@ type Handler struct {
 }
 
 // NewHandler builds the API router. Middleware order (outermost first):
-// CORS → auth → CSRF → routes. st serves the data routes; sessions and gateway
-// serve sign-in (in production sessions is the same *store.Store).
+// trace → CORS → auth → CSRF → routes. st serves the data routes; sessions and
+// gateway serve sign-in (in production sessions is the same *store.Store).
 func NewHandler(cfg config.Config, st *store.Store, sessions SessionStore, gateway Gateway) http.Handler {
 	h := &Handler{cfg: cfg, store: st, sessions: sessions, gateway: gateway}
 
@@ -77,7 +78,7 @@ func NewHandler(cfg config.Config, st *store.Store, sessions SessionStore, gatew
 
 	mux.HandleFunc("/", h.notFound)
 
-	return h.corsMiddleware(h.authMiddleware(h.csrfProtection(mux)))
+	return logx.Middleware(h.corsMiddleware(h.authMiddleware(h.csrfProtection(mux))))
 }
 
 // corsMiddleware answers credentialed preflights for allow-listed dev origins.
