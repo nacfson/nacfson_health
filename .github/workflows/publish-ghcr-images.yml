@@ -141,16 +141,16 @@ jobs:
           : > migrate.log
           docker run --rm --network "$NET" \
             -e DATABASE_URL="$DB_URL" \
-            --entrypoint /app/health-migrate \
+            --entrypoint /app/migrate \
             health-backend:logcheck up >> migrate.log 2>&1
           docker run --rm --network "$NET" \
             -e DATABASE_URL="$DB_URL" \
-            --entrypoint /app/health-migrate \
+            --entrypoint /app/migrate \
             health-backend:logcheck version >> migrate.log 2>&1
           docker run --rm --network "$NET" \
             -e DATABASE_URL="$DB_URL" \
             -e MIGRATIONS_PATH="/nonexistent" \
-            --entrypoint /app/health-migrate \
+            --entrypoint /app/migrate \
             health-backend:logcheck up >> migrate.log 2>&1 || true
 
           docker run --rm -i "$LOGCHECK_IMAGE" \
