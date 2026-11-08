@@ -1,11 +1,17 @@
 # 기능 구현 현황
 
-> **마지막 업데이트**: 2026-11-02 (health-web 플랫폼 게이트웨이 로그인, spec 001)
+> **마지막 업데이트**: 2026-11-08 (health-web Log Contract v3, spec 011)
 > 새 기능 완료 시 체크박스를 채우고, 백로그에 새 항목을 추가할 것.
 
 ---
 
 ## 완료된 기능 ✅
+
+### health-web Log Contract v3 (2026-11) — `nacfson_pipeline` `CONTRACT_LOG_SCHEMA.md` v3
+- [x] `apps/health-web/api/internal/logx` — `slog.JSONHandler` 래퍼 (`time` UTC 밀리초 RFC3339, `service.name`/`service.version` 주입, `error` attr → 최내부 unwrap `exception.type` + `exception.message`, `exception.stacktrace` 8 KiB 상한 + `\n…[truncated N bytes]` 표기)
+- [x] W3C `traceparent` 미들웨어 및 전파 — `httpapi.NewHandler` 진입 시 32-hex `trace_id` 추출/생성, 요청별 구조화 access log (`http.request.method`, `url.path`, `http.response.status_code`, `http.server.request.duration`, 5xx 시 `level=error`), `platformauth` 아웃바운드 호출 시 `traceparent` 전파
+- [x] `apps/health-web/frontend/nginx.conf` — `log_format contract escape=json` (`service.name: "health-web"`, `service.version` 빌드 인자 주입, `trace_id: $request_id`, 백엔드 프록시 시 `traceparent` 헤더 전파)
+- [x] `.github/workflows/publish-ghcr-images.yml` — `SERVICE_VERSION` 빌드 인자 + OCI `org.opencontainers.image.version` / `revision` 라벨 + `log-contract` CI 게이트 (`ghcr.io/nacfson/logcheck` 로 `health-migrate` / `health-api` / `health-web` 정상·오류 로그 검증)
 
 ### health-web 플랫폼 게이트웨이 로그인 (2026-11) — spec `specs/001-health-web-gateway-auth/`
 - [x] 레거시 인증 제거 — 중앙 인증 클라이언트, 레거시 세션 쿠키, 공유 검증 토큰, 관련 env 전부 삭제

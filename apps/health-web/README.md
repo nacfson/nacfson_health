@@ -9,11 +9,11 @@ SQLite + Supabase stack. There is no sync bridge yet.
 ```
 apps/health-web/
   api/        Go module github.com/nacfson/nacfson_health/apps/health-web/api
-    cmd/api     HTTP server (applies migrations + seed on start)
-    cmd/migrate manual migrate up/down/version/seed
-    internal/   config, platformauth (gateway client), store, httpapi, domain, migrations, seed
+    cmd/api     HTTP server (applies migrations + seed on start; service.name=health-api)
+    cmd/migrate manual migrate up/down/version/seed (service.name=health-migrate)
+    internal/   config, logx (Log Contract v3 slog + W3C traceparent), platformauth (gateway client), store, httpapi, domain, migrations, seed
     db/         migrations/*.sql and master_exercise_seed_v12_6.json
-  frontend/   static SPA (nginx image)
+  frontend/   static SPA (nginx image; service.name=health-web)
 ```
 
 ## Authentication
@@ -150,14 +150,21 @@ cross-compiles for the target (`TARGETOS`/`TARGETARCH`), so arm64 builds skip QE
 | `ghcr.io/nacfson/health-frontend` | `apps/health-web/frontend` | 8080 |
 
 - Platforms: `linux/amd64` + `linux/arm64` (one OCI index per tag).
-- Tags: 7-char commit SHA, plus `latest` on `main`.
-- Labels: `org.opencontainers.image.source` (this repo) and `org.opencontainers.image.revision`
-  (full commit SHA).
-- `go vet` + `go test` for the API, and `frontend/smoke-test.sh`, gate both builds. The smoke test
-  runs the SPA image the way the pipeline pod does (UID 10001, read-only rootfs, all capabilities
-  dropped, writable `/tmp` · `/var/cache/nginx` · `/var/log/nginx`) against a stub `health-backend`.
-  It checks `/`, `/healthz` and `/api/auth/config` on 8080 (the liveness, readiness and startup probe
-  paths).
+- Tags: 7-char commit SHA, `vX.Y.Z` on tag builds, plus `latest` on `main`.
+- Labels: `org.opencontainers.image.source` (this repo), `org.opencontainers.image.revision`
+  (full commit SHA), and `org.opencontainers.image.version` (`vX.Y.Z` on tag builds, or
+  `v0.0.0-<7-char-sha>` on untagged builds — never `latest`), matching `service.version` injected via
+  `--build-arg SERVICE_VERSION` (`-ldflags "-X main.version=..."` in Go, `nginx.conf` substitution in
+  frontend).
+- `go vet` + `go test` for the API, `frontend/smoke-test.sh`, and the `log-contract` job gate both
+  builds:
+  - The SPA smoke test runs the SPA image the way the pipeline pod does (UID 10001, read-only rootfs,
+    all capabilities dropped, writable `/tmp` · `/var/cache/nginx` · `/var/log/nginx`) against a stub
+    `health-backend`. It checks `/`, `/healthz` and `/api/auth/config` on 8080 (the liveness, readiness
+    and startup probe paths).
+  - The `log-contract` job validates `health-migrate`, `health-api`, and `health-web` logs (both normal
+    and handled error paths) against `nacfson_pipeline` `CONTRACT_LOG_SCHEMA.md` v3 using
+    `ghcr.io/nacfson/logcheck`.
 - Pull requests (and manual runs from other branches) build both images without logging in or
   pushing.
 - After pushing, the run re-reads the published index and fails if a platform, label, or port is

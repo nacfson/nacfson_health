@@ -7,12 +7,13 @@ FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS build
 
 WORKDIR /src
 ARG TARGETOS TARGETARCH
+ARG SERVICE_VERSION=v0.0.0
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api \
-    && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.version=${SERVICE_VERSION}" -o /out/api ./cmd/api \
+    && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X main.version=${SERVICE_VERSION}" -o /out/migrate ./cmd/migrate
 
 # --- runtime -----------------------------------------------------------------
 # Migrations run through this same image (`./migrate up` then `./migrate seed`),

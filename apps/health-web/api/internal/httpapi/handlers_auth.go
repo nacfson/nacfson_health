@@ -53,7 +53,7 @@ func (h *Handler) authConfig(w http.ResponseWriter, _ *http.Request) {
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	nonce, err := randomHex(16)
 	if err != nil {
-		slog.Error("auth.login.nonce_failed", "error", err)
+		slog.ErrorContext(r.Context(), "auth.login.nonce_failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal", "could not start sign-in")
 		return
 	}
@@ -67,7 +67,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	callback := h.cfg.AppOrigin() + "/api/auth/callback?" + q.Encode()
 	target := h.cfg.AuthOrigin() + "/oauth/start?return=" + url.QueryEscape(callback)
 
-	slog.Info("auth.login.start")
+	slog.InfoContext(r.Context(), "auth.login.start")
 	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, target, http.StatusFound)
 }
@@ -81,7 +81,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	clearCookie(w, loginCookieName)
 
 	fail := func(reason, outcome string) {
-		slog.Warn("auth.callback.failed", "reason", reason)
+		slog.WarnContext(r.Context(), "auth.callback.failed", "reason", reason)
 		http.Redirect(w, r, "/?auth="+outcome, http.StatusFound)
 	}
 
@@ -106,7 +106,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		fail("ticket_rejected", "failed")
 		return
 	case err != nil:
-		slog.Warn("auth.gateway.unavailable", "step", "exchange", "error", err)
+		slog.WarnContext(r.Context(), "auth.gateway.unavailable", "step", "exchange", "error", err)
 		fail("gateway_unavailable", "unavailable")
 		return
 	}
@@ -117,13 +117,13 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := h.sessions.EnsureUser(r.Context(), exchanged.Issuer, exchanged.Subject)
 	if err != nil {
-		slog.Error("auth.callback.store_failed", "step", "ensure_user", "error", err)
+		slog.ErrorContext(r.Context(), "auth.callback.store_failed", "step", "ensure_user", "error", err)
 		fail("store_error", "unavailable")
 		return
 	}
 	token, err := store.NewSessionToken()
 	if err != nil {
-		slog.Error("auth.callback.token_failed", "error", err)
+		slog.ErrorContext(r.Context(), "auth.callback.token_failed", "error", err)
 		fail("token_error", "unavailable")
 		return
 	}
@@ -135,7 +135,7 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:     time.Now().Add(exchanged.ExpiresIn),
 	})
 	if err != nil {
-		slog.Error("auth.callback.store_failed", "step", "create_session", "error", err)
+		slog.ErrorContext(r.Context(), "auth.callback.store_failed", "step", "create_session", "error", err)
 		fail("store_error", "unavailable")
 		return
 	}
@@ -143,12 +143,12 @@ func (h *Handler) callback(w http.ResponseWriter, r *http.Request) {
 	// Replace any session this browser already had.
 	if old := sessionTokenFromRequest(r); old != "" && old != token {
 		if err := h.sessions.DeleteWebSession(r.Context(), old); err != nil {
-			slog.Warn("auth.callback.old_session_delete_failed", "error", err)
+			slog.WarnContext(r.Context(), "auth.callback.old_session_delete_failed", "error", err)
 		}
 	}
 	setCookie(w, sessionCookieName, token, int(exchanged.ExpiresIn/time.Second))
 
-	slog.Info("auth.callback.ok", "user_id", userID.String())
+	slog.InfoContext(r.Context(), "auth.callback.ok", "user_id", userID.String())
 	http.Redirect(w, r, sanitizeNext(query.Get("next")), http.StatusFound)
 }
 
@@ -176,7 +176,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case err == nil:
 			if err := h.gateway.Revoke(r.Context(), sess.SessionHandle); err != nil {
-				slog.Warn("auth.logout.revoke_failed", "error", err)
+				slog.WarnContext(r.Context(), "auth.logout.revoke_failed", "error", err)
 				platform = "unconfirmed"
 			} else {
 				platform = "revoked"
@@ -184,16 +184,16 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, store.ErrNotFound):
 			// Already gone (expired or rejected earlier): nothing to revoke.
 		default:
-			slog.Error("auth.logout.store_failed", "error", err)
+			slog.ErrorContext(r.Context(), "auth.logout.store_failed", "error", err)
 			platform = "unconfirmed"
 		}
 		if err := h.sessions.DeleteWebSession(r.Context(), token); err != nil {
-			slog.Error("auth.logout.delete_failed", "error", err)
+			slog.ErrorContext(r.Context(), "auth.logout.delete_failed", "error", err)
 		}
 	}
 	clearSessionCookie(w)
 
-	slog.Info("auth.logout", "platform", platform)
+	slog.InfoContext(r.Context(), "auth.logout", "platform", platform)
 	writeJSON(w, http.StatusOK, logoutResponse{Status: "signed_out", Platform: platform})
 }
 

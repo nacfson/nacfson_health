@@ -15,6 +15,7 @@ name: Publish health-web images
 on:
   push:
     branches: [main]
+    tags: ["v*.*.*"]
     paths:
       - "apps/health-web/**"
       - ".github/workflows/publish-ghcr-images.yml"
@@ -70,9 +71,144 @@ jobs:
       - name: Run SPA image under the pod's security constraints
         run: bash apps/health-web/frontend/smoke-test.sh
 
+  log-contract:
+    # Exact job name required by nacfson_pipeline Gate 3 (`update-project-images`).
+    # Keep the role words "backend"/"frontend" out of this name (see api-tests).
+    name: log-contract
+    needs: [api-tests, spa-smoke]
+    runs-on: ubuntu-latest
+    env:
+      LOGCHECK_IMAGE: ghcr.io/nacfson/logcheck@sha256:68d833e925a01497d8a60a93d926ce9d2aa2aef2b31f7b31de74f68d22773573
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute service version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="v0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Build images and validate logs with logcheck
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          NET="health-logcheck-$$"
+          PG="health-pg-$$"
+          BE="health-be-$$"
+          FE="health-fe-$$"
+          PORT=18081
+
+          cleanup() {
+            docker rm -f "$FE" "$BE" "$PG" > /dev/null 2>&1 || true
+            docker network rm "$NET" > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker build --build-arg SERVICE_VERSION="$VERSION" -t health-backend:logcheck apps/health-web/api
+          docker build --build-arg SERVICE_VERSION="$VERSION" -t health-frontend:logcheck apps/health-web/frontend
+
+          docker network create "$NET" > /dev/null
+          docker run -d --name "$PG" --network "$NET" --network-alias health-pg \
+            -e POSTGRES_USER=health \
+            -e POSTGRES_PASSWORD=health \
+            -e POSTGRES_DB=health \
+            postgres:16-alpine > /dev/null
+
+          for _ in $(seq 1 30); do
+            if docker exec "$PG" pg_isready -U health -d health > /dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          DB_URL="postgres://health:health@health-pg:5432/health?sslmode=disable"
+
+          # 1. Validate health-migrate (normal + handled error paths)
+          : > migrate.log
+          docker run --rm --network "$NET" \
+            -e DATABASE_URL="$DB_URL" \
+            --entrypoint /app/health-migrate \
+            health-backend:logcheck up >> migrate.log 2>&1
+          docker run --rm --network "$NET" \
+            -e DATABASE_URL="$DB_URL" \
+            --entrypoint /app/health-migrate \
+            health-backend:logcheck version >> migrate.log 2>&1
+          docker run --rm --network "$NET" \
+            -e DATABASE_URL="$DB_URL" \
+            -e MIGRATIONS_PATH="/nonexistent" \
+            --entrypoint /app/health-migrate \
+            health-backend:logcheck up >> migrate.log 2>&1 || true
+
+          docker run --rm -i "$LOGCHECK_IMAGE" \
+            --format json \
+            --expect-version "$VERSION" \
+            --expect-service health-migrate < migrate.log
+
+          # 2. Start health-backend and health-frontend and exercise normal + error paths
+          docker run -d --name "$BE" --network "$NET" --network-alias health-backend \
+            -e DATABASE_URL="$DB_URL" \
+            -e APP_ADDR=":8080" \
+            -e PUBLIC_APP_URL="https://health.nacfson.cloud" \
+            -e PUBLIC_AUTH_URL="https://auth.nacfson.cloud" \
+            -e GATEWAY_AUTH_URL="http://127.0.0.1:19999/auth" \
+            health-backend:logcheck > /dev/null
+
+          docker run -d --name "$FE" --network "$NET" \
+            --user 10001:10001 --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --tmpfs /tmp:mode=1777 --tmpfs /var/cache/nginx:mode=1777 --tmpfs /var/log/nginx:mode=1777 \
+            -p "127.0.0.1:${PORT}:8080" \
+            health-frontend:logcheck > /dev/null
+
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/readyz"; then
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/"
+          curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/healthz"
+          curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/api/auth/config"
+          curl -sS -o /dev/null "http://127.0.0.1:${PORT}/api/auth/login"
+
+          # Trigger a real handled error (503) in both health-api and health-web
+          docker exec "$PG" psql -U health -d health -c "DROP TABLE web_sessions;" > /dev/null
+          STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -H 'Cookie: __Host-health_session=smoke-token' "http://127.0.0.1:${PORT}/api/me")"
+          if [ "$STATUS" != "503" ]; then
+            echo "::error::expected HTTP 503 on /api/me after dropping web_sessions, got $STATUS"
+            exit 1
+          fi
+
+          docker logs "$BE" > backend.log 2>&1
+          docker logs "$FE" > frontend.log 2>&1
+
+          docker run --rm -i "$LOGCHECK_IMAGE" \
+            --format json \
+            --expect-version "$VERSION" \
+            --expect-service health-api < backend.log
+
+          docker run --rm -i "$LOGCHECK_IMAGE" \
+            --format nginx \
+            --expect-version "$VERSION" \
+            --expect-service health-web < frontend.log
+
   publish:
     name: Publish ${{ matrix.role }} image
-    needs: [api-tests, spa-smoke]
+    needs: [api-tests, spa-smoke, log-contract]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -88,7 +224,7 @@ jobs:
             port: "8080"
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
-      PUBLISH: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+      PUBLISH: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -107,8 +243,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # metadata-action also emits org.opencontainers.image.source and
-      # org.opencontainers.image.revision (= github.sha); do not set them here.
+      - name: Compute service version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE:-}" == "tag" && "${GITHUB_REF_NAME:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="v0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v6
@@ -116,9 +260,12 @@ jobs:
           images: ${{ env.IMAGE }}
           tags: |
             type=sha,prefix=,format=short
+            type=semver,pattern={{raw}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.description=nacfson_health health-web ${{ matrix.role }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
           annotations: |
             index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
@@ -129,6 +276,8 @@ jobs:
           context: ${{ matrix.context }}
           platforms: linux/amd64,linux/arm64
           push: ${{ env.PUBLISH == 'true' }}
+          build-args: |
+            SERVICE_VERSION=${{ steps.version.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
@@ -140,6 +289,7 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           PORT: ${{ matrix.port }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
           REF="${IMAGE}@${DIGEST}"
@@ -152,6 +302,9 @@ jobs:
             jq -e --arg p "$p" --arg v "$GITHUB_SHA" \
               '.[$p].config.Labels["org.opencontainers.image.revision"] == $v' image.json > /dev/null \
               || { echo "::error::$p revision label != $GITHUB_SHA"; exit 1; }
+            jq -e --arg p "$p" --arg v "$VERSION" \
+              '.[$p].config.Labels["org.opencontainers.image.version"] == $v' image.json > /dev/null \
+              || { echo "::error::$p version label != $VERSION"; exit 1; }
             jq -e --arg p "$p" --arg v "$SRC" \
               '.[$p].config.Labels["org.opencontainers.image.source"] == $v' image.json > /dev/null \
               || { echo "::error::$p source label != $SRC"; exit 1; }

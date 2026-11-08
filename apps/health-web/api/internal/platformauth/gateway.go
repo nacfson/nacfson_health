@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 )
 
 var (
@@ -209,6 +211,9 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body io.Re
 	req.Header.Set("Accept", "application/json")
 	if c.appHost != "" {
 		req.Header.Set("X-Forwarded-Host", c.appHost)
+	}
+	if tid := logx.TraceIDFromContext(ctx); tid != "" {
+		req.Header.Set("traceparent", logx.FormatTraceparent(tid))
 	}
 	return req, nil
 }

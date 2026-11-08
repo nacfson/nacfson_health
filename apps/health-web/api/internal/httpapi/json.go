@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/logx"
 	"github.com/nacfson/nacfson_health/apps/health-web/api/internal/store"
 )
 
@@ -60,7 +61,7 @@ func writeStoreError(w http.ResponseWriter, err error) {
 	case errors.Is(err, store.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict", "resource already exists")
 	default:
-		slog.Error("api: store failure", "error", err)
+		slog.ErrorContext(logx.ContextFromResponseWriter(w), "api: store failure", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal", "internal error")
 	}
 }
