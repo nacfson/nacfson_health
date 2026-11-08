@@ -66,11 +66,14 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 	if len(groups) != 0 {
 		return a
 	}
+	val := a.Value.Resolve()
 	switch a.Key {
 	case slog.TimeKey:
-		return slog.String(slog.TimeKey, a.Value.Time().UTC().Format(timeLayout))
+		if val.Kind() == slog.KindTime {
+			return slog.String(slog.TimeKey, val.Time().UTC().Format(timeLayout))
+		}
 	case "exception.stacktrace":
-		return slog.String("exception.stacktrace", TruncateStacktrace(a.Value.String()))
+		return slog.String("exception.stacktrace", TruncateStacktrace(val.String()))
 	}
 	return a
 }
@@ -92,27 +95,28 @@ func (h *contractHandler) Handle(ctx context.Context, r slog.Record) error {
 	hasException := h.hasException
 
 	r.Attrs(func(a slog.Attr) bool {
+		val := a.Value.Resolve()
 		if !h.inGroup && a.Key == "error" {
-			if err, ok := a.Value.Any().(error); ok && err != nil {
+			if err, ok := val.Any().(error); ok && err != nil {
 				nr.AddAttrs(
 					slog.String("exception.type", errorType(err)),
 					slog.String("exception.message", err.Error()),
 				)
 				hasException = true
-			} else if a.Value.Any() != nil && a.Value.String() != "" {
-				nr.AddAttrs(slog.String("exception.message", a.Value.String()))
+			} else if val.Any() != nil && val.String() != "" {
+				nr.AddAttrs(slog.String("exception.message", val.String()))
 				hasException = true
 			}
 			return true
 		}
 		if !h.inGroup && a.Key == "exception.stacktrace" {
-			nr.AddAttrs(slog.String("exception.stacktrace", TruncateStacktrace(a.Value.String())))
+			nr.AddAttrs(slog.String("exception.stacktrace", TruncateStacktrace(val.String())))
 			return true
 		}
-		if !h.inGroup && (a.Key == "exception.message" || a.Key == "exception.type") && a.Value.String() != "" {
+		if !h.inGroup && (a.Key == "exception.message" || a.Key == "exception.type") && val.String() != "" {
 			hasException = true
 		}
-		if !h.inGroup && a.Key == "trace_id" && a.Value.String() != "" {
+		if !h.inGroup && a.Key == "trace_id" && val.String() != "" {
 			hasTraceID = true
 		}
 		nr.AddAttrs(a)
@@ -137,27 +141,28 @@ func (h *contractHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	hasException := h.hasException
 
 	for _, a := range attrs {
+		val := a.Value.Resolve()
 		if !h.inGroup && a.Key == "error" {
-			if err, ok := a.Value.Any().(error); ok && err != nil {
+			if err, ok := val.Any().(error); ok && err != nil {
 				transformed = append(transformed,
 					slog.String("exception.type", errorType(err)),
 					slog.String("exception.message", err.Error()),
 				)
 				hasException = true
-			} else if a.Value.Any() != nil && a.Value.String() != "" {
-				transformed = append(transformed, slog.String("exception.message", a.Value.String()))
+			} else if val.Any() != nil && val.String() != "" {
+				transformed = append(transformed, slog.String("exception.message", val.String()))
 				hasException = true
 			}
 			continue
 		}
 		if !h.inGroup && a.Key == "exception.stacktrace" {
-			transformed = append(transformed, slog.String("exception.stacktrace", TruncateStacktrace(a.Value.String())))
+			transformed = append(transformed, slog.String("exception.stacktrace", TruncateStacktrace(val.String())))
 			continue
 		}
-		if !h.inGroup && (a.Key == "exception.message" || a.Key == "exception.type") && a.Value.String() != "" {
+		if !h.inGroup && (a.Key == "exception.message" || a.Key == "exception.type") && val.String() != "" {
 			hasException = true
 		}
-		if !h.inGroup && a.Key == "trace_id" && a.Value.String() != "" {
+		if !h.inGroup && a.Key == "trace_id" && val.String() != "" {
 			hasTraceID = true
 		}
 		transformed = append(transformed, a)
